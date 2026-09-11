@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+*.sqlite
+.env
+/venv/
+/data/          # stvarni nalozi kupaca ostaju izvan repozitorija (05_NALOZI_ZA_TEST)
+*.png
