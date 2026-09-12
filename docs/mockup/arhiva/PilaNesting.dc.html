@@ -1,0 +1,160 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <title>Production Hub — Pila / nesting i export</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&amp;family=IBM+Plex+Mono:wght@500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <style>
+:root{--bg:#E7EAEE;--surface:#FFFFFF;--surface2:#F3F5F7;--ink:#14171A;--muted:#5A6470;--line:#C9D1D9;--line2:#E3E8ED;
+ --accent:#17546E;--accent-ink:#FFFFFF;--accent-soft:#DCEAF1;--addr-bg:#F5C518;--addr-ink:#1B1706;--addr-line:#8A6D02;
+ --ok:#1B6E48;--ok-soft:#DDEFE5;--warn:#9A5B06;--warn-soft:#FBEBD0;--crit:#A32017;--crit-soft:#F6DEDB;
+ --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--cond:"Barlow Condensed","IBM Plex Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.4}
+a{color:var(--accent);text-decoration:none} a:hover{color:#0f3a4d;text-decoration:underline}
+button,input,select{font:inherit;color:inherit}
+.top{background:var(--surface);border-bottom:1px solid var(--line)}
+.topin{padding:10px 24px;display:flex;align-items:center;gap:18px;flex-wrap:nowrap}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto;flex:none}
+.brand b{font-family:var(--cond);font-weight:700;font-size:26px;letter-spacing:.02em;text-transform:uppercase;white-space:nowrap}
+.brand span{font-size:12px;color:var(--muted);letter-spacing:.09em;text-transform:uppercase;white-space:nowrap}
+.tabs{display:flex;gap:6px;flex:none}
+.tab{background:transparent;border:1px solid transparent;border-radius:3px;padding:8px 12px;font-family:var(--cond);font-size:17px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;color:var(--muted)}
+.tab[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
+.user{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);border-radius:3px;padding:6px 10px;white-space:nowrap}
+.ostrip{background:var(--surface);border-bottom:1px solid var(--line)}
+.oin{padding:10px 24px;display:flex;align-items:center;gap:18px;flex-wrap:nowrap}
+.back{font-size:13px;color:var(--muted);white-space:nowrap}
+.oname{display:flex;flex-direction:column;gap:2px;flex:none}
+.oname b{font-family:var(--cond);font-size:24px;font-weight:700;letter-spacing:.02em;line-height:1.05}
+.oname span{font-size:12px;color:var(--muted);white-space:nowrap}
+.steps{display:flex;gap:5px;list-style:none;margin:0 auto;padding:0;flex:none}
+.steps li{font-family:var(--cond);font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--surface);white-space:nowrap}
+.steps li.done{border-color:var(--ok);color:var(--ok);background:var(--ok-soft)}
+.steps li.cur{border-color:var(--accent);color:var(--accent-ink);background:var(--accent)}
+.subtabs{display:flex;gap:4px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--line)}
+.subtab{padding:10px 16px;font-family:var(--cond);font-size:17px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
+.subtab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.wrap{padding:18px 24px 28px}
+h2{font-family:var(--cond);font-size:24px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;margin:0;white-space:nowrap}
+h3{font-family:var(--cond);font-size:17px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin:0 0 10px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:14px 16px}
+.row{display:flex;gap:10px;align-items:center}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:8px 14px;font-weight:500;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn.ghost{border-style:dashed;color:var(--muted)}
+.inp{background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:8px 10px;width:100%;min-height:36px;display:flex;align-items:center;gap:8px}
+.inp.ro{background:var(--surface2);color:var(--muted)}
+.inp .ph{color:#8b95a1}
+.inp.big{font-family:var(--cond);font-size:22px;font-weight:600;letter-spacing:.02em;padding:6px 12px}
+label.l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
+.fld{display:flex;flex-direction:column;gap:0}
+.mono{font-family:var(--mono);font-size:.92em;letter-spacing:-.01em}
+.muted{color:var(--muted)}
+.note{font-size:13px;color:var(--muted)}
+.tag{display:inline-block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:2px;background:var(--surface2);color:var(--muted);border:1px solid var(--line2);white-space:nowrap;font-weight:600}
+.tag.acc{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.tag.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.tag.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.tag.crit{background:var(--crit-soft);color:var(--crit);border-color:transparent}
+.tag.nest{background:#1E3A4A;color:#fff;border-color:transparent}
+.tag.pila{background:#5A6470;color:#fff;border-color:transparent}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px;white-space:nowrap}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+table{border-collapse:collapse;width:100%}
+th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;font-weight:600}
+td{padding:7px 10px;border-bottom:1px solid var(--line2);vertical-align:middle;font-variant-numeric:tabular-nums}
+td.num,th.num{text-align:right}
+td.nw{white-space:nowrap}
+.btn.wrap{white-space:normal;text-align:left}
+tr.sel td{background:var(--accent-soft)}
+tr.grp td{background:var(--surface2);font-family:var(--cond);font-size:16px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--ink)}
+.addr{display:inline-block;background:var(--addr-bg);color:var(--addr-ink);border:1px solid var(--addr-line);border-radius:2px;font-family:var(--cond);font-weight:700;letter-spacing:.06em;padding:1px 8px;font-size:15px;white-space:nowrap}
+.kpi{display:flex;flex-direction:column;gap:2px}
+.kpi b{white-space:nowrap;font-family:var(--cond);font-size:24px;font-weight:700;letter-spacing:.02em;line-height:1;font-variant-numeric:tabular-nums}
+.kpi span{white-space:nowrap;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rub{display:inline-grid;grid-template-columns:14px 22px 14px;grid-template-rows:12px 16px 12px;gap:1px;vertical-align:middle}
+.rub i{display:block;background:var(--line2);border-radius:1px}
+.rub i.on{background:var(--accent)}
+.rub i.m{background:var(--warn)}
+.rub i.c{background:transparent}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--line);margin-right:6px;vertical-align:middle}
+.dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.crit{background:var(--crit)} .dot.acc{background:var(--accent)}
+.stripe{border-left:4px solid var(--accent)}
+.stripe.warn{border-left-color:var(--warn)} .stripe.ok{border-left-color:var(--ok)} .stripe.crit{border-left-color:var(--crit)}
+.list{display:flex;flex-direction:column;gap:8px}
+.kbd{display:inline-block;min-width:20px;text-align:center;background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:0 5px;font-family:var(--mono);font-weight:600;font-size:12px}
+.cb{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.cb i{width:16px;height:16px;border:1px solid var(--line);border-radius:3px;background:var(--surface);display:inline-block}
+.cb i.on{background:var(--accent);border-color:var(--accent)}
+.radio{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.radio i{width:16px;height:16px;border:1px solid var(--line);border-radius:50%;background:var(--surface);display:inline-block}
+.radio i.on{border:5px solid var(--accent)}
+.foot{font-size:12px;color:var(--muted);padding:10px 24px;border-top:1px solid var(--line2)}
+</style>
+</helmet>
+<div style="width: 1440px; min-height: 1040px; background: #E7EAEE; display: flex; flex-direction: column;">
+<div class="top"><div class="topin"><div class="brand"><b>Production Hub</b><span>Paneli projekt · mockup v0.1</span></div><nav class="tabs" style="display: flex; gap: 6px;"><button class="tab" aria-current="page">Nalozi</button><button class="tab">Šifrarnici</button><button class="tab">Skladište</button><button class="tab">Obračun</button><button class="tab">Postavke</button></nav><div class="user">IVANA</div></div></div><div class="ostrip"><div class="oin"><a class="back" href="#">← Nalozi</a><div class="oname"><b>HUMER_2823_OMIS <span class="tag" style="vertical-align: middle;">v3</span></b><span>2026-02823 · Mario Humer · ponuda 26-010-002823</span></div><ol class="steps" style="display: flex; gap: 6px;"><li class="done">Unos</li><li class="done">Provjera</li><li class="cur">Optimirano</li><li class="">Ponuda</li><li class="">Proizvodnja</li><li class="">Zatvoren</li></ol><div class="row" style="display: flex; gap: 10px;"><button class="btn">Dnevnik</button><button class="btn pri">Potvrdi put</button></div></div></div><div class="subtabs" style="display: flex; gap: 4px;"><div class="subtab">1 · Zaglavlje i elementi</div><div class="subtab on">2 · Pila / nesting i export</div><div class="subtab">3 · Obračun → ponuda</div></div>
+<div class="wrap" style="display: flex; flex-direction: column; gap: 14px;">
+  <div class="row" style="display: flex; gap: 12px; align-items: center;">
+    <h2>Pila / nesting i export</h2>
+    <span class="note">Hub predlaže put po materijalu (pravilo iz prakse), voditelj proizvodnje potvrđuje; export nastaje iz istog naloga bez prekucavanja.</span>
+    <div style="flex: 1;"></div>
+    <span class="user">voditelj proizvodnje</span>
+  </div>
+  <div class="card" style="padding: 0;">
+    <table>
+      <thead><tr><th>Materijal</th><th class="num">Stavki / kom</th><th class="num">m² dijelova</th><th>Hub prijedlog</th><th>Put (voditelj)</th><th class="num">Ploče (PW-metoda)</th><th>Skladište</th><th>Export</th><th>Rezultat sa stroja</th></tr></thead>
+      <tbody><tr><td class="nw"><b>IV BIJELI NK 18</b><br><span class="note mono">IV000090 · W908ST2-18</span></td><td class="num nw">53 / 174</td><td class="num">50,37</td><td><span class="tag nest">nesting</span><br><span class="note">iveral, 50 m² ≫ 1 ploča</span></td><td><div class="row" style="display: flex; gap: 10px;"><span class="radio"><i class=""></i> Pila</span> <span class="radio"><i class="on"></i> Nesting</span></div></td><td class="num">10 · 57,96 m²</td><td><span class="dot ok"></span>Winstore <b>13</b> ploča</td><td><span class="tag ok">CSV + CIX</span> <span class="mono">H0001201–H0001253</span><br><span class="note">11.09. 08:17 · IV_BIJELI_NK_18 · 53 CIX</span></td><td><span class="dot ok"></span><b>9 ploča</b> · 95,4 % <span class="note">(.mno 11.09. 08:31)</span><br><span class="note">ostatak zadnje ploče → prijedlog restla</span></td></tr><tr><td class="nw"><b>IV JELA TAVERNA 19</b><br><span class="note mono">IV001210 · K2665AI-19</span></td><td class="num nw">35 / 48</td><td class="num">25,57</td><td><span class="tag nest">nesting</span><br><span class="note">iveral s godom, 25,6 m²</span></td><td><div class="row" style="display: flex; gap: 10px;"><span class="radio"><i class=""></i> Pila</span> <span class="radio"><i class="on"></i> Nesting</span></div></td><td class="num">6 · 30,16 m²</td><td><span class="dot warn"></span>Winstore <b>0</b> ploča · restl „IV JELA“ 2×</td><td><span class="tag ok">CSV + CIX</span> <span class="mono">H0001254–H0001288</span><br><span class="note">11.09. 08:32 · 35 CIX · god = 1</span></td><td><span class="dot ok"></span><b>5 ploča</b> · 88,2 % <span class="note">(.mno 11.09. 08:40)</span><br><span class="note">po ploči 94,9 / 93,8 / 93,2 / 92,1 / 67,2 %</span></td></tr><tr><td class="nw"><b>MDF BIJELI 3</b><br><span class="note mono">IV000054 · XXX</span></td><td class="num nw">22 / 27</td><td class="num">16,09</td><td><span class="tag pila">pila</span><br><span class="note">MDF 3 mm uvijek pila</span></td><td><div class="row" style="display: flex; gap: 10px;"><span class="radio"><i class="on"></i> Pila</span> <span class="radio"><i class=""></i> Nesting</span></div></td><td class="num">4 · 18,49 m²</td><td><span class="dot ok"></span>skladište ploča: <b>26</b> · restl 0</td><td><span class="tag ok">CPO</span> <span class="mono">HUB_00904</span> → <span class="mono">Z:\Krojne_liste</span><br><span class="note">kerf 5 u CPO, shema kao za obračun (D-21) · PNG sheme</span></td><td><span class="dot acc"></span>na pili (OSI) — čeka se rezanje<br><span class="note">etikete printa OSI (D-25)</span></td></tr><tr><td class="nw"><b>IV BIJELI NK 16</b><br><span class="note mono">IV000002 · W908ST2-16</span></td><td class="num nw">10 / 28</td><td class="num">4,60</td><td><span class="tag pila">pila</span><br><span class="note">&lt; 1 ploče (4,6 m²)</span></td><td><div class="row" style="display: flex; gap: 10px;"><span class="radio"><i class="on"></i> Pila</span> <span class="radio"><i class=""></i> Nesting</span></div></td><td class="num">1 · 5,80 m²</td><td><span class="dot warn"></span>Winstore <b>0</b> · restl 0 → <a href="#">rezerviraj / nabavi</a></td><td><span class="tag">CPO</span> <span class="mono">HUB_00905</span> <span class="note">— generira se nakon potvrde</span></td><td><span class="muted">—</span></td></tr><tr><td class="nw"><b>IV HRAST RELIEF CARDAMOM 19</b><br><span class="note mono">IV001219 · K2776GR-19</span></td><td class="num nw">1 / 1</td><td class="num">1,95</td><td><span class="tag pila">pila</span><br><span class="note">1 element, 1,95 m²</span></td><td><div class="row" style="display: flex; gap: 10px;"><span class="radio"><i class="on"></i> Pila</span> <span class="radio"><i class=""></i> Nesting</span></div></td><td class="num">1 · 2,73 m²</td><td><span class="dot warn"></span>restl za ovaj dekor: <b>nema</b> → cijela ploča</td><td><span class="tag">CPO</span> <span class="mono">HUB_00906</span></td><td><span class="muted">—</span></td></tr><tr><td class="nw"><b>RP BASANIT SAND</b><br><span class="note mono">RP000259 · —</span></td><td class="num nw">2 / 2</td><td class="num">4,99 m</td><td><span class="tag pila">pila</span><br><span class="note">radna ploča 4100 × 600</span></td><td><div class="row" style="display: flex; gap: 10px;"><span class="radio"><i class="on"></i> Pila</span> <span class="radio"><i class=""></i> Nesting</span></div></td><td class="num">2 kom</td><td><span class="dot ok"></span>RP na skladištu: <b>3</b></td><td><span class="tag">CPO</span> <span class="mono">HUB_00907</span> <span class="note">obrub 0 (radna ploča)</span></td><td><span class="muted">—</span></td></tr></tbody>
+    </table>
+    <div class="foot">Pravilo (odgovor 8, 11.9.): pila = MDF 3 mm, radne / zidne / compact ploče, restlovi i nalozi ispod jedne pune ploče; sve ostalo nesting. Ploče za obračun uvijek PW-metodom (D-18), bez obzira na put.</div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px;">
+    <div class="card" style="display: flex; flex-direction: column; gap: 10px;">
+      <h3>Export datoteka (iz naloga, ne iz PPNEST-a)</h3>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+        <div class="card stripe" style="background: #F3F5F7; display: flex; flex-direction: column; gap: 6px;">
+          <b>bNest — nesting</b>
+          <span class="note">CSV (28 stupaca, SIFRA MAT = Winstore kod) + 1 CIX po elementu u stilu operatera: ulaz na L/2, 8D ≤ 19 mm / 14 do 26 mm, 2 prolaza. Imena CIX iz globalnog brojača <span class="mono">H0001234</span>, nikad se ne ponavljaju (D-23).</span>
+          <span class="note">Mapa: <span class="mono">C:\PPNESTING\Humer\NESTING\</span></span>
+          <button class="btn pri sm wrap">Generiraj CSV + CIX (2 materijala)</button>
+        </div>
+        <div class="card stripe" style="background: #F3F5F7; display: flex; flex-direction: column; gap: 6px;">
+          <b>Pila — OSI (Sektor 450)</b>
+          <span class="note">Hub složi shemu (kerf 16 za obračun, u CPO upisuje 5) i piše <span class="mono">HUB_00904.cpo</span> izravno u <span class="mono">Z:\Krojne_liste</span>; uz CPO ide PNG sheme za operatera. Nazivi bez Š Č Ć (PW/OSI).</span>
+          <span class="note">Brojač programa: <span class="mono">HUB_xxxxx</span>, neovisan o I_/SA_ (D-22)</span>
+          <button class="btn pri sm wrap">Pošalji na pilu (4 materijala)</button>
+        </div>
+        <div class="card stripe" style="background: #F3F5F7; display: flex; flex-direction: column; gap: 6px;">
+          <b>PanelWizard — paralelni rad</b>
+          <span class="note">Dok traje paralelni rad (D-11, najmanje 1 mjesec) Hub piše i CPW za PW (zaglavlje jednom, rubovi duža1·kraća1·duža2·kraća2). Ponuda u tom razdoblju iz PW brojki.</span>
+          <span class="note">Provjera: PW količine = Hub količine → 50 naloga bez razlike = prekidač</span>
+          <button class="btn sm wrap">Generiraj CPW (6 datoteka)</button>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="display: flex; flex-direction: column; gap: 8px;">
+      <h3>Rezultati sa strojeva (watcher na mape)</h3>
+      <div class="list" style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="row" style="display: flex; gap: 10px;"><span class="note mono" style="width: 100px; white-space: nowrap; flex: none;">11.09. 08:40</span><span class="dot ok"></span><span>bNest .mno <b>K2665AI-19</b>: 5 ploča, 88,2 % — 1 ostatak ≥ 400×400 → <a href="#">predloži restl</a></span></div>
+        <div class="row" style="display: flex; gap: 10px;"><span class="note mono" style="width: 100px; white-space: nowrap; flex: none;">11.09. 08:31</span><span class="dot ok"></span><span>bNest .mno <b>W908ST2-18</b>: 9 ploča, 95,4 %</span></div>
+        <div class="row" style="display: flex; gap: 10px;"><span class="note mono" style="width: 100px; white-space: nowrap; flex: none;">11.09. 08:20</span><span class="dot acc"></span><span>CPO <b>HUB_00904</b> zapisan u Z:\Krojne_liste (MDF 3 mm, 4 ploče)</span></div>
+        <div class="row" style="display: flex; gap: 10px;"><span class="note mono" style="width: 100px; white-space: nowrap; flex: none;">18.08. 17:52</span><span class="dot"></span><span>PW CPO I_01911–I_01916 učitani (paralelni rad): 24 ploče, 115,14 m² za naplatu</span></div>
+      </div>
+      <div class="note">Stvarna potrošnja (nesting 9 + 5 ploča) evidentira se uz nalog, ali ne mijenja ponudu (D-18) — razlika je interni izvještaj.</div>
+      <div class="row" style="display: flex; gap: 8px;"><button class="btn sm"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><path d="M2 5 8 2l6 3v6l-6 3-6-3V5z"/><path d="M2 5l6 3 6-3M8 8v6"/></svg> Restlovi za upis (2)</button><button class="btn sm"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><path d="M4 6V2h8v4M4 12H2V6h12v6h-2"/><rect x="4" y="9" width="8" height="5"/></svg> Sheme PNG</button></div>
+    </div>
+  </div>
+</div>
+</div>
+</x-dc>
+</body>
+</html>

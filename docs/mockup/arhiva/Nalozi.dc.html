@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <title>Production Hub — Nalozi</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&amp;family=IBM+Plex+Mono:wght@500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <style>
+:root{--bg:#E7EAEE;--surface:#FFFFFF;--surface2:#F3F5F7;--ink:#14171A;--muted:#5A6470;--line:#C9D1D9;--line2:#E3E8ED;
+ --accent:#17546E;--accent-ink:#FFFFFF;--accent-soft:#DCEAF1;--addr-bg:#F5C518;--addr-ink:#1B1706;--addr-line:#8A6D02;
+ --ok:#1B6E48;--ok-soft:#DDEFE5;--warn:#9A5B06;--warn-soft:#FBEBD0;--crit:#A32017;--crit-soft:#F6DEDB;
+ --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--cond:"Barlow Condensed","IBM Plex Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.4}
+a{color:var(--accent);text-decoration:none} a:hover{color:#0f3a4d;text-decoration:underline}
+button,input,select{font:inherit;color:inherit}
+.top{background:var(--surface);border-bottom:1px solid var(--line)}
+.topin{padding:10px 24px;display:flex;align-items:center;gap:18px;flex-wrap:nowrap}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto;flex:none}
+.brand b{font-family:var(--cond);font-weight:700;font-size:26px;letter-spacing:.02em;text-transform:uppercase;white-space:nowrap}
+.brand span{font-size:12px;color:var(--muted);letter-spacing:.09em;text-transform:uppercase;white-space:nowrap}
+.tabs{display:flex;gap:6px;flex:none}
+.tab{background:transparent;border:1px solid transparent;border-radius:3px;padding:8px 12px;font-family:var(--cond);font-size:17px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;color:var(--muted)}
+.tab[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
+.user{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);border-radius:3px;padding:6px 10px;white-space:nowrap}
+.ostrip{background:var(--surface);border-bottom:1px solid var(--line)}
+.oin{padding:10px 24px;display:flex;align-items:center;gap:18px;flex-wrap:nowrap}
+.back{font-size:13px;color:var(--muted);white-space:nowrap}
+.oname{display:flex;flex-direction:column;gap:2px;flex:none}
+.oname b{font-family:var(--cond);font-size:24px;font-weight:700;letter-spacing:.02em;line-height:1.05}
+.oname span{font-size:12px;color:var(--muted);white-space:nowrap}
+.steps{display:flex;gap:5px;list-style:none;margin:0 auto;padding:0;flex:none}
+.steps li{font-family:var(--cond);font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--surface);white-space:nowrap}
+.steps li.done{border-color:var(--ok);color:var(--ok);background:var(--ok-soft)}
+.steps li.cur{border-color:var(--accent);color:var(--accent-ink);background:var(--accent)}
+.subtabs{display:flex;gap:4px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--line)}
+.subtab{padding:10px 16px;font-family:var(--cond);font-size:17px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
+.subtab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.wrap{padding:18px 24px 28px}
+h2{font-family:var(--cond);font-size:24px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;margin:0;white-space:nowrap}
+h3{font-family:var(--cond);font-size:17px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin:0 0 10px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:14px 16px}
+.row{display:flex;gap:10px;align-items:center}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:8px 14px;font-weight:500;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn.ghost{border-style:dashed;color:var(--muted)}
+.inp{background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:8px 10px;width:100%;min-height:36px;display:flex;align-items:center;gap:8px}
+.inp.ro{background:var(--surface2);color:var(--muted)}
+.inp .ph{color:#8b95a1}
+.inp.big{font-family:var(--cond);font-size:22px;font-weight:600;letter-spacing:.02em;padding:6px 12px}
+label.l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
+.fld{display:flex;flex-direction:column;gap:0}
+.mono{font-family:var(--mono);font-size:.92em;letter-spacing:-.01em}
+.muted{color:var(--muted)}
+.note{font-size:13px;color:var(--muted)}
+.tag{display:inline-block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:2px;background:var(--surface2);color:var(--muted);border:1px solid var(--line2);white-space:nowrap;font-weight:600}
+.tag.acc{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.tag.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.tag.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.tag.crit{background:var(--crit-soft);color:var(--crit);border-color:transparent}
+.tag.nest{background:#1E3A4A;color:#fff;border-color:transparent}
+.tag.pila{background:#5A6470;color:#fff;border-color:transparent}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px;white-space:nowrap}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+table{border-collapse:collapse;width:100%}
+th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;font-weight:600}
+td{padding:7px 10px;border-bottom:1px solid var(--line2);vertical-align:middle;font-variant-numeric:tabular-nums}
+td.num,th.num{text-align:right}
+td.nw{white-space:nowrap}
+.btn.wrap{white-space:normal;text-align:left}
+tr.sel td{background:var(--accent-soft)}
+tr.grp td{background:var(--surface2);font-family:var(--cond);font-size:16px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--ink)}
+.addr{display:inline-block;background:var(--addr-bg);color:var(--addr-ink);border:1px solid var(--addr-line);border-radius:2px;font-family:var(--cond);font-weight:700;letter-spacing:.06em;padding:1px 8px;font-size:15px;white-space:nowrap}
+.kpi{display:flex;flex-direction:column;gap:2px}
+.kpi b{white-space:nowrap;font-family:var(--cond);font-size:24px;font-weight:700;letter-spacing:.02em;line-height:1;font-variant-numeric:tabular-nums}
+.kpi span{white-space:nowrap;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rub{display:inline-grid;grid-template-columns:14px 22px 14px;grid-template-rows:12px 16px 12px;gap:1px;vertical-align:middle}
+.rub i{display:block;background:var(--line2);border-radius:1px}
+.rub i.on{background:var(--accent)}
+.rub i.m{background:var(--warn)}
+.rub i.c{background:transparent}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--line);margin-right:6px;vertical-align:middle}
+.dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.crit{background:var(--crit)} .dot.acc{background:var(--accent)}
+.stripe{border-left:4px solid var(--accent)}
+.stripe.warn{border-left-color:var(--warn)} .stripe.ok{border-left-color:var(--ok)} .stripe.crit{border-left-color:var(--crit)}
+.list{display:flex;flex-direction:column;gap:8px}
+.kbd{display:inline-block;min-width:20px;text-align:center;background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:0 5px;font-family:var(--mono);font-weight:600;font-size:12px}
+.cb{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.cb i{width:16px;height:16px;border:1px solid var(--line);border-radius:3px;background:var(--surface);display:inline-block}
+.cb i.on{background:var(--accent);border-color:var(--accent)}
+.radio{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.radio i{width:16px;height:16px;border:1px solid var(--line);border-radius:50%;background:var(--surface);display:inline-block}
+.radio i.on{border:5px solid var(--accent)}
+.foot{font-size:12px;color:var(--muted);padding:10px 24px;border-top:1px solid var(--line2)}
+</style>
+</helmet>
+<div style="width: 1440px; min-height: 860px; background: #E7EAEE; display: flex; flex-direction: column;">
+<div class="top"><div class="topin"><div class="brand"><b>Production Hub</b><span>Paneli projekt · mockup v0.1</span></div><nav class="tabs" style="display: flex; gap: 6px;"><button class="tab" aria-current="page">Nalozi</button><button class="tab">Šifrarnici</button><button class="tab">Skladište</button><button class="tab">Obračun</button><button class="tab">Postavke</button></nav><div class="user">IVANA</div></div></div>
+<div class="wrap" style="display: flex; flex-direction: column; gap: 14px;">
+  <div class="row" style="display: flex; gap: 12px; align-items: center;">
+    <h2>Nalozi</h2>
+    <span class="note">danas 3 nova · ovaj tjedan 41 · u proizvodnji 2</span>
+    <div style="flex: 1;"></div>
+    <div class="inp" style="width: 300px;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#5A6470" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span class="ph">traži: nalog, kupac, ponuda, materijal…</span></div>
+    <button class="btn"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><path d="M8 11V3M4.5 6.5 8 3l3.5 3.5M3 13h10"/></svg> Uvezi CPW / Excel / foto</button>
+    <button class="btn pri"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><path d="M8 3v10M3 8h10"/></svg> Novi nalog</button>
+  </div>
+  <div class="chips" style="display: flex; gap: 6px;">
+    <span class="chip on">Svi 10</span><span class="chip">Unos 1</span><span class="chip">Provjera 0</span><span class="chip">Optimirano 1</span><span class="chip">Ponuda 3</span><span class="chip">Proizvodnja 2</span><span class="chip">Zatvoren 3</span>
+    <span style="width: 18px;"></span>
+    <span class="chip">Moji (IVANA)</span><span class="chip">Čeka odluku pila/nesting</span><span class="chip">S upozorenjem</span>
+  </div>
+  <div class="card" style="padding: 0;">
+    <table>
+      <thead><tr><th>Nalog</th><th>Kupac</th><th>Datum</th><th>Izradio</th><th class="num">Mat.</th><th class="num">Stavki / kom</th><th class="num">m² dijelova</th><th>Put</th><th>Ponuda (Pantheon)</th><th>Status</th></tr></thead>
+      <tbody><tr><td><span class="muted">— novi (bez imena) —</span> <span class="tag warn"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><path d="M8 2 14.5 13.5h-13L8 2z"/><path d="M8 6.5v3.5M8 12v.5"/></svg> Rukopis: 4 elementa za provjeru</span></td><td>Bogdanić (rukopis, 3 str.)</td><td>11.09.2026</td><td>GORAN</td><td class="num">—</td><td class="num">— / —</td><td class="num">—</td><td class="nw"><span class="tag">—</span></td><td><span class="muted">—</span></td><td><span class="tag warn">Unos</span></td></tr><tr class="sel"><td><b class="mono" style="font-size: 14px;">HUMER_2823_OMIS</b></td><td>Mario Humer</td><td>18.08.2026</td><td>IVANA</td><td class="num">6</td><td class="num">123 / 280</td><td class="num">103,1</td><td class="nw"><span class="tag nest">nesting</span> <span class="tag pila">pila</span></td><td><span class="mono">26-010-002823</span></td><td><span class="tag acc">Optimirano</span></td></tr><tr><td><b class="mono" style="font-size: 14px;">MAZUR_3258_16</b></td><td>Mazur</td><td>04.09.2026</td><td>IVANA</td><td class="num">7</td><td class="num">71 / 186</td><td class="num">57,9</td><td class="nw"><span class="tag nest">nesting</span></td><td><span class="mono">26-010-003258</span></td><td><span class="tag acc">Ponuda</span></td></tr><tr><td><b class="mono" style="font-size: 14px;">BRATEK_3231</b></td><td>Bratek (Excel narudžba)</td><td>27.08.2026</td><td>GORAN</td><td class="num">4</td><td class="num">46 / 118</td><td class="num">49,3</td><td class="nw"><span class="tag nest">nesting</span></td><td><span class="mono">26-010-003231</span></td><td><span class="tag acc">Ponuda</span></td></tr><tr><td><b class="mono" style="font-size: 14px;">BOGDANIC_3217_IVA</b></td><td>Bogdanić</td><td>01.09.2026</td><td>IVANA</td><td class="num">5</td><td class="num">86 / 158</td><td class="num">56,7</td><td class="nw"><span class="tag nest">nesting</span></td><td><span class="mono">26-010-003217</span></td><td><span class="tag ok">Proizvodnja</span></td></tr><tr><td><b class="mono" style="font-size: 14px;">VARGA_3213_POTNJANI</b></td><td>Varga</td><td>29.08.2026</td><td>GORAN</td><td class="num">7</td><td class="num">75 / 129</td><td class="num">33,9</td><td class="nw"><span class="tag nest">nesting</span> <span class="tag pila">pila</span></td><td><span class="mono">26-010-003213</span></td><td><span class="tag ok">Proizvodnja</span></td></tr><tr><td><b class="mono" style="font-size: 14px;">BLAGO_3166_JASA</b></td><td>Blago</td><td>28.08.2026</td><td>IVANA</td><td class="num">2</td><td class="num">18 / 32</td><td class="num">6,0</td><td class="nw"><span class="tag pila">pila</span></td><td><span class="mono">26-010-003166</span></td><td><span class="tag ">Zatvoren</span></td></tr><tr><td><b class="mono" style="font-size: 14px;">BLAGO_2929_ADRIJANA</b> <span class="tag warn"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><path d="M8 2 14.5 13.5h-13L8 2z"/><path d="M8 6.5v3.5M8 12v.5"/></svg> 2 materijala bez stavke u ponudi</span></td><td>Blago</td><td>20.08.2026</td><td>IVANA</td><td class="num">8</td><td class="num">75 / 159</td><td class="num">53,6</td><td class="nw"><span class="tag nest">nesting</span></td><td><span class="mono">26-010-002929</span></td><td><span class="tag acc">Ponuda</span></td></tr><tr><td><b class="mono" style="font-size: 14px;">TURALIJA_2924_TUKA</b></td><td>Turalija</td><td>19.08.2026</td><td>GORAN</td><td class="num">5</td><td class="num">25 / 43</td><td class="num">12,7</td><td class="nw"><span class="tag pila">pila</span></td><td><span class="mono">26-010-002924</span></td><td><span class="tag ">Zatvoren</span></td></tr><tr><td><b class="mono" style="font-size: 14px;">ROMIC_2423</b></td><td>Romić</td><td>10.06.2026</td><td>IVANA</td><td class="num">6</td><td class="num">8 / 10</td><td class="num">6,7</td><td class="nw"><span class="tag pila">pila</span></td><td><span class="mono">26-010-002423</span></td><td><span class="tag ">Zatvoren</span></td></tr></tbody>
+    </table>
+    <div class="foot">Jedan redak = jedan nalog kroz cijeli lanac (unos → pila/nesting → obračun → ponuda). Nalog, PW program, bNest projekt i ponuda vezani su Hub brojem (2026-02823), ne samo imenom PREZIME_BROJ.</div>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
+    <div class="card stripe warn"><h3>Čeka odluku</h3><div class="note">HUMER_2823_OMIS — voditelj: pila ili nesting za 6 materijala (Hub predložio)</div></div>
+    <div class="card stripe crit"><h3>Upozorenja</h3><div class="note">BLAGO_2929_ADRIJANA — 2 materijala izrezana, a bez stavke u ponudi (24,1 m²)</div></div>
+    <div class="card stripe acc"><h3>Rezultati sa strojeva</h3><div class="note">bNest: 2 nova .mno (HUMER) · pila: 4 CPO poslana u Z:\Krojne_liste</div></div>
+    <div class="card stripe ok"><h3>Skladište</h3><div class="note">Winstore izvoz 11.09. učitan (374 ploče) · restlovi: 1.589 kom, 2 nova prijedloga iz nestinga</div></div>
+  </div>
+</div>
+</div>
+</x-dc>
+</body>
+</html>

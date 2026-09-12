@@ -19,7 +19,7 @@ naplata = Σ ploča − Σ korisnih ostataka; trake = Σ stranica × 1,10). Ponu
 | I_01913 | IV BIJELI NK 18MM | 53 | 174 | 50.37 | ne | 10 | 57.96 | 11 | 58.98 (uzduzno) | IV000090 | 57.96 M2 | +0.00 |
 | I_01914 | MDF BIJELI 3MM | 22 | 27 | 16.09 | ne | 4 | 18.49 | 4 | 20.87 (poprecno) | IV000054 | 18.49 M2 | +0.00 |
 | I_01915 | IV JELA TAVERNA 19MM | 35 | 48 | 25.57 | da | 6 | 30.16 | 6 | 30.89 (uzduzno) | IV001210 | 30.97 M2 | +0.81 |
-| I_01916 | RP BASANIT SAND | 2 | 2 | 4.49 | da | 2 | 7.38 | 2 | 7.38 (uzduzno) | RP000259 | 2.4 M | RP po dužnom m: elementi 4.99 m |
+| I_01916 | RP BASANIT SAND | 2 | 2 | 4.49 | da | 2 | 7.38 | 2 | 7.38 (uzduzno) | RP000136 PLOČA STOLA CIJELA | 2 KOM | = D-37b (900 mm → 2 × cijela); *ispravak 12.9.*: 2,4 M RP000259 je zasebna stavka izvan CPO-a |
 
 Ukupno ploče (bez RP/ZO): **PW 115.14 m² · Hub 119.27 m² · ponuda 116.20 m²**
 
@@ -90,7 +90,7 @@ Stavke traka u ponudi: TR000168 ABS 1/22 BIJELI NK 11 m; TR001163 ABS 1/22 CHAMP
 | SA_015893 | IV HR SONOMA 25mm | 2 | 2 | 0.60 | da | 1 | 1.24 | 1 | 1.24 (uzduzno) | IV000351 | 1.24 M2 | +0.00 |
 | SA_015894 | IV BIJELI NK 18mm | 1 | 2 | 0.40 | ne | 1 | 0.74 | 1 | 0.74 (poprecno) | IV000090 | 0.74 M2 | +0.00 |
 | SA_015895 | MDF BIJELI 3mm | 1 | 2 | 0.36 | ne | 1 | 0.72 | 1 | 0.72 (poprecno) | IV000054 | 0.72 M2 | +0.00 |
-| SA_015896 | RP HR SONOMA | 2 | 2 | 2.59 | da | 2 | 2.61 | 2 | 4.92 (uzduzno) | RP000068 | 4.41 M | RP po dužnom m: elementi 4.31 m |
+| SA_015896 | RP HR SONOMA | 2 | 2 | 2.59 | da | 2 | 2.61 | 2 | 4.92 (uzduzno) | RP000068 | 4.41 M | D-37a (600 mm, po metru): elementi 2,01 + 2,30 = 4,31 m; +0,10 m u ponudi — provjeriti |
 
 Ukupno ploče (bez RP/ZO): **PW 6.37 m² · Hub 6.37 m² · ponuda 6.37 m²**
 

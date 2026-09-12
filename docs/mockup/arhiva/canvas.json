@@ -1,0 +1,144 @@
+{
+  "artboards": [
+    {
+      "file": "Nalozi.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 960,
+      "title": "1 · Nalozi (popis)"
+    },
+    {
+      "file": "Main.dc.html",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 1660,
+      "title": "2 · Unos naloga (v0.2 — kompaktno, daska kao PPNEST)"
+    },
+    {
+      "file": "MainPaneli.dc.html",
+      "x": 1560,
+      "y": 1800,
+      "w": 1440,
+      "h": 1500,
+      "title": "2b · Unos naloga — paneli na klik"
+    },
+    {
+      "file": "PilaNesting.dc.html",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 1380,
+      "title": "3 · Pila / nesting i export"
+    },
+    {
+      "file": "Obracun.dc.html",
+      "x": 4680,
+      "y": 0,
+      "w": 1440,
+      "h": 2080,
+      "title": "4 · Obračun → ponuda"
+    },
+    {
+      "file": "MainBrandB.dc.html",
+      "x": 3120,
+      "y": 1800,
+      "w": 1440,
+      "h": 1660,
+      "title": "2B · Unos naloga — varijanta B: logo + tamno zaglavlje, narančasta samo kao naglasak"
+    },
+    {
+      "file": "MainC.dc.html",
+      "x": 6240,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "C · Unos naloga — neovisan UX prijedlog (tablica + inspektor, sve na jednom ekranu)"
+    },
+    {
+      "file": "MainD.dc.html",
+      "x": 7800,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "D · Unos naloga — HIBRID: raspored iz C + daska iz B + brand"
+    },
+    {
+      "file": "MainDOkov.dc.html",
+      "x": 7800,
+      "y": 1140,
+      "w": 1440,
+      "h": 1000,
+      "title": "D · Okov i obrade — isti raspored, lijevo se bira grupa „Okov“"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "kako-citati",
+      "x": 0,
+      "y": -330,
+      "w": 700,
+      "text": "KAKO ČITATI\n4 ekrana = tok jednog naloga slijeva nadesno: 1 popis naloga → 2 unos (zaglavlje, materijali, elementi) → 3 pila / nesting i export → 4 obračun → ponuda.\nPrimjer je stvarni nalog HUMER_2823_OMIS (ponuda 26-010-002823): broj ploča, m², metri traka, Winstore stanje i cijene su iz audita 11. 9. 2026.; datumi, statusi i vremena u popisu su ilustracija.\nIzgled = kao Regal traka (isti fontovi i boje), da djelatnici imaju jedan poznati izgled.\nv0.2 (12. 9.): ekran 2 pojednostavljen po Igorovoj napomeni; ekran 2b prikazuje panele koji se otvaraju na klik."
+    },
+    {
+      "id": "pitanja-popis",
+      "x": 760,
+      "y": -330,
+      "w": 660,
+      "text": "PITANJA ZA SASTANAK — popis naloga\n1. Tko otvara nalog (Ivana / Goran) i tko ga prebacuje u „Proizvodnja“ — voditelj?\n2. Treba li voditelju poseban pogled „Čeka odluku pila/nesting“ (filter gore) ili je popis dovoljan?\n3. Naziv naloga ostaje PREZIME_BROJ_… (kako PW i bNest očekuju) + Hub broj u pozadini — OK?"
+    },
+    {
+      "id": "pitanja-unos",
+      "x": 1560,
+      "y": -330,
+      "w": 1440,
+      "text": "PITANJA ZA SASTANAK — unos naloga (v0.2, 12. 9.)\nIgorova napomena ugrađena: bitno na ekranu (zaglavlje u jednom retku, materijali, unos elementa s daskom kao u PPNEST-u/PW-u, tablica, sažetak); sve ostalo otvara se na klik — vidi ekran 2b ispod.\n1. Zadana traka po materijalu (MELAMIN / ABS padajući izbornici iznad daske) + prekidači M/A po rubu — dovoljno za sve slučajeve?\n2. God se naslijedi od materijala — treba li ga moći isključiti po elementu (kao u PW-u)?\n3. Kerf (16) ostaje u panelu Zaglavlje — u redu, ili u postavke?\n4. Napomena elementa ide na etiketu i u CSV — koliko znakova stane na etiketu?\n5. Uvoz rukopisa: ekran „original + prepoznato + potvrdi“ — tko potvrđuje (onaj tko unosi)?\n6. Tipke: L/D/G/B uključuju rub (drugi pritisak = melamin) — ili radije klik mišem na prekidače kao dosad?"
+    },
+    {
+      "id": "pitanja-put",
+      "x": 3120,
+      "y": -330,
+      "w": 1440,
+      "text": "PITANJA ZA SASTANAK — pila / nesting i export\n1. Hub predlaže put po materijalu (pravilo iz prakse), voditelj potvrđuje — treba li prije potvrde vidjeti sheme (PNG) ili je dovoljan broj ploča?\n2. Kad Winstore pokaže 0 ploča: tko rezervira restl ili javlja nabavu (Sanela / voditelj)?\n3. Operater nestinga: nastavlja iz mape C:\\PPNESTING\\<kupac>\\NESTING ili otvara Hub?\n4. Paralelni rad (D-11): CPW za PanelWizard generirati uvijek automatski ili samo na klik?\n5. Rezultat s pile: OSI ne vraća datoteku — potvrđuje li operater u Hubu „izrezano“ ili to ostaje u praćenju proizvodnje?"
+    },
+    {
+      "id": "pitanja-obracun",
+      "x": 4680,
+      "y": -330,
+      "w": 1440,
+      "text": "PITANJA ZA SASTANAK — obračun → ponuda\n1. Radne ploče (RP): jedinica u ponudi je M — pravilo za količinu nije potvrđeno (HUMER: elementi 4,99 m, ponuda 2,4 m). Koje je pravilo?\n2. Ručne usluge (CNC, bušenje, LED urez, nut, ljepljenje…) ostaju ručni unos — tko ih upisuje i u kojem trenutku?\n3. Okov: prepoznati ident + potvrda — u Hubu ili i dalje izravno u Pantheonu?\n4. Zaključavanje ponude i slanje eSlog XML-a: tko smije (Ivana / Goran / Igor)?\n5. Prikaz „naplaćeno vs potrošeno“ — vidljiv svima ili samo Igoru?"
+    },
+    {
+      "id": "brand-b",
+      "x": 3120,
+      "y": 1690,
+      "w": 1440,
+      "text": "VARIJANTA B (mirna, 12. 9. popodne) — logo i tamno zaglavlje iz new_mockup; narančasta samo kao tanki naglasak (crta ispod aktivnog taba, donja crta u logu, podcrtane poveznice). Akcija i aktivno stanje = antracit s bijelim tekstom, radne površine svijetle, materijali u tonu drva. Boje rubova (zeleno ABS / smeđe MEL) i statusa ostaju semantičke. Isti tokeni mogu se primijeniti i na Regal traku da svi interni alati izgledaju isto."
+    },
+    {
+      "id": "varijanta-c",
+      "x": 6240,
+      "y": -330,
+      "w": 1440,
+      "text": "VARIJANTA C — pogled „novim očima“, bez današnjih ulaza (brand ploče, logo, PPNEST raspored)\nIdeja: cijeli unos stane na jedan ekran 1440×980 bez skrolanja. Lijevo materijali (uvijek vidljivi, klik = prebaci), u sredini tablica elemenata s REDOM ZA UNOS NA VRHU (kao proračunska tablica: Tab kroz ćelije, Enter = potvrdi i novi red, mjere ostaju za serije; rubovi L/D/G/B jednim slovom: — → A → M), desno inspektor s daskom koja prati odabrani ili novi redak (klik na M/A/— uz svaku stranu).\nVizualno: lijeva traka s ikonama umjesto gornjih tabova, topla papirnata pozadina, jedna naglasna boja (mahovina zelena) samo za odabir i glavnu akciju, rubovi ABS plavo / MEL žuto-smeđe, brojevi u monospace radi poravnanja. Bez ijedne boje branda — logo se doda kasnije bez promjene rasporeda.\nKompromis prema navici: daska je prikaz i kontrola, ali unos ide kroz tablicu — brže za 1000 kom dnevno, no zahtijeva par dana navikavanja. Koraci naloga (1 Unos · 2 Pila/nesting · 3 Obračun) su gore desno kao pilule, sve ostalo (zaglavlje, uvoz, provjere) na klik."
+    },
+    {
+      "id": "varijanta-d",
+      "x": 7800,
+      "y": -330,
+      "w": 1440,
+      "text": "VARIJANTA D — HIBRID\nRaspored iz C: jedan ekran 1440×980 bez skrolanja, lijeva traka s ikonama, materijali lijevo (uvijek vidljivi), desni stupac stalno vidljiv (trake materijala, podaci o materijalu i skladištu, sažetak, provjere) — ono što je u B bilo „na klik“.\nUnos iz B / PPNEST-a: 1. mjera, 2. mjera, kom, napomena, izbornici MEL-ISTI / ABS iznad daske, daska s M/A prekidačima uz svaki rub, Prihvati = Enter; tablica ispod daske s mini-daskom po retku.\nBrand iz B: logo u jednom retku, antracit #5A5F64 za zaglavlje, aktivni materijal i gumbe; narančasta samo u logu; Inter. Koraci naloga kao pilule u zaglavlju."
+    },
+    {
+      "id": "okov",
+      "x": 7800,
+      "y": 1030,
+      "w": 1440,
+      "text": "GDJE JE OKOV (odgovor na Igorovo pitanje 12. 9.): okov i obrade su grupe naloga na istoj razini kao materijali — u lijevom stupcu ispod materijala („Ostalo u nalogu“: Okov · Obrade i usluge). Klik na „Okov“ mijenja sredinu u popis okova: uvoz Excela/fotografije kupca ili popisa iz Corpusa, alias-tablica → ident bez pitanja, inače prijedlog identa po nazivu s oznakom „za potvrdu“; redak za brzi ručni unos (traži naziv/ident/kako kupac piše + kom + Enter). Obrade i usluge (bušenje, nut, CNC, LED urez…) ista logika: ručno danas, iz Corpusovog CIX-a kasnije (I-14). Sve tri grupe idu u jednu ponudu (eSlog XML) istim redoslijedom kao danas: materijali → okov → usluge. Podaci na ekranu su stvarni: kupčev OKOV (48).xlsx i identi iz ponude 26-010-002823."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

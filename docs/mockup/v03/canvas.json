@@ -1,0 +1,106 @@
+{
+  "artboards": [
+    {
+      "file": "v03_Nalozi.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 980,
+      "title": "1 · Nalozi (popis) — v0.3"
+    },
+    {
+      "file": "Main.dc.html",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 980,
+      "title": "2 · Unos naloga — v0.3 (varijanta D, sredina u bojama C)"
+    },
+    {
+      "file": "v03_Okov.dc.html",
+      "x": 1560,
+      "y": 1300,
+      "w": 1440,
+      "h": 980,
+      "title": "2b · Okov i obrade — grupa naloga (klik na „Okov“ lijevo)"
+    },
+    {
+      "file": "v03_Ponuda.dc.html",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 980,
+      "title": "3 · Obračun → ponuda (čeka potvrdu kupca)"
+    },
+    {
+      "file": "v03_Skladiste.dc.html",
+      "x": 4680,
+      "y": 0,
+      "w": 1440,
+      "h": 980,
+      "title": "4 · Skladište nakon potvrde kupca (upozorenje + popis za nabavu)"
+    },
+    {
+      "file": "v03_PilaNesting.dc.html",
+      "x": 6240,
+      "y": 0,
+      "w": 1440,
+      "h": 980,
+      "title": "5 · Pila / nesting (voditelj) — sheme uvijek vidljive, rezultat sa stroja"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "kako-citati",
+      "x": 0,
+      "y": -600,
+      "w": 1440,
+      "text": "KAKO ČITATI — mockup v0.3 (12. 9. 2026.)\n6 ekrana = tok jednog naloga po D-35, slijeva nadesno: 1 popis → 2 unos (+ 2b okov i obrade) → 3 obračun i ponuda (čeka potvrdu kupca) → 4 skladište nakon potvrde (upozorenje + popis za nabavu) → 5 pila / nesting (voditelj). Proizvodnja i „izrezano“ ostaju praćenju proizvodnje (D-03).\nDizajn = varijanta D (D-39): zaglavlje antracit + logo nepromijenjeno; sredina ekrana u nijansama varijante C (papir, mahovina zelena za odabir i glavnu akciju, ABS plavo / MEL jantar) — Igorova dopuna 12. 9. Stare varijante (v0.1, v0.2, B, C) su u arhivi.\nBrojke su stvarne: nalog HUMER_OMIS_2823 (ponuda 26-010-002823), ploče i m² PW-metodom, metri traka, Winstore stanje 11. 9., cijene iz šifrarnika bez rabata, okov iz kupčevog OKOV (48).xlsx. Ilustracija su: datumi i statusi u popisu, stanje skladišta za materijale koji idu na pilu (MDF, hrast, RP), adrese regala, mini-sheme."
+    },
+    {
+      "id": "n-nalozi",
+      "x": 0,
+      "y": -300,
+      "w": 1440,
+      "text": "1 · POPIS NALOGA — što je ugrađeno\nD-33: naziv KUPAC_NAZIV_BROJ (HUMER_OMIS_2823), Hub broj u pozadini. D-35: statusi Unos → Ponuda (čeka kupca) → Potvrđeno → Skladište → Pila / nesting → Proizvodnja → Zatvoren. D-34: voditelj radi iz istog popisa (filter „Čeka voditelja“), bez posebnog pogleda; ured (Ivana / Goran) otvara nalog i prebacuje ga dalje. Desno: kartice po koraku toka — tko čeka koga (kupac, skladište, voditelj), rezultati sa strojeva, skladište."
+    },
+    {
+      "id": "n-unos",
+      "x": 1560,
+      "y": -300,
+      "w": 1440,
+      "text": "2 · UNOS NALOGA — što je ugrađeno\nD-36: rubovi se biraju samo mišem (M / A uz dasku), bez tipkovničkih prečaca; god se nasljeđuje iz Winstorea (Grain), gašenje po elementu uz potvrdu; kerf u panelu Zaglavlje (na klik); CPW za PanelWizard uvijek automatski. D-31: izbornici MEL-ISTI (0,5 mm) i ABS (zadano ABS-ISTI = 1 mm, rijetko „ABS-ISTI 2mm“) iznad daske. D-38: napomena elementa s brojačem — prvih 14 znakova ide na etiketu. D-32: Okov i Obrade su grupe naloga u lijevom stupcu (klik na „Okov“ → ekran 2b ispod). Desni stupac stalno vidljiv: trake materijala, materijal i skladište, sažetak, provjere."
+    },
+    {
+      "id": "n-okov",
+      "x": 1560,
+      "y": 1080,
+      "w": 1440,
+      "text": "2b · OKOV I OBRADE (D-32)\nOkov iz kupčevog Excela / fotografije ili iz Corpusovog popisa; alias-tablica → ident bez pitanja, inače prepoznavanje po nazivu + oznaka „za potvrdu“; ništa ne ide u ponudu bez potvrde onoga tko unosi. Obrade i usluge (bušenje, nut, CNC, LED urez…) upisuje ured pri obračunu (D-38); za Corpus naloge Hub ih kasnije predlaže iz CIX-a. Sve tri grupe idu u jedan eSlog XML: materijali → okov → usluge. Podaci su stvarni (OKOV (48).xlsx, identi iz ponude 2823)."
+    },
+    {
+      "id": "n-ponuda",
+      "x": 3120,
+      "y": -300,
+      "w": 1440,
+      "text": "3 · OBRAČUN → PONUDA — što je ugrađeno\nD-35: ponuda se radi PRIJE proizvodnje i čeka potvrdu kupca; do potvrde se ništa ne rezervira. D-18: količine PW-metodom za svaki nalog (prekidač PanelWizard / Hub optimizator za paralelni rad). D-37: radne ploče — 600 mm po metru (min 1,4 m, > 2,7 m cijela), 900 mm „ploča stola“ pola / cijela → HUMER: PLOČA STOLA CIJELA 2 KOM. D-38: obrade i usluge upisuje ured pri obračunu; ponudu zaključavaju i eSlog šalju Ivana i Goran. Okov kao grupa (3 za potvrdu). Cijene iz šifrarnika bez rabata; ukupno je ilustracija."
+    },
+    {
+      "id": "n-skladiste",
+      "x": 4680,
+      "y": -300,
+      "w": 1440,
+      "text": "4 · SKLADIŠTE NAKON POTVRDE KUPCA (D-35) — novi ekran\nKad kupac potvrdi, Hub provjeri: Winstore (cijele ploče za nesting, izvoz 11. 9.), Hub skladište ploča (pila), restlove i regal-traku; da UPOZORENJE (proizvodnja ne može krenuti) i POPIS ZA NABAVU koji Sanela pošalje dobavljaču; rezervira količine za ovaj nalog. D-02: Hub skladište = količine, Pantheon = financije. Stanje za pila-materijale, role traka i adrese su ilustracija; Winstore brojke su stvarne (W908ST2-18 13, K2665AI-19 0, W908ST2-16 0)."
+    },
+    {
+      "id": "n-pila",
+      "x": 6240,
+      "y": -300,
+      "w": 1440,
+      "text": "5 · PILA / NESTING (voditelj) — što je ugrađeno\nD-34: sheme uvijek vidljive uz materijal (krojne sheme PW-metodom za obračun + rezultat s nestinga), voditelj potvrđuje put u istom ekranu; operater nestinga radi iz mape (Hub zapiše CSV+CIX); potvrda „izrezano“ ostaje praćenju proizvodnje. D-36: CPW za PanelWizard uvijek automatski. D-29: element s CNC obradom uvijek nesting. D-38: „naplaćeno vs potrošeno“ pojavljuje se tek kad stigne .mno — na ovom ekranu, ne na obračunu; ne mijenja ponudu (D-18). Mini-sheme su ilustracija; brojevi ploča i iskorištenja su stvarni (.mno 11. 9.)."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

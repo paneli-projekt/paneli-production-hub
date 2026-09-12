@@ -1,0 +1,159 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <title>Production Hub — Obračun → ponuda</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&amp;family=IBM+Plex+Mono:wght@500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+  <style>
+:root{--bg:#E7EAEE;--surface:#FFFFFF;--surface2:#F3F5F7;--ink:#14171A;--muted:#5A6470;--line:#C9D1D9;--line2:#E3E8ED;
+ --accent:#17546E;--accent-ink:#FFFFFF;--accent-soft:#DCEAF1;--addr-bg:#F5C518;--addr-ink:#1B1706;--addr-line:#8A6D02;
+ --ok:#1B6E48;--ok-soft:#DDEFE5;--warn:#9A5B06;--warn-soft:#FBEBD0;--crit:#A32017;--crit-soft:#F6DEDB;
+ --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--cond:"Barlow Condensed","IBM Plex Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.4}
+a{color:var(--accent);text-decoration:none} a:hover{color:#0f3a4d;text-decoration:underline}
+button,input,select{font:inherit;color:inherit}
+.top{background:var(--surface);border-bottom:1px solid var(--line)}
+.topin{padding:10px 24px;display:flex;align-items:center;gap:18px;flex-wrap:nowrap}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto;flex:none}
+.brand b{font-family:var(--cond);font-weight:700;font-size:26px;letter-spacing:.02em;text-transform:uppercase;white-space:nowrap}
+.brand span{font-size:12px;color:var(--muted);letter-spacing:.09em;text-transform:uppercase;white-space:nowrap}
+.tabs{display:flex;gap:6px;flex:none}
+.tab{background:transparent;border:1px solid transparent;border-radius:3px;padding:8px 12px;font-family:var(--cond);font-size:17px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;color:var(--muted)}
+.tab[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
+.user{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);border-radius:3px;padding:6px 10px;white-space:nowrap}
+.ostrip{background:var(--surface);border-bottom:1px solid var(--line)}
+.oin{padding:10px 24px;display:flex;align-items:center;gap:18px;flex-wrap:nowrap}
+.back{font-size:13px;color:var(--muted);white-space:nowrap}
+.oname{display:flex;flex-direction:column;gap:2px;flex:none}
+.oname b{font-family:var(--cond);font-size:24px;font-weight:700;letter-spacing:.02em;line-height:1.05}
+.oname span{font-size:12px;color:var(--muted);white-space:nowrap}
+.steps{display:flex;gap:5px;list-style:none;margin:0 auto;padding:0;flex:none}
+.steps li{font-family:var(--cond);font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--surface);white-space:nowrap}
+.steps li.done{border-color:var(--ok);color:var(--ok);background:var(--ok-soft)}
+.steps li.cur{border-color:var(--accent);color:var(--accent-ink);background:var(--accent)}
+.subtabs{display:flex;gap:4px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--line)}
+.subtab{padding:10px 16px;font-family:var(--cond);font-size:17px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
+.subtab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.wrap{padding:18px 24px 28px}
+h2{font-family:var(--cond);font-size:24px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;margin:0;white-space:nowrap}
+h3{font-family:var(--cond);font-size:17px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin:0 0 10px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:14px 16px}
+.row{display:flex;gap:10px;align-items:center}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:8px 14px;font-weight:500;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn.ghost{border-style:dashed;color:var(--muted)}
+.inp{background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:8px 10px;width:100%;min-height:36px;display:flex;align-items:center;gap:8px}
+.inp.ro{background:var(--surface2);color:var(--muted)}
+.inp .ph{color:#8b95a1}
+.inp.big{font-family:var(--cond);font-size:22px;font-weight:600;letter-spacing:.02em;padding:6px 12px}
+label.l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
+.fld{display:flex;flex-direction:column;gap:0}
+.mono{font-family:var(--mono);font-size:.92em;letter-spacing:-.01em}
+.muted{color:var(--muted)}
+.note{font-size:13px;color:var(--muted)}
+.tag{display:inline-block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:2px;background:var(--surface2);color:var(--muted);border:1px solid var(--line2);white-space:nowrap;font-weight:600}
+.tag.acc{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.tag.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.tag.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.tag.crit{background:var(--crit-soft);color:var(--crit);border-color:transparent}
+.tag.nest{background:#1E3A4A;color:#fff;border-color:transparent}
+.tag.pila{background:#5A6470;color:#fff;border-color:transparent}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px;white-space:nowrap}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+table{border-collapse:collapse;width:100%}
+th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;font-weight:600}
+td{padding:7px 10px;border-bottom:1px solid var(--line2);vertical-align:middle;font-variant-numeric:tabular-nums}
+td.num,th.num{text-align:right}
+td.nw{white-space:nowrap}
+.btn.wrap{white-space:normal;text-align:left}
+tr.sel td{background:var(--accent-soft)}
+tr.grp td{background:var(--surface2);font-family:var(--cond);font-size:16px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--ink)}
+.addr{display:inline-block;background:var(--addr-bg);color:var(--addr-ink);border:1px solid var(--addr-line);border-radius:2px;font-family:var(--cond);font-weight:700;letter-spacing:.06em;padding:1px 8px;font-size:15px;white-space:nowrap}
+.kpi{display:flex;flex-direction:column;gap:2px}
+.kpi b{white-space:nowrap;font-family:var(--cond);font-size:24px;font-weight:700;letter-spacing:.02em;line-height:1;font-variant-numeric:tabular-nums}
+.kpi span{white-space:nowrap;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rub{display:inline-grid;grid-template-columns:14px 22px 14px;grid-template-rows:12px 16px 12px;gap:1px;vertical-align:middle}
+.rub i{display:block;background:var(--line2);border-radius:1px}
+.rub i.on{background:var(--accent)}
+.rub i.m{background:var(--warn)}
+.rub i.c{background:transparent}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--line);margin-right:6px;vertical-align:middle}
+.dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.crit{background:var(--crit)} .dot.acc{background:var(--accent)}
+.stripe{border-left:4px solid var(--accent)}
+.stripe.warn{border-left-color:var(--warn)} .stripe.ok{border-left-color:var(--ok)} .stripe.crit{border-left-color:var(--crit)}
+.list{display:flex;flex-direction:column;gap:8px}
+.kbd{display:inline-block;min-width:20px;text-align:center;background:var(--surface);border:1px solid var(--line);border-radius:3px;padding:0 5px;font-family:var(--mono);font-weight:600;font-size:12px}
+.cb{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.cb i{width:16px;height:16px;border:1px solid var(--line);border-radius:3px;background:var(--surface);display:inline-block}
+.cb i.on{background:var(--accent);border-color:var(--accent)}
+.radio{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.radio i{width:16px;height:16px;border:1px solid var(--line);border-radius:50%;background:var(--surface);display:inline-block}
+.radio i.on{border:5px solid var(--accent)}
+.foot{font-size:12px;color:var(--muted);padding:10px 24px;border-top:1px solid var(--line2)}
+</style>
+</helmet>
+<div style="width: 1440px; min-height: 1330px; background: #E7EAEE; display: flex; flex-direction: column;">
+<div class="top"><div class="topin"><div class="brand"><b>Production Hub</b><span>Paneli projekt · mockup v0.1</span></div><nav class="tabs" style="display: flex; gap: 6px;"><button class="tab" aria-current="page">Nalozi</button><button class="tab">Šifrarnici</button><button class="tab">Skladište</button><button class="tab">Obračun</button><button class="tab">Postavke</button></nav><div class="user">IVANA</div></div></div><div class="ostrip"><div class="oin"><a class="back" href="#">← Nalozi</a><div class="oname"><b>HUMER_2823_OMIS <span class="tag" style="vertical-align: middle;">v3</span></b><span>2026-02823 · Mario Humer · ponuda 26-010-002823</span></div><ol class="steps" style="display: flex; gap: 6px;"><li class="done">Unos</li><li class="done">Provjera</li><li class="done">Optimirano</li><li class="cur">Ponuda</li><li class="">Proizvodnja</li><li class="">Zatvoren</li></ol><div class="row" style="display: flex; gap: 10px;"><button class="btn">Dnevnik</button><button class="btn pri">Zaključaj ponudu</button></div></div></div><div class="subtabs" style="display: flex; gap: 4px;"><div class="subtab">1 · Zaglavlje i elementi</div><div class="subtab">2 · Pila / nesting i export</div><div class="subtab on">3 · Obračun → ponuda</div></div>
+<div class="wrap" style="display: flex; flex-direction: column; gap: 14px;">
+  <div class="row" style="display: flex; gap: 12px; align-items: center;">
+    <h2>Obračun → ponuda</h2>
+    <span class="note">Količine PW-metodom za svaki nalog (D-18): m² za naplatu s pravilom korisnog ostatka, usluga rezanja, metri traka i kantiranja (D-20).</span>
+    <div style="flex: 1;"></div>
+    <div class="row" style="display: flex; gap: 12px; border: 1px solid #C9D1D9; border-radius: 3px; padding: 6px 10px; background: #fff;">
+      <span class="note">Količine iz:</span><span class="radio"><i class="on"></i> PanelWizard (paralelni rad)</span><span class="radio"><i></i> Hub optimizator <span class="muted">(119,27 m², +3,6 %)</span></span>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 14px; align-items: start;">
+    <div class="card" style="padding: 0;">
+      <table>
+        <thead><tr><th>Ident</th><th>Naziv (Pantheon)</th><th class="num">Količina</th><th>JM</th><th class="num">Cijena</th><th class="num">Iznos €</th><th>Pravilo / napomena</th></tr></thead>
+        <tbody><tr class="grp"><td colspan="7">IV BIJELI NK 18 — 10 ploča (PW-metoda) · W908ST2-18</td></tr><tr><td class="mono nw">IV000090</td><td>IVERAL BIJELI NK W908 ST2 18 MM</td><td class="num nw"><b>57,96</b></td><td>M2</td><td class="num">14,34</td><td class="num nw">831,15</td><td><span class="tag ">10 × 5,796 m² − korisni ostatci</span></td></tr><tr><td class="mono nw">US000002</td><td>USLUGA REZANJA</td><td class="num nw"><b>57,96</b></td><td>M2</td><td class="num">2,55</td><td class="num nw">147,80</td><td><span class="tag ">= m² ploča</span></td></tr><tr><td class="mono nw">TR001254</td><td>ABS 1/22 JELA CLAY</td><td class="num nw"><b>209</b></td><td>M</td><td class="num">1,20</td><td class="num nw">250,80</td><td><span class="tag ">PW 208,2 m → naviše na metar (D-20)</span></td></tr><tr><td class="mono nw">US000011</td><td>USLUGA KANTIRANJA 2/22</td><td class="num nw"><b>208,2</b></td><td>M</td><td class="num">1,30</td><td class="num nw">270,66</td><td><span class="tag ">točno PW metri</span></td></tr><tr><td class="mono nw">TR000017</td><td>ABS 0,5/22 BIJELI NK</td><td class="num nw"><b>22</b></td><td>M</td><td class="num">0,25</td><td class="num nw">5,50</td><td><span class="tag ">PW 21,8 m → naviše</span></td></tr><tr><td class="mono nw">US000003</td><td>USLUGA KANTIRANJA 0,5/22</td><td class="num nw"><b>21,8</b></td><td>M</td><td class="num">0,87</td><td class="num nw">18,97</td><td></td></tr><tr class="grp"><td colspan="7">IV JELA TAVERNA 19 — 6 ploča, uzdužno (god) · K2665AI-19</td></tr><tr><td class="mono nw">IV001210</td><td>IVERAL JELA TAVERNA K2665 AI 19MM</td><td class="num nw"><b>30,16</b></td><td>M2</td><td class="num">31,00</td><td class="num nw">934,96</td><td><span class="tag ">ponuda 2823 imala 30,97 (ručno +0,81)</span></td></tr><tr><td class="mono nw">US000002</td><td>USLUGA REZANJA</td><td class="num nw"><b>30,16</b></td><td>M2</td><td class="num">2,55</td><td class="num nw">76,91</td><td></td></tr><tr><td class="mono nw">TR001254</td><td>ABS 1/22 JELA CLAY</td><td class="num nw"><b>152</b></td><td>M</td><td class="num">1,20</td><td class="num nw">182,40</td><td><span class="tag ">PW 151,3 m → naviše (ponuda: 180 m)</span></td></tr><tr><td class="mono nw">US000011</td><td>USLUGA KANTIRANJA 2/22</td><td class="num nw"><b>151,3</b></td><td>M</td><td class="num">1,30</td><td class="num nw">196,69</td><td></td></tr><tr><td class="mono nw">TR001258</td><td>ABS 1/44 JELA CLAY</td><td class="num nw"><b>7</b></td><td>M</td><td class="num">5,25</td><td class="num nw">36,75</td><td><span class="tag ">PW 6,8 m → naviše</span></td></tr><tr><td class="mono nw">US000012</td><td>USLUGA KANTIRANJA 2/44</td><td class="num nw"><b>6,8</b></td><td>M</td><td class="num">2,40</td><td class="num nw">16,32</td><td></td></tr><tr class="grp"><td colspan="7">MDF BIJELI 3 — 4 ploče</td></tr><tr><td class="mono nw">IV000054</td><td>MDF BIJELI 3 MM</td><td class="num nw"><b>18,49</b></td><td>M2</td><td class="num">5,00</td><td class="num nw">92,45</td><td></td></tr><tr><td class="mono nw">US000013</td><td>USLUGA REZANJA MDF</td><td class="num nw"><b>18,49</b></td><td>M2</td><td class="num">1,25</td><td class="num nw">23,11</td><td></td></tr><tr class="grp"><td colspan="7">IV BIJELI NK 16 — 1 ploča</td></tr><tr><td class="mono nw">IV000002</td><td>IVERAL BIJELI NK W908 ST2 16MM</td><td class="num nw"><b>5,80</b></td><td>M2</td><td class="num">14,50</td><td class="num nw">84,10</td><td></td></tr><tr><td class="mono nw">US000002</td><td>USLUGA REZANJA</td><td class="num nw"><b>5,80</b></td><td>M2</td><td class="num">2,55</td><td class="num nw">14,79</td><td></td></tr><tr><td class="mono nw">TR000017</td><td>ABS 0,5/22 BIJELI NK</td><td class="num nw"><b>51</b></td><td>M</td><td class="num">0,25</td><td class="num nw">12,75</td><td><span class="tag ">PW 50,9 m → naviše</span></td></tr><tr><td class="mono nw">US000003</td><td>USLUGA KANTIRANJA 0,5/22</td><td class="num nw"><b>50,9</b></td><td>M</td><td class="num">0,87</td><td class="num nw">44,28</td><td></td></tr><tr class="grp"><td colspan="7">IV HRAST RELIEF CARDAMOM 19 — 1 ploča, uzdužno (god)</td></tr><tr><td class="mono nw">IV001219</td><td>IVERAL HRAST RELIEF CARDAMOM K2776 GR 19MM</td><td class="num nw"><b>2,73</b></td><td>M2</td><td class="num">22,00</td><td class="num nw">60,06</td><td><span class="tag ">ponuda 2823: 2,98 (ručno +0,25)</span></td></tr><tr><td class="mono nw">US000002</td><td>USLUGA REZANJA</td><td class="num nw"><b>2,73</b></td><td>M2</td><td class="num">2,55</td><td class="num nw">6,96</td><td></td></tr><tr><td class="mono nw">TR001213</td><td>ABS 1/22 HRAST RELIEF PIMENTO</td><td class="num nw"><b>7</b></td><td>M</td><td class="num">1,20</td><td class="num nw">8,40</td><td><span class="tag ">PW 6,6 m → naviše</span></td></tr><tr><td class="mono nw">US000011</td><td>USLUGA KANTIRANJA 2/22</td><td class="num nw"><b>6,6</b></td><td>M</td><td class="num">1,30</td><td class="num nw">8,58</td><td></td></tr><tr class="grp"><td colspan="7">RP BASANIT SAND — 2 kom (radna ploča 4100 × 600)</td></tr><tr><td class="mono nw">RP000259</td><td>RADNA PLOČA BASANIT SAND K2875CN</td><td class="num nw"><b>4,99</b></td><td>M</td><td class="num">42,00</td><td class="num nw">209,58</td><td><span class="tag warn">⚠ pravilo za RP nije potvrđeno (ponuda 2823: 2,4 m)</span></td></tr><tr><td class="mono nw">US000303</td><td>USLUGA REZANJA RADNE PLOČE</td><td class="num nw"><b>2</b></td><td>KOM</td><td class="num">3,00</td><td class="num nw">6,00</td><td></td></tr><tr><td class="mono nw">US000015</td><td>USLUGA SPOJ RADNE PLOČE</td><td class="num nw"><b>2</b></td><td>KOM</td><td class="num">9,00</td><td class="num nw">18,00</td><td></td></tr><tr class="grp"><td colspan="7">Okov — 42 stavke iz upita kupca (OKOV (48).xlsx) · prepoznati identi, ručna potvrda <span class="tag warn">6 za provjeru</span></td></tr><tr><td colspan="7" class="note">Prikaz sažet — otvori „Okov“ za stavke. Hub okov ne računa, samo mapira i provjerava (D-07).</td></tr><tr class="grp"><td colspan="7">Ručne usluge — CNC, bušenje, LED urez, nut, ljepljenje, glodanje za ručkicu (8 stavki) <span class="tag">ručno</span></td></tr><tr><td colspan="7" class="note">npr. US000148 USLUGA P-BUŠENJA 5/8 MM 569 KOM · US000005 USLUGA REZANJA CNC 1,98 M · US002089 UREZIVANJE ZA LED PROFIL 1,04 M — kao dosad, s upisom tko je unio.</td></tr>
+          <tr><td colspan="5" style="text-align: right; font-family: Barlow Condensed, sans-serif; font-size: 18px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase;">Ploče, rezanje, trake, kantiranje</td><td class="num" style="font-family: Barlow Condensed, sans-serif; font-size: 20px; font-weight: 700;">3.557,97</td><td class="note">bez okova i ručnih usluga · cijene iz šifrarnika, bez rabata</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      <div class="card stripe ok" style="display: flex; flex-direction: column; gap: 8px;">
+        <h3>Provjere</h3>
+        <div><span class="dot ok"></span>svaki materijal naloga ima stavku (6 / 6)<div class="note" style="margin-left: 15px;">spriječilo bi slučaj 2929 (2 materijala bez stavke)</div></div>
+        <div><span class="dot ok"></span>trake po D-20: ident naviše na metar, usluga točno PW metri</div>
+        <div><span class="dot ok"></span>ploče = PW brojke (3 materijala točno; JELA i HRAST u ponudi ručno +0,81 / +0,25)</div>
+        <div><span class="dot warn"></span>RP BASANIT SAND: pravilo za dužne metre nije potvrđeno</div>
+        <div><span class="dot warn"></span>okov: 6 stavki čeka potvrdu identa</div>
+      </div>
+      <div class="card stripe" style="display: flex; flex-direction: column; gap: 8px;">
+        <h3>Naplaćeno vs potrošeno (interno)</h3>
+        <table>
+          <thead><tr><th>Materijal</th><th class="num">Naplaćeno</th><th class="num">Nesting</th><th class="num">Razlika</th></tr></thead>
+          <tbody>
+            <tr><td>IV BIJELI NK 18</td><td class="num">10 pl.</td><td class="num">9 pl.</td><td class="num" style="color: #1B6E48;">+1 pl.<br>5,80 m²</td></tr>
+            <tr><td>IV JELA TAVERNA 19</td><td class="num">6 pl.</td><td class="num">5 pl.</td><td class="num" style="color: #1B6E48;">+1 pl.<br>5,80 m²</td></tr>
+            <tr><td><b>Ukupno</b></td><td></td><td></td><td class="num"><b>+11,59 m²<br>≈ 263 €</b></td></tr>
+          </tbody>
+        </table>
+        <div class="note">Prvi put vidljivo po nalogu; ne mijenja ponudu (D-18).</div>
+      </div>
+      <div class="card" style="display: flex; flex-direction: column; gap: 8px;">
+        <h3>Izlaz</h3>
+        <button class="btn pri"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><path d="M4 2h5l3 3v9H4V2z"/><path d="M9 2v3h3"/></svg> eSlog XML ponude → Pantheon</button>
+        <button class="btn"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none;"><path d="M4 6V2h8v4M4 12H2V6h12v6h-2"/><rect x="4" y="9" width="8" height="5"/></svg> PDF ponude za kupca</button>
+        <button class="btn">Excel stavki (kao skill krojna-ponuda)</button>
+        <div class="note">Hub nikad ne piše u Pantheon bazu (D-06); broj ponude <span class="mono">26-010-00xxxx</span> dodjeljuje Pantheon pri uvozu i vraća se u nalog.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</x-dc>
+</body>
+</html>

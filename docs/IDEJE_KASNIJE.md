@@ -12,7 +12,7 @@ Ovdje se parkiraju ideje koje NISU u fazi 1. Jedan blok po ideji: što, zašto, 
 
 **I-05 Nesting restlovi** — čitati `.mno` (pozicije dijelova) i automatski predlagati korisni ostatak zadnje ploče kao restl s QR-om.
 
-**I-06 Praćenje proizvodnje u Hubu** — kad stari APEX sustav dođe na red; temelji (kupci, nalozi, korisnici, materijali) pripremljeni u Hubu (D-12).
+**I-06 Praćenje proizvodnje u Hubu** — kad stari APEX sustav dođe na red; temelji (kupci, nalozi, korisnici, materijali) pripremljeni u Hubu (D-12). *Dopuna 12. 9.:* što Hub bilježi već sada (događaji, rokovi, osobe, rezervacije, operacije po elementu, narudžbenice) i što praćenje dobiva API-jem — dokument 10, prijedlog D-42.
 
 **I-07 Portal za kupce** — zamjena PPW 5.2 (2020., CPW bez šifri materijala): web unos krojne liste s izborom materijala iz Hubovog šifrarnika; CPW ostaje kao uvoz za stare kupce.
 
@@ -27,3 +27,9 @@ Ovdje se parkiraju ideje koje NISU u fazi 1. Jedan blok po ideji: što, zašto, 
 **I-12 Winstore automatski izvoz / API** — danas operater ručno izvozi XML inventara (11092026.XML); pitati Biesse ima li Winstore zakazani izvoz, bazu koju Hub smije čitati ili uvoz (rezervacija ploča za nalog, ulaz robe). Dok toga nema, Hub čita XML iz dogovorene mape jednom dnevno i prijavljuje razlike prema Pantheonu. (D-24, 05 §1.2)
 
 **I-13 Optimizator PW-kvalitete** — Hubov optimizator je +4,0 % m² prema PW-u na 42 materijala (05 §5.6); poznati uzroci: PW smije zadnju traku "u daleki obrub" (jedan obrub umjesto dva), bolje kombinira širine traka i bira raspored koji ostavlja jedan veliki ostatak. Sljedeći koraci: lokalna pretraga po redoslijedu traka, kandidat-širine iz kombinacija do 4 komada, cilj = ≤ PW na benchmarku (`benchmark_optimizator.py`). Tek kad Hub preuzme obračun (kraj paralelnog rada, D-11). (D-16, D-26)
+
+**I-14 Usluge CNC u ponudi iz CIX operacija** — za naloge iz Corpusa (D-29) Hub čita CIX (bušenja kom, utori m, kontura/krivolinija m) i predlaže stavke koje se danas unose ručno (USLUGA P-BUŠENJA, USLUGA REZANJA CNC, USLUGA NUT KANT — vidi HUMER 06 §5). Prvo validirati na 5 postojećih ponuda, tek onda automatski. (08 §3.1)
+
+**I-15 Corpus → Hub izravno** — ako Corpus ima izvoz s više podataka od CPW-a (popis elemenata s korpusima i pozicijama, okov po korpusu), Hub ga čita umjesto samo CPW-a; temelj za praćenje montaže po korpusu kad dođe praćenje proizvodnje (D-03, I-06). (08 §7)
+
+**I-16 Potvrda ponude gumbom u mailu** — kad ponude idu iz Huba (D-40), u mail se može dodati gumb „Potvrdi ponudu“ (jednokratni link) koji sam prebaci nalog u „Potvrđeno“ i pokrene provjeru skladišta (D-35). Ured danas potvrdu upisuje ručno (često telefonom), pa gumb ide tek kad se vidi koliko kupaca odgovara mailom. Uz to: automatski podsjetnik kupcu nakon N dana bez odgovora.

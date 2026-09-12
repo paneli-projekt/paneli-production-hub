@@ -1,5 +1,8 @@
 # Paneli Production Hub — sažetak audita specifikacije (10. 9. 2026.)
 
+> **Napomena za nove sesije (12. 9. 2026.):** ovo je početni audit. Aktualno stanje projekta, otvorene stvari i sljedeći koraci su u
+> **`STANJE.md`** (čitati prvo), odluke u `DECISIONS.md` (D-01 … D-42). Audit je zatvoren 11. 9. (D-28); u tijeku je faza 2 (mockup + odluke o toku).
+
 Spremiti u: `CLAUDE_COWORK\Paneli_Production_Hub\20_ANALIZA\`
 Izvor: audit ChatGPT sažetka specifikacije, razgovor s Igorom u Claude chatu.
 

@@ -1,0 +1,155 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <title>Production Hub — Unos naloga, varijanta C</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+  <style>
+:root{--ink:#1C2A33;--muted:#66727C;--line:#DDD8CF;--line2:#EBE7DF;--paper:#F6F4EF;--surf:#FFFFFF;--acc:#2E6B57;--acc-soft:#E3EFE9;--abs:#2F5D8C;--mel:#B7791F}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.4}
+a{color:var(--acc)} a:hover{color:#1F4E3F}
+.num{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}
+.rail{width:76px;background:var(--surf);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px}
+.rail .it{width:62px;padding:8px 0 6px;border-radius:8px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+.rail .it.on{background:var(--acc-soft);color:var(--acc)}
+.rail .it svg{width:20px;height:20px}
+.topbar{height:52px;background:var(--surf);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 20px}
+.crumb{color:var(--muted);font-size:13px} .crumb b{color:var(--ink);font-weight:700;font-size:16px}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;color:var(--muted);background:var(--surf)}
+.pill.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.pill.done{border-color:var(--acc);color:var(--acc)}
+.btn{background:var(--surf);border:1px solid var(--line);border-radius:6px;padding:7px 12px;font-weight:600;font-size:13px;color:var(--ink)}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.ghost{border-style:dashed;color:var(--muted);font-weight:500}
+.lbl{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.pane{background:var(--surf);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;min-height:0}
+.pane .hd{padding:10px 14px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:8px}
+.mat{padding:10px 14px;border-bottom:1px solid var(--line2);display:flex;flex-direction:column;gap:3px;cursor:pointer}
+.mat.on{background:var(--acc-soft);box-shadow:inset 3px 0 0 var(--acc)}
+.mat b{font-size:13.5px} .mat .m{font-size:12px;color:var(--muted)}
+.tag{display:inline-block;white-space:nowrap;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:4px;background:var(--line2);color:var(--muted)}
+.tag.nest{background:#1C2A33;color:#fff} .tag.pila{background:#8C7A63;color:#fff} .tag.warn{background:#F6E7C9;color:#7A4E10} .tag.ok{background:var(--acc-soft);color:var(--acc)}
+table{border-collapse:collapse;width:100%}
+th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;font-weight:700}
+td{padding:6px 10px;border-bottom:1px solid var(--line2);vertical-align:middle;white-space:nowrap}
+td.r,th.r{text-align:right}
+tr.entry td{background:#FBFAF6;border-bottom:2px solid var(--acc);padding:8px 10px}
+tr.sel td{background:var(--acc-soft)}
+.cell{display:inline-block;min-width:74px;border:1px solid var(--line);border-radius:6px;padding:5px 8px;background:var(--surf);font-size:16px;text-align:right}
+.cell.foc{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+.cell.txt{text-align:left;min-width:180px;font-size:13px;color:var(--muted)}
+.e{display:inline-flex;width:26px;height:24px;align-items:center;justify-content:center;border-radius:5px;font-size:12px;font-weight:700;border:1px solid var(--line2);color:var(--muted)}
+.e.A{background:var(--abs);border-color:var(--abs);color:#fff} .e.M{background:var(--mel);border-color:var(--mel);color:#fff}
+.kbd{display:inline-block;min-width:18px;text-align:center;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:600;background:var(--surf)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg span{padding:3px 9px;font-size:12px;font-weight:700;color:var(--muted);border-right:1px solid var(--line)} .seg span:last-child{border-right:0}
+.seg span.on{background:var(--ink);color:#fff}
+.seg span.A.on{background:var(--abs)} .seg span.M.on{background:var(--mel)}
+.foot{height:60px;background:var(--surf);border-top:1px solid var(--line);display:flex;align-items:center;gap:26px;padding:0 20px}
+.kpi b{font-size:18px;font-weight:700} .kpi span{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:var(--acc)}
+.dot.warn{background:#B7791F}
+</style>
+</helmet>
+<div style="width: 1440px; min-height: 980px; background: #F6F4EF;">
+
+<div style="display: flex; height: 980px;">
+  <nav class="rail">
+    <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; margin-bottom: 8px;">PH</div>
+    <div class="it on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M8 12h8M8 16h8"/></svg>Nalozi</div>
+    <div class="it"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Šifrarnici</div>
+    <div class="it"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9 12 4l9 5v11H3z"/><path d="M9 20v-7h6v7"/></svg>Skladište</div>
+    <div class="it"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>Obračun</div>
+    <div class="it"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3.9a7 7 0 0 0-1.7-1L14.5 3h-5l-.4 2.5a7 7 0 0 0-1.7 1L5.1 5.6l-2 3.4L5.1 10.5a7 7 0 0 0 0 2L3.1 14l2 3.4 2.3-.9a7 7 0 0 0 1.7 1l.4 2.5h5l.4-2.5a7 7 0 0 0 1.7-1l2.3.9 2-3.4-2-1.5c.1-.3.1-.7.1-1z"/></svg>Postavke</div>
+    <div style="flex: 1;"></div>
+    <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--acc-soft); color: var(--acc); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px;">IV</div>
+  </nav>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+    <div class="topbar">
+      <div class="crumb">Nalozi / <b>HUMER_2823_OMIS</b> <span style="margin-left: 8px;">Mario Humer · 18.08.2026 · ponuda 26-010-002823</span></div>
+      <div style="flex: 1;"></div>
+      <span class="pill on">1 Unos</span><span class="pill">2 Pila / nesting</span><span class="pill">3 Obračun</span>
+      <span style="width: 10px;"></span>
+      <button class="btn">Uvoz ▾</button><button class="btn">Zaglavlje</button><button class="btn pri">Spremi</button>
+    </div>
+
+    <div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 250px minmax(0, 1fr) 320px; gap: 14px; padding: 14px 16px;">
+
+      <div class="pane">
+        <div class="hd"><span class="lbl">Materijali</span><span style="flex: 1;"></span><span class="num" style="font-size: 12px; color: var(--muted);">6</span></div>
+        <div class="mat on"><b>IV BIJELI NK 18</b><span class="m">53 st. · 174 kom · 50,4 m²</span><span><span class="tag nest">nesting</span></span></div><div class="mat"><b>IV JELA TAVERNA 19</b><span class="m">35 · 48 · 25,6 m²</span><span><span class="tag nest">nesting</span></span></div><div class="mat"><b>MDF BIJELI 3</b><span class="m">22 · 27 · 16,1 m²</span><span><span class="tag pila">pila</span></span></div><div class="mat"><b>IV BIJELI NK 16</b><span class="m">10 · 28 · 4,6 m²</span><span><span class="tag pila">pila</span></span></div><div class="mat"><b>IV HRAST RELIEF CARDAMOM 19</b><span class="m">1 · 1 · 1,9 m²</span><span><span class="tag pila">pila</span></span></div><div class="mat"><b>RP BASANIT SAND</b><span class="m">2 · 2 · 4,99 m</span><span><span class="tag pila">pila</span></span></div>
+        <div style="padding: 10px 14px;"><button class="btn ghost" style="width: 100%;">+ Materijal</button></div>
+        <div style="flex: 1;"></div>
+        <div style="padding: 10px 14px; border-top: 1px solid var(--line2); font-size: 12px; color: var(--muted);">Nalog: 123 st. · 280 kom · 103,1 m²</div>
+      </div>
+
+      <div class="pane">
+        <div class="hd">
+          <div><div class="lbl">Elementi</div><div style="font-weight: 700; font-size: 15px;">IV000090 · IVERAL BIJELI NK W908 ST2 18 MM <span style="color: var(--muted); font-weight: 500; font-size: 13px;">18 mm · bez goda · W908ST2-18</span></div></div>
+          <div style="flex: 1;"></div>
+          <span class="tag nest">nesting</span><span class="tag">Winstore 13</span>
+        </div>
+        <div style="overflow: hidden;">
+        <table>
+          <thead><tr><th class="r">#</th><th class="r">1. mjera</th><th class="r">2. mjera</th><th class="r">kom</th><th>Rubovi L · D · G · B</th><th>Traka</th><th>Napomena</th></tr></thead>
+          <tbody>
+            <tr class="entry"><td class="r num" style="color: var(--acc); font-weight: 700;">+</td>
+              <td class="r"><span class="cell num foc">820</span></td><td class="r"><span class="cell num">550</span></td><td class="r"><span class="cell num" style="min-width: 56px;">16</span></td>
+              <td><span class="e A">A</span> <span class="e ">·</span> <span class="e A">A</span> <span class="e A">A</span></td>
+              <td class="num" style="font-size: 12px;">ABS-ISTI</td>
+              <td><span class="cell txt">napomena…</span></td></tr>
+            <tr class="sel"><td class="r num" style="color: var(--muted);">1</td><td class="r num" style="font-size: 15px; font-weight: 600;">820</td><td class="r num" style="font-size: 15px; font-weight: 600;">550</td><td class="r num">16</td><td><span class="e A">A</span> <span class="e ">·</span> <span class="e A">A</span> <span class="e A">A</span></td><td class="num" style="font-size: 12px;">ABS-ISTI</td><td style="color: var(--muted);"></td></tr><tr><td class="r num" style="color: var(--muted);">2</td><td class="r num" style="font-size: 15px; font-weight: 600;">820</td><td class="r num" style="font-size: 15px; font-weight: 600;">520</td><td class="r num">4</td><td><span class="e A">A</span> <span class="e ">·</span> <span class="e A">A</span> <span class="e A">A</span></td><td class="num" style="font-size: 12px;">ABS-ISTI</td><td style="color: var(--muted);"></td></tr><tr><td class="r num" style="color: var(--muted);">3</td><td class="r num" style="font-size: 15px; font-weight: 600;">140</td><td class="r num" style="font-size: 15px; font-weight: 600;">520</td><td class="r num">1</td><td><span class="e A">A</span> <span class="e ">·</span> <span class="e A">A</span> <span class="e A">A</span></td><td class="num" style="font-size: 12px;">ABS-ISTI</td><td style="color: var(--muted);">134X520 <span class="tag warn">2 prolaza</span></td></tr><tr><td class="r num" style="color: var(--muted);">4</td><td class="r num" style="font-size: 15px; font-weight: 600;">480</td><td class="r num" style="font-size: 15px; font-weight: 600;">550</td><td class="r num">2</td><td><span class="e A">A</span> <span class="e ">·</span> <span class="e A">A</span> <span class="e A">A</span></td><td class="num" style="font-size: 12px;">ABS-ISTI</td><td style="color: var(--muted);"></td></tr><tr><td class="r num" style="color: var(--muted);">5</td><td class="r num" style="font-size: 15px; font-weight: 600;">464</td><td class="r num" style="font-size: 15px; font-weight: 600;">520</td><td class="r num">1</td><td><span class="e A">A</span> <span class="e ">·</span> <span class="e ">·</span> <span class="e ">·</span></td><td class="num" style="font-size: 12px;">ABS-ISTI</td><td style="color: var(--muted);"></td></tr><tr><td class="r num" style="color: var(--muted);">6</td><td class="r num" style="font-size: 15px; font-weight: 600;">464</td><td class="r num" style="font-size: 15px; font-weight: 600;">80</td><td class="r num">4</td><td><span class="e A">A</span> <span class="e ">·</span> <span class="e ">·</span> <span class="e ">·</span></td><td class="num" style="font-size: 12px;">ABS-ISTI</td><td style="color: var(--muted);"> <span class="tag warn">2 prolaza</span></td></tr><tr><td class="r num" style="color: var(--muted);">22</td><td class="r num" style="font-size: 15px; font-weight: 600;">1830</td><td class="r num" style="font-size: 15px; font-weight: 600;">557</td><td class="r num">2</td><td><span class="e A">A</span> <span class="e ">·</span> <span class="e A">A</span> <span class="e A">A</span></td><td class="num" style="font-size: 12px;">ABS-ISTI</td><td style="color: var(--muted);">RASTER 150 64-64 150</td></tr><tr><td class="r num" style="color: var(--muted);">26</td><td class="r num" style="font-size: 15px; font-weight: 600;">544</td><td class="r num" style="font-size: 15px; font-weight: 600;">557</td><td class="r num">8</td><td><span class="e A">A</span> <span class="e ">·</span> <span class="e ">·</span> <span class="e ">·</span></td><td class="num" style="font-size: 12px;">ABS-ISTI</td><td style="color: var(--muted);">CNC SKICA 1</td></tr><tr><td class="r num" style="color: var(--muted);">27</td><td class="r num" style="font-size: 15px; font-weight: 600;">1050</td><td class="r num" style="font-size: 15px; font-weight: 600;">140</td><td class="r num">1</td><td><span class="e M">M</span> <span class="e M">M</span> <span class="e M">M</span> <span class="e M">M</span></td><td class="num" style="font-size: 12px;">MEL-ISTI</td><td style="color: var(--muted);">1050X120 <span class="tag warn">2 prolaza</span></td></tr><tr><td class="r num" style="color: var(--muted);">31</td><td class="r num" style="font-size: 15px; font-weight: 600;">460</td><td class="r num" style="font-size: 15px; font-weight: 600;">190</td><td class="r num">1</td><td><span class="e M">M</span> <span class="e M">M</span> <span class="e M">M</span> <span class="e M">M</span></td><td class="num" style="font-size: 12px;">MEL-ISTI</td><td style="color: var(--muted);"> <span class="tag warn">2 prolaza</span></td></tr><tr><td class="r num" style="color: var(--muted);">37</td><td class="r num" style="font-size: 15px; font-weight: 600;">1030</td><td class="r num" style="font-size: 15px; font-weight: 600;">340</td><td class="r num">14</td><td><span class="e A">A</span> <span class="e A">A</span> <span class="e A">A</span> <span class="e A">A</span></td><td class="num" style="font-size: 12px;">ABS-ISTI</td><td style="color: var(--muted);">RASTER 150 64-64 150</td></tr><tr><td class="r num" style="color: var(--muted);">46</td><td class="r num" style="font-size: 15px; font-weight: 600;">272</td><td class="r num" style="font-size: 15px; font-weight: 600;">340</td><td class="r num">2</td><td><span class="e A">A</span> <span class="e ">·</span> <span class="e A">A</span> <span class="e ">·</span></td><td class="num" style="font-size: 12px;">ABS-ISTI</td><td style="color: var(--muted);"></td></tr>
+            <tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 8px;">… još 41 redak · <a href="#">sve</a></td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div style="flex: 1;"></div>
+        <div style="padding: 8px 14px; border-top: 1px solid var(--line2); font-size: 12px; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap;">
+          <span><span class="kbd">Tab</span> sljedeća ćelija</span><span><span class="kbd">Enter</span> potvrdi i novi red (mjere ostaju — serije)</span><span><span class="kbd">L</span><span class="kbd">D</span><span class="kbd">G</span><span class="kbd">B</span> rub: — → A → M</span><span><span class="kbd">↑</span><span class="kbd">↓</span> odabir retka (daska desno prati)</span>
+        </div>
+      </div>
+
+      <div class="pane">
+        <div class="hd"><span class="lbl">Element</span><span style="font-weight: 700; white-space: nowrap;">#1 · 820×550 · 16 kom</span><span style="flex: 1;"></span><span class="tag ok">novi</span></div>
+        <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; justify-content: center;"><svg width="260" height="262" viewBox="0 0 260 262" style="display: block;"><rect x="70" y="40" width="116" height="186" fill="#F6F4EF" stroke="#DDD8CF"/><line x1="70" y1="40" x2="70" y2="226" stroke="#2F5D8C" stroke-width="6" stroke-linecap="square"/><line x1="186" y1="40" x2="186" y2="226" stroke="#DDD8CF" stroke-width="1.5" stroke-linecap="square"/><line x1="70" y1="40" x2="186" y2="40" stroke="#2F5D8C" stroke-width="6" stroke-linecap="square"/><line x1="70" y1="226" x2="186" y2="226" stroke="#2F5D8C" stroke-width="6" stroke-linecap="square"/><text x="128" y="26" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="600" font-size="15" fill="#1C2A33">550</text><text x="48" y="133" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="600" font-size="15" fill="#1C2A33" transform="rotate(-90 48 133)">820</text><text x="128" y="246" text-anchor="middle" font-family="Public Sans, sans-serif" font-weight="700" font-size="11" fill="#66727C">B</text><text x="208" y="138" text-anchor="middle" font-family="Public Sans, sans-serif" font-weight="700" font-size="11" fill="#66727C">D</text><text x="24" y="138" text-anchor="middle" font-family="Public Sans, sans-serif" font-weight="700" font-size="11" fill="#66727C">L</text><text x="168" y="26" text-anchor="middle" font-family="Public Sans, sans-serif" font-weight="700" font-size="11" fill="#66727C">G</text><text x="128" y="137" text-anchor="middle" font-family="Public Sans, sans-serif" font-size="11" fill="#66727C">god ↕ (1. mjera)</text></svg></div>
+          <div style="display: grid; grid-template-columns: 26px 1fr auto; gap: 6px 10px; align-items: center; font-size: 13px;">
+            <b>L</b><span class="num" style="font-size: 12px; color: var(--muted);">ABS-ISTI · 1 mm</span><span class="seg"><span class="">—</span><span class="A on">A</span><span class="M">M</span></span>
+            <b>D</b><span class="num" style="font-size: 12px; color: var(--muted);">—</span><span class="seg"><span class=" on">—</span><span class="A">A</span><span class="M">M</span></span>
+            <b>G</b><span class="num" style="font-size: 12px; color: var(--muted);">ABS-ISTI · 1 mm</span><span class="seg"><span class="">—</span><span class="A on">A</span><span class="M">M</span></span>
+            <b>B</b><span class="num" style="font-size: 12px; color: var(--muted);">ABS-ISTI · 1 mm</span><span class="seg"><span class="">—</span><span class="A on">A</span><span class="M">M</span></span>
+          </div>
+          <div style="border-top: 1px solid var(--line2); padding-top: 10px; display: flex; flex-direction: column; gap: 6px;">
+            <div class="lbl">Trake ovog materijala</div>
+            <div style="display: flex; justify-content: space-between; font-size: 13px;"><span><span class="e A" style="width: 18px; height: 18px; font-size: 10px;">A</span> ABS-ISTI</span><span class="num" style="font-size: 12px; color: var(--muted);">TR000168 · 1 mm ▾</span></div>
+            <div style="display: flex; justify-content: space-between; font-size: 13px;"><span><span class="e M" style="width: 18px; height: 18px; font-size: 10px;">M</span> MEL-ISTI</span><span class="num" style="font-size: 12px; color: var(--muted);">TR000017 · 0,5 mm</span></div>
+            <div style="display: flex; justify-content: space-between; font-size: 13px;"><span style="color: var(--muted);">+ druga boja…</span><span class="num" style="font-size: 12px; color: var(--muted);">traži ident</span></div>
+          </div>
+          <div style="border-top: 1px solid var(--line2); padding-top: 10px; font-size: 12px; color: var(--muted);">0,45 m² · rubovi 2,19 m · CNC: ne · 2 prolaza: ne</div>
+          <button class="btn pri" style="width: 100%; padding: 10px;">Potvrdi element <span class="kbd" style="margin-left: 6px; color: var(--ink);">↵</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <div class="kpi"><b class="num">53 · 174</b><span>stavki · kom</span></div>
+      <div class="kpi"><b class="num">50,37 m²</b><span>dijelova</span></div>
+      <div class="kpi"><b class="num">208,2 + 21,8 m</b><span>ABS · MEL (PW metri)</span></div>
+      <div class="kpi"><b class="num">10 pl. · 57,96 m²</b><span>za obračun</span></div>
+      <div style="flex: 1;"></div>
+      <span style="font-size: 13px;"><span class="dot"></span>Provjere: sve u redu</span>
+      <button class="btn pri">Dalje: pila / nesting →</button>
+    </div>
+  </div>
+</div>
+</div>
+</x-dc>
+</body>
+</html>
