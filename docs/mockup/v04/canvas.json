@@ -1,0 +1,79 @@
+{
+  "artboards": [
+    { "file": "v04_Nalozi.dc.html", "x": 0, "y": 0, "w": 1440, "h": 980, "title": "1 · Nalozi (popis) — v0.4" },
+    { "file": "Main.dc.html", "x": 1560, "y": 0, "w": 1440, "h": 980, "title": "2 · Unos naloga — v0.4" },
+    { "file": "v04_Okov.dc.html", "x": 1560, "y": 1300, "w": 1440, "h": 980, "title": "2b · Okov i obrade — grupa naloga (klik na „Okov“ lijevo)" },
+    { "file": "v04_Ponuda.dc.html", "x": 3120, "y": 0, "w": 1440, "h": 980, "title": "3 · Obračun → ponuda iz Huba (spremna za slanje kupcu) — NOVO u v0.4" },
+    { "file": "v04_Potvrda.dc.html", "x": 3120, "y": 1300, "w": 620, "h": 620, "title": "3b · „Kupac potvrdio“ — dijalog (ured) — NOVO" },
+    { "file": "v04_Dogadjaji.dc.html", "x": 3820, "y": 1300, "w": 760, "h": 740, "title": "3c · Događaji naloga — vremenska crta (na klik iz Zaglavlja) — NOVO" },
+    { "file": "v04_Skladiste.dc.html", "x": 4680, "y": 0, "w": 1440, "h": 980, "title": "4 · Skladište nakon potvrde kupca (upozorenje + manjak → Nabava)" },
+    { "file": "v04_PilaNesting.dc.html", "x": 6240, "y": 0, "w": 1440, "h": 980, "title": "5 · Pila / nesting (voditelj) — sheme uvijek vidljive, rezultat sa stroja" },
+    { "file": "v04_Nabava.dc.html", "x": 7800, "y": 0, "w": 1440, "h": 980, "title": "6 · Nabava (Sanela) — potrebe preko svih naloga + narudžbenice — NOVO u v0.4" }
+  ],
+  "annotations": [
+    {
+      "id": "kako-citati",
+      "x": 0,
+      "y": -600,
+      "w": 1440,
+      "text": "KAKO ČITATI — mockup v0.4 (12. 9. 2026.)\nTok jednog naloga po D-35, slijeva nadesno: 1 popis → 2 unos (+ 2b okov i obrade) → 3 obračun i ponuda iz Huba (+ 3b dijalog „Kupac potvrdio“, 3c događaji naloga) → 4 skladište nakon potvrde → 5 pila / nesting (voditelj) → 6 Nabava (Sanela, preko svih naloga). Proizvodnja i „izrezano“ ostaju praćenju proizvodnje (D-03).\nNOVO u v0.4 (prema D-40 i D-42): ekran 3 — ponuda nastaje i šalje se iz Huba („Pošalji kupcu“), rabat kupca s dvije stope, eSlog u Pantheon tek uz „Kupac potvrdio“ (3b: datum, način, rok obećan); 3c vremenska crta događaja; ekran 6 Nabava — pregled potreba preko svih potvrđenih naloga i narudžbenice po dobavljaču koje se zatvaraju iz primke; lijeva traka dobila „Nabava“; na ekranima više nema oznaka odluka (D-xx) — one ostaju u ovim bilješkama.\nDizajn = varijanta D (D-39), sredina u nijansama C, zaglavlje nepromijenjeno. Brojke su stvarne za nalog HUMER_OMIS_2823 (ponuda 26-010-002823: ploče i m² PW-metodom, metri traka, Winstore stanje 11. 9., cijene iz šifrarnika, rabat 15 % / 20 % kao u ponudi 2823, okov iz OKOV (48).xlsx). Ilustracija su: datumi, vremena i statusi, drugi nalozi (BLAGO, VARGA…), narudžbenice N-2026-04x, primke PR-118x, stanje pila-materijala, role i adrese traka, mini-sheme, e-mail kupca."
+    },
+    {
+      "id": "n-nalozi",
+      "x": 0,
+      "y": -300,
+      "w": 1440,
+      "text": "1 · POPIS NALOGA — što je ugrađeno\nD-33: naziv KUPAC_NAZIV_BROJ (HUMER_OMIS_2823), Hub broj u pozadini. D-35: statusi Unos → Ponuda (čeka kupca) → Potvrđeno → Skladište → Pila / nesting → Proizvodnja → Zatvoren. D-34: voditelj radi iz istog popisa (filter „Čeka voditelja“). Desno: kartice po koraku toka — tko čeka koga (kupac, skladište, voditelj), rezultati sa strojeva, skladište; manjak nakon potvrde vodi u Nabavu (D-42)."
+    },
+    {
+      "id": "n-unos",
+      "x": 1560,
+      "y": -300,
+      "w": 1440,
+      "text": "2 · UNOS NALOGA — što je ugrađeno\nD-36: rubovi se biraju samo mišem (M / A uz dasku), bez tipkovničkih prečaca; god se nasljeđuje iz Winstorea (Grain), gašenje po elementu uz potvrdu; kerf u panelu Zaglavlje (na klik); CPW za PanelWizard uvijek automatski. D-31: izbornici MEL-ISTI (0,5 mm) i ABS (zadano ABS-ISTI = 1 mm, rijetko „ABS-ISTI 2mm“) iznad daske. D-38: napomena elementa s brojačem — prvih 14 znakova ide na etiketu. D-32: Okov i Obrade su grupe naloga u lijevom stupcu (klik na „Okov“ → ekran 2b ispod). Desni stupac stalno vidljiv: trake materijala, materijal i skladište, sažetak, provjere. Nepromijenjeno od v0.3.1 (osim „Nabava“ u lijevoj traci)."
+    },
+    {
+      "id": "n-okov",
+      "x": 1560,
+      "y": 1080,
+      "w": 1440,
+      "text": "2b · OKOV I OBRADE (D-32) — nepromijenjeno od v0.3.1\nOkov iz kupčevog Excela / fotografije ili iz Corpusovog popisa; alias-tablica → ident bez pitanja, inače prepoznavanje po nazivu + oznaka „za potvrdu“; ništa ne ide u ponudu bez potvrde onoga tko unosi. Obrade i usluge (bušenje, nut, CNC, LED urez…) upisuje ured pri obračunu (D-38); za Corpus naloge Hub ih kasnije predlaže iz CIX-a (I-14). Sve tri grupe idu u jedan eSlog XML: materijali → okov → usluge."
+    },
+    {
+      "id": "n-ponuda",
+      "x": 3120,
+      "y": -300,
+      "w": 1440,
+      "text": "3 · OBRAČUN → PONUDA IZ HUBA (D-40) — NOVO u v0.4\nPonuda nastaje i šalje se iz Huba: glavna akcija je „Pošalji kupcu“ (PDF + e-mail s adrese ponuda@paneliprojekt.hr, D-41 — čeka potvrdu pružatelja e-pošte); u Pantheon ide tek potvrđena ponuda (eSlog uz „Kupac potvrdio“, dijalog 3b ispod). Do potvrde ponuda nosi Hub broj (2026-02823); Pantheonov broj (26-010-002823) vraća se u nalog nakon potvrde (D-33). Cijene iz dnevne sinkronizacije Pantheona, u Hubu se ne mijenjaju; RABAT kupca s DVIJE stope iz šifrarnika kupaca Huba (u Zaglavlju naloga): Humer 15 % materijal + okov + ostalo, 20 % rezanje i kantiranje — točno kao u ponudi 2823 (stupac Rabat, iznos po stavci = količina × cijena × (1 − rabat), PDV 25 %). Verzije ponude (v1 → v3) čuvaju svoj PDF i tekst maila. D-18: količine PW-metodom; D-37: RP = 2 × cijela; D-38: obrade i usluge upisuje ured, šalju Ivana i Goran. „Pošalji u Pantheon odmah“ ostaje kao iznimka za paralelni rad (D-11)."
+    },
+    {
+      "id": "n-potvrda",
+      "x": 3120,
+      "y": 1080,
+      "w": 1440,
+      "text": "3b · „KUPAC POTVRDIO“ (D-40 + D-42) — ured upisuje potvrdu ručno (mail / telefon / osobno), datum, ROK OBEĆAN kupcu (službeni rok — po njemu planira proizvodnja; rok koji kupac traži je samo napomena) i prioritet; osoba se uzima iz prijave. Na „Potvrdi“ Hub: zaključa verziju, upiše događaj, pošalje eSlog ponude u Pantheon (ponuda → račun, cijena i rabat po stavci), provjeri skladište i rezervira količine, a manjak preda Nabavi.\n3c · DOGAĐAJI NALOGA (10 §1, §4; D-42) — dnevnik promjena statusa (iz → u, tko, kada, razlog), rokovi, potvrda kupca, osobe po koraku. Otvara se na klik iz Zaglavlja, nije na radnom ekranu. Događaje čita praćenje proizvodnje preko API-ja; ne mogu se brisati. Prikazan je isti nalog u kasnijem trenutku (nakon potvrde i nabave), da se vidi cijela crta."
+    },
+    {
+      "id": "n-skladiste",
+      "x": 4680,
+      "y": -300,
+      "w": 1440,
+      "text": "4 · SKLADIŠTE NAKON POTVRDE KUPCA (D-35) — promjena u v0.4: manjak ide u Nabavu\nKad kupac potvrdi, Hub provjeri Winstore (cijele ploče za nesting, izvoz 11. 9.), Hub skladište ploča (pila), restlove i regal-traku; da UPOZORENJE (proizvodnja ne može krenuti) i rezervira količine za ovaj nalog. Popis manjka po nalogu više se ne šalje mailom odavde — Hub ga sam preda modulu Nabava (ekran 6), gdje Sanela vidi potrebe preko SVIH naloga i radi narudžbenicu po dobavljaču (D-42). D-02: Hub skladište = količine, Pantheon = financije. Winstore brojke su stvarne; stanje pila-materijala, role traka i adrese su ilustracija."
+    },
+    {
+      "id": "n-pila",
+      "x": 6240,
+      "y": -300,
+      "w": 1440,
+      "text": "5 · PILA / NESTING (voditelj) — nepromijenjeno od v0.3.1\nD-34: sheme uvijek vidljive uz materijal (krojne sheme PW-metodom za obračun + rezultat s nestinga), voditelj potvrđuje put u istom ekranu; operater nestinga radi iz mape (Hub zapiše CSV+CIX); potvrda „izrezano“ ostaje praćenju proizvodnje. D-36: CPW za PanelWizard uvijek automatski. D-29: element s CNC obradom uvijek nesting. D-38: „naplaćeno vs potrošeno“ pojavljuje se tek kad stigne .mno — na ovom ekranu, ne na obračunu; ne mijenja ponudu (D-18). Mini-sheme su ilustracija; brojevi ploča i iskorištenja su stvarni (.mno 11. 9.)."
+    },
+    {
+      "id": "n-nabava",
+      "x": 7800,
+      "y": -300,
+      "w": 1440,
+      "text": "6 · NABAVA (Sanela) — NOVO u v0.4 (D-42, dokument 10 §3 i §6)\nZamjena za sustav narudžbi iz starog programa kontrole proizvodnje. Sredina: POTREBE preko svih potvrđenih naloga — po materijalu Σ potrebno (PW-metoda), fizičko (Winstore / Hub skladište / regal-traka), rezervirano, naručeno, raspoloživo = fizičko − rezervirano + naručeno, manjak i prijedlog; ispod NARUDŽBENICA po dobavljaču (nacrt → poslana → djelomično zaprimljena → zaprimljena), slanje mailom kao ponude (D-41); stavka može biti i bez naloga (zaliha unaprijed, „iskustveno“ kao dosad). Desno: dobave koje kasne, otvorene narudžbenice, nalozi koji čekaju nabavu, pravila računanja. Zatvaranje je automatsko: isti eSlog primke koji Knjiga radi za Pantheon puni i Hub skladište (D-02), Hub spoji stavke (ident + kom) s otvorenom narudžbenicom — Knjiga se ne mijenja, Pantheonova narudžba dobavljaču se ne koristi. Pitanja za Sanelu: treba li narudžbenici broj iz Pantheona ili je Hubov N-2026-xxx dovoljan; koji dobavljači imaju minimalne količine / „samo cijele ploče“ (D-37b); tko potvrđuje slanje."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

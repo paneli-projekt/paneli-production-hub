@@ -1,3 +1,7 @@
 matplotlib>=3.7      # hub/alati/cpo_crtaj.py (slike shema)
 openpyxl>=3.1        # čitanje Excel popisa restlova
 pytest>=7            # testovi
+fastapi>=0.110       # hub/api/app.py (HTTP API)
+uvicorn>=0.27        # poslužitelj za API
+httpx>=0.25          # TestClient u tests/test_api.py
+python-multipart>=0.0.9   # upload datoteka (POST /api/nalog/{id}/uvoz)

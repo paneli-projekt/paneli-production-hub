@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <title>Production Hub v0.4 — Događaji naloga</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=IBM+Plex+Mono:wght@500;600&amp;family=Barlow+Condensed:wght@700&amp;display=swap">
+  <style>
+:root{--ink:#1C2A33;--muted:#66727C;--line:#DDD8CF;--line2:#EBE7DF;--paper:#F6F4EF;--surf:#FFFFFF;--ant:#5A5F64;--or:#F37A20;
+--acc:#2E6B57;--acc-soft:#E3EFE9;--abs:#2F5D8C;--abs-soft:#E4ECF5;--mel:#B7791F;--mel-soft:#F6E7C9;--warn:#B7791F;--crit:#A63D2F;--crit-soft:#F5E1DC}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.4}
+a{color:var(--acc);text-decoration:underline;text-decoration-color:var(--acc)}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums}
+/* zaglavlje — varijanta D, nepromijenjeno */
+.top{height:54px;background:var(--ant);color:#fff;display:flex;align-items:center;gap:12px;padding:0 16px;flex:none}
+.top .brand{display:flex;align-items:center;gap:10px;margin-right:6px}
+.top .brand b{font-size:18px;font-weight:800;white-space:nowrap} .top .brand .us{color:var(--or)}
+.top .crumb{color:#E1E4E7;font-size:13px;white-space:nowrap;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis} .top .crumb b{color:#fff;font-size:15px}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #8A9096;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;color:#E1E4E7;white-space:nowrap}
+.pill.on{background:#fff;border-color:#fff;color:var(--ink)}
+.pill.done{border-color:#C9E3D3;color:#C9E3D3}
+.tbtn{background:transparent;border:1px solid #8A9096;border-radius:6px;padding:6px 12px;font-weight:600;font-size:13px;color:#fff;white-space:nowrap}
+.tbtn.pri{background:#fff;border-color:#fff;color:var(--ink)}
+/* lijeva traka */
+.rail{width:76px;background:var(--surf);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:6px;flex:none}
+.rail .it{width:62px;padding:8px 0 6px;border-radius:8px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:var(--muted)}
+.rail .it.on{background:var(--acc-soft);color:var(--acc)}
+.rail .it svg{width:20px;height:20px}
+/* sredina */
+.btn{background:var(--surf);border:1px solid var(--line);border-radius:6px;padding:7px 12px;font-weight:600;font-size:13px;color:var(--ink);white-space:nowrap}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.ghost{border-style:dashed;color:var(--muted);font-weight:500}
+.btn.sm{padding:5px 9px;font-size:12px}
+.lbl{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.pane{background:var(--surf);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;min-height:0}
+.pane .hd{padding:9px 14px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:8px}
+.pane .bd{padding:8px 14px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.mat{padding:9px 14px;border-bottom:1px solid var(--line2);display:flex;flex-direction:column;gap:2px}
+.mat.on{background:var(--acc-soft);box-shadow:inset 3px 0 0 var(--acc)}
+.mat b{font-size:13px} .mat .m{font-size:12px;color:var(--muted)}
+.tag{display:inline-block;white-space:nowrap;font-size:10.5px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:var(--line2);color:var(--muted)}
+.tag.nest{background:#DAEBEC;color:#1E6E76} .tag.pila{background:#F0E4D6;color:#7A5230} .tag.warn{background:var(--mel-soft);color:#7A4E10} .tag.ok{background:var(--acc-soft);color:var(--acc)}
+.tag.crit{background:var(--crit-soft);color:var(--crit)} .tag.abs{background:var(--abs-soft);color:var(--abs)} .tag.info{background:#E8ECF0;color:#3D4A55}
+table{border-collapse:collapse;width:100%}
+th{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;font-weight:700}
+td{padding:5px 10px;border-bottom:1px solid var(--line2);vertical-align:middle;white-space:nowrap}
+td.r,th.r{text-align:right}
+tr.sel td{background:var(--acc-soft)}
+tr.grp td{background:#E9ECEF;border-top:1px solid #D3D9DE;border-bottom:1px solid #D3D9DE;font-weight:700;font-size:12.5px;padding:6px 10px}
+.inp{background:var(--surf);border:1px solid var(--line);border-radius:6px;padding:7px 10px;min-height:38px;display:flex;align-items:center;gap:8px;font-size:14px}
+.inp.big{font-size:22px;font-weight:700;justify-content:flex-end;font-variant-numeric:tabular-nums}
+.inp.foc{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+.inp .ph{color:#9AA0A6;font-size:13px}
+.kbd{display:inline-block;min-width:18px;text-align:center;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;background:var(--surf);color:var(--ink)}
+.foot{height:58px;background:var(--surf);border-top:1px solid var(--line);display:flex;align-items:center;gap:24px;padding:0 20px;flex:none}
+.kpi b{font-size:18px;font-weight:700;white-space:nowrap} .kpi span{display:block;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;white-space:nowrap}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:var(--acc)}
+.dot.warn{background:var(--warn)} .dot.crit{background:var(--crit)} .dot.info{background:#8A9096} .dot.abs{background:var(--abs)} .dot.mel{background:var(--mel)}
+.addr{display:inline-block;background:#F5C518;color:#1B1706;border:1px solid #8A6D02;border-radius:2px;font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-weight:700;letter-spacing:.06em;padding:0 8px;font-size:14px;line-height:19px;white-space:nowrap}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600;color:var(--muted);background:var(--surf);white-space:nowrap}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.chip .n{font-family:"IBM Plex Mono",monospace;font-size:11px;opacity:.8}
+.radio{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px} .radio i{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--line);display:inline-block;background:#fff}
+.radio i.on{border-color:var(--acc);box-shadow:inset 0 0 0 3.5px var(--acc)}
+.step{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap} .step b{color:var(--ink)} .step.wrap{white-space:normal;align-items:flex-start;line-height:1.35} .step.wrap .s{flex:none;margin-top:1px}
+.step .s{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:#fff}
+.step .s.done{background:var(--acc);border-color:var(--acc);color:#fff} .step .s.now{border-color:var(--acc);color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+.thumb{display:flex;flex-direction:column;gap:3px;align-items:center;font-size:11px;color:var(--muted);white-space:nowrap}
+.thumb svg{display:block;border:1px solid var(--line);border-radius:3px;background:#fff}
+.note{font-size:12px;color:var(--muted)}
+</style>
+</helmet>
+<div style="width: 760px; min-height: 740px; background: #F6F4EF; padding: 0;">
+<div class="pane" style="margin: 20px; overflow: hidden;"><div class="hd"><div style="min-width: 0; white-space: nowrap;"><div class="lbl">Događaji naloga</div><div style="font-weight: 700; font-size: 16px;">HUMER_OMIS_2823 <span style="color: var(--muted); font-weight: 500; font-size: 13px;">· vremenska crta · otvara se iz Zaglavlja</span></div></div><div style="flex: 1;"></div><span class="tag nest">Pila / nesting</span></div><div style="padding: 8px 14px; border-bottom: 1px solid var(--line2);"><div style="display: flex; align-items: center; gap: 10px;"><span class="step" style="font-size: 11.5px;"><span class="s done">✓</span>Unos</span><span class="step" style="font-size: 11.5px;"><span class="s done">✓</span>Ponuda</span><span class="step" style="font-size: 11.5px;"><span class="s done">✓</span>Potvrđeno</span><span class="step" style="font-size: 11.5px;"><span class="s done">✓</span>Skladište</span><span class="step" style="font-size: 11.5px;"><span class="s now">5</span><b>Pila / nesting</b></span><span class="step" style="font-size: 11.5px;"><span class="s ">6</span>Proizvodnja</span><span class="step" style="font-size: 11.5px;"><span class="s ">7</span>Zatvoren</span></div></div><div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line2); background: #FBFAF6; font-size: 12.5px;"><div><div class="lbl">Rok obećan</div><b>26.09.2026</b><div class="note">Ivana · pri potvrdi</div></div><div><div class="lbl">Rok kupca</div>„do kraja mjeseca“<div class="note">napomena</div></div><div><div class="lbl">Potvrda kupca</div><b>12.09.</b> · telefon<div class="note">1 dan nakon v3</div></div><div><div class="lbl">Prioritet</div>normalan<div class="note">voditelj može promijeniti</div></div></div><table style="table-layout: fixed;"><thead><tr><th style="width: 96px;">Kada</th><th style="width: 74px;">Tko</th><th style="width: 190px;">Status</th><th>Što</th></tr></thead><tbody><tr><td class="mono" style="font-size: 12px; color: var(--muted);">18.08. 09:12</td><td><span class="tag">IVANA</span></td><td style="font-weight: 600; white-space: normal;"><span class="dot info"></span>— → Unos</td><td style="white-space: normal; color: var(--muted);">nalog otvoren · uvoz CPW iz PPW-a: 6 materijala, 123 stavke</td></tr><tr><td class="mono" style="font-size: 12px; color: var(--muted);">18.08. 13:40</td><td><span class="tag">IVANA</span></td><td style="font-weight: 600; white-space: normal;"><span class="dot info"></span>Unos → Ponuda</td><td style="white-space: normal; color: var(--muted);">v1 poslana kupcu (PDF + e-mail iz Huba)</td></tr><tr><td class="mono" style="font-size: 12px; color: var(--muted);">20.08. 10:05</td><td><span class="tag">IVANA</span></td><td style="font-weight: 600; white-space: normal;"><span class="dot info"></span>Ponuda</td><td style="white-space: normal; color: var(--muted);">nova verzija v2 — kupac dodao okov · poslana</td></tr><tr><td class="mono" style="font-size: 12px; color: var(--muted);">27.08. 07:00</td><td><span class="tag info">Hub</span></td><td style="font-weight: 600; white-space: normal;"><span class="dot info"></span>Ponuda</td><td style="white-space: normal; color: var(--muted);">podsjetnik kupcu: 7 dana bez odgovora</td></tr><tr><td class="mono" style="font-size: 12px; color: var(--muted);">11.09. 14:20</td><td><span class="tag">IVANA</span></td><td style="font-weight: 600; white-space: normal;"><span class="dot info"></span>Ponuda</td><td style="white-space: normal; color: var(--muted);">v3 — radna ploča 2 × cijela · poslana</td></tr><tr><td class="mono" style="font-size: 12px; color: var(--muted);">12.09. 08:15</td><td><span class="tag">IVANA</span></td><td style="font-weight: 600; white-space: normal;"><span class="dot ok"></span>Ponuda → Potvrđeno</td><td style="white-space: normal; color: var(--muted);">telefon · rok obećan 26.09. · eSlog → Pantheon 26-010-002823</td></tr><tr><td class="mono" style="font-size: 12px; color: var(--muted);">12.09. 08:15</td><td><span class="tag info">Hub</span></td><td style="font-weight: 600; white-space: normal;"><span class="dot warn"></span>Potvrđeno → Skladište</td><td style="white-space: normal; color: var(--muted);">2 materijala bez ploča (7 pl.) → rezervacija za 4 · manjak u Nabavu</td></tr><tr><td class="mono" style="font-size: 12px; color: var(--muted);">12.09. 09:30</td><td><span class="tag">SANELA</span></td><td style="font-weight: 600; white-space: normal;"><span class="dot info"></span>Skladište</td><td style="white-space: normal; color: var(--muted);">narudžbenica N-2026-043 IVERPAN poslana · očekivano 16.09.</td></tr><tr><td class="mono" style="font-size: 12px; color: var(--muted);">12.09. 10:02</td><td><span class="tag">VP</span></td><td style="font-weight: 600; white-space: normal;"><span class="dot ok"></span>Skladište → Pila / nesting</td><td style="white-space: normal; color: var(--muted);">put potvrđen: 2 nesting · 4 pila (2 materijala čekaju dobavu)</td></tr><tr><td class="mono" style="font-size: 12px; color: #B8BDC2;">—</td><td></td><td style="color: #B8BDC2; white-space: normal;">Pila / nesting → Proizvodnja → Zatvoren</td><td style="color: #B8BDC2; white-space: normal;">upisuje praćenje proizvodnje (izrezano, kantirano, isporučeno)</td></tr></tbody></table><div style="padding: 9px 14px; border-top: 1px solid var(--line2); font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 3px;"><div>Osobe po koraku: unio <b>IVANA</b> · poslao <b>IVANA</b> · potvrdio <b>IVANA</b> · nabava <b>SANELA</b> · put <b>VP</b> · operateri upisuje praćenje proizvodnje</div><div>Događaji se ne brišu; praćenje proizvodnje i „naplaćeno vs potrošeno“ čitaju ih preko API-ja.</div></div></div>
+</div>
+</x-dc>
+</body>
+</html>

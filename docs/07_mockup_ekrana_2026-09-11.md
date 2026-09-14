@@ -1,4 +1,4 @@
-# Paneli Production Hub — faza 2, korak 1: mockup ekrana (v0.1 11. 9. → v0.3 12. 9. 2026.)
+# Paneli Production Hub — faza 2, korak 1: mockup ekrana (v0.1 11. 9. → v0.4 12. 9. 2026.)
 
 Po D-14 (ekrani se prvo crtaju, pa kodiraju) i D-28 (faza 2 počinje mockupom s voditeljem proizvodnje i Igorom).
 Igor je 11. 9. izabrao: **statični ekrani na jednom platnu** (ne klikabilni prototip) i **cijeli tok naloga** u prvom krugu.
@@ -144,7 +144,38 @@ v0.3.1 (Igorove primjedbe na boje, isti dan): retci s nazivom grupe u tablicama 
 nesting tirkiz `#1E6E76` na `#DAEBEC`, pila drvo `#7A5230` na `#F0E4D6`; adrese pretinaca traka su identične regal-traci (žuto `#F5C518`,
 tamni tekst, tanki rub `#8A6D02`, Barlow Condensed).
 
+
+## 4c. v0.4 (12. 9. 2026., kasno navečer) — ponuda iz Huba, potvrda kupca, događaji naloga, Nabava
+
+Nastavak v0.3.1 prije prezentacije kolegama: ugrađeno je ono što je odlučeno nakon v0.3 (D-40 ponuda iz Huba, D-42 nabava i temelji za praćenje)
+i što ne ovisi o povratnim informacijama Ivane, Gorana i voditelja. Platno = isti artefakt „Production Hub — mockup ekrana“ (verzija 17),
+9 artboarda; slike `20_ANALIZA\mockup\v04_*.png`; offline kopija `20_ANALIZA\mockup\production-hub-mockup-ekrana.html`;
+izvor `30_NOVI_PROGRAM\docs\mockup\v04\` (`build_v04.py` + `v04_base.py`, `canvas.json`, `shot.py` za PNG).
+
+| Ekran | Datoteka (PNG) | Što je novo / promijenjeno |
+|---|---|---|
+| 1 Nalozi (popis) | `v04_1_Nalozi_popis.png` | kartica „Potvrđeno → skladište“ vodi manjak u Nabavu; lijeva traka ima „Nabava“ (na svim ekranima) |
+| 2 Unos naloga · 2b Okov | `v04_2_Unos_naloga.png`, `v04_2b_Okov_obrade.png` | nepromijenjeno (osim trake) |
+| **3 Obračun → ponuda iz Huba** | `v04_3_Obracun_ponuda.png` | **D-40**: glavna akcija „Pošalji kupcu“ (zaglavlje, podnožje, panel „Slanje kupcu“: za / od `ponuda@paneliprojekt.hr` / predmet / PDF privitak); ponuda do potvrde nosi Hub broj `2026-02823 · v3`; stupac **Rabat** i iznos po stavci = količina × cijena × (1 − rabat), dvije stope kupca u zaglavlju stavki (Humer 15 % / 20 %), PDV 25 % i ukupno; verzije v1 → v3 s vlastitim PDF-om; „Stanje ponude“: nacrt → pošalji → čeka kupca (podsjetnik 7 dana) → kupac potvrdio → eSlog; eSlog gumb više nije na ekranu — ide sam uz potvrdu, „Pošalji u Pantheon odmah“ ostaje kao iznimka (D-11) |
+| **3b Kupac potvrdio (dijalog)** | `v04_3b_Kupac_potvrdio.png` | novi mali ekran (620×620): datum potvrde, način (e-mail / telefon / osobno), **rok obećan kupcu** (službeni), rok kupca (napomena), prioritet, tko (iz prijave); popis onoga što Hub napravi na „Potvrdi“ (zaključaj verziju, događaj, eSlog u Pantheon, provjera skladišta, rezervacija, manjak u Nabavu); kvačica „Pošalji eSlog u Pantheon odmah“ |
+| **3c Događaji naloga** | `v04_3c_Dogadjaji_naloga.png` | novi mali ekran (760×740, na klik iz Zaglavlja): rokovi i potvrda kupca u zaglavlju, dnevnik iz → u / tko / kada / što (od unosa do potvrde puta), buduće korake upisuje praćenje; osobe po koraku u podnožju (10 §1, §4) |
+| 4 Skladište nakon potvrde | `v04_4_Skladiste_nakon_potvrde.png` | odjeljak „Popis za nabavu“ postao „Manjak za nalog“ s gumbom „Otvori u Nabavi“ (Hub ga sam preda modulu nabava); traka ABS 1/22 JELA CLAY prikazana kao „u dolasku 15.09.“; „Što dalje“ prepisano (narudžbenica → primka iz Knjige zatvara) |
+| 5 Pila / nesting | `v04_5_Pila_nesting.png` | nepromijenjeno |
+| **6 Nabava (Sanela)** | `v04_6_Nabava.png` | **D-42, 10 §3 i §6** — novi ekran, korisnik SA: lijevo Potrebe · manjak / Narudžbenice / Očekivane dobave / Zaprimljeno + dobavljači; sredina tablica POTREBE preko svih potvrđenih naloga (treba Σ, nalozi, fizičko, rezervirano, naručeno, raspoloživo = fizičko − rezervirano + naručeno, manjak, prijedlog „naruči N“ + „iskustveno“ za zalihu unaprijed) i NARUDŽBENICA nacrt N-2026-043 IVERPAN (stavke s vezom na naloge ili „zaliha“, očekivana dobava, status nacrt → poslana → djelomično zaprimljena → zaprimljena, „Pošalji dobavljaču (e-mail)“); desno Kasni (djelomična dobava), Otvorene narudžbenice, Nalozi koji čekaju nabavu, Kako Hub računa; podnožje objašnjava automatsko zatvaranje iz eSlog primke (Knjiga se ne mijenja) |
+
+Pravilo iz §4a provedeno dosljedno: na ekranima više nema oznaka odluka (D-xx / I-xx) — generator ih pri zapisu uklanja (`strip_dxx`) i odbija
+ekran na kojem bi ostala oznaka ili riječ „AI“; obrazloženja s oznakama ostaju samo u bilješkama na platnu i ovdje. Brojke na ekranu 3 su iz
+stvarne ponude 2823 (rabat 15 % / 20 %, PDV 25 %); ukupno s rabatom na mockupu je 4.673,44 € bez PDV-a (ponuda 2823 ima drukčiji skup stavki —
+mockup prikazuje samo dio okova i usluga sažeto). Ilustracija su: e-mail kupca (u Hubu iz šifrarnika kupaca — preduvjet D-40 (1)), datumi i vremena,
+verzije v1/v2, nalozi BLAGO / VARGA / BOGDANIĆ, narudžbenice N-2026-04x, primke PR-118x, dobavljači po materijalu.
+
+Pitanja za prezentaciju v0.4 (uz ona iz §4): za Ivanu / Gorana — je li dijalog potvrde (3b) dovoljan ili potvrdu upisuju iz popisa naloga bez
+otvaranja ponude; treba li „Pošalji kupcu“ tražiti pregled PDF-a prije slanja; što u mail ide kao tekst (predložak). Za Sanelu — treba li narudžbenici
+Pantheonov broj ili je Hubov `N-2026-xxx` dovoljan; koji dobavljači imaju minimalne količine / „samo cijele ploče“ (D-37b); tko smije poslati narudžbu;
+je li pregled potreba po materijalu (a ne po nalogu) ono što danas radi u starom programu. Za voditelja — treba li vremenska crta (3c) i njemu, i
+gdje: u popisu naloga ili samo u nalogu.
+
 ## 5. Sljedeći korak
 
-Odgovori sa sastanka → DECISIONS (D-29…) → mockup v0.2 (ispravci) → kod ekrana „Unos naloga“ kao prvi ekran kralježnice (04 §4, korak 2), uz šifrarnik
-materijala s aliasima (korak 1) koji taj ekran već pretpostavlja.
+Prezentacija v0.4 Ivani, Goranu, Saneli i voditelju (ekrani 3, 3b, 4, 5, 6) → povratne informacije → v0.5 (ispravci) → Igor odobrava → kod
+kralježnice (04 §4): šifrarnik materijala i traka s aliasima (korak 1), pa nalog + elementi i ekran „Unos naloga“ (korak 2), s tablicama iz 10 §4 od početka.
