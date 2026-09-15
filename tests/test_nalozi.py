@@ -2,6 +2,7 @@
 """Testovi koraka 2 — kupci, nalog, materijali, elementi, statusi, uvoz CPW / CSV kroz šifrarnik, API.
 Dio A: sintetički šifrarnik (iz test_sifrarnik.py) + mali ph_subjekti.csv + CPW/CSV datoteke u tmp — uvijek.
 Dio B: stvarni testni nalozi (HUB_TEST_DATA) — CPW ↔ CSV uvoz istog naloga daje iste elemente; materijali prepoznati."""
+import io
 import os
 import pytest
 
@@ -275,6 +276,141 @@ def test_api_nalozi(baza, monkeypatch):
         P.ocisti_kes()
 
 
+def test_spajanje_prijedlozi(baza):
+    """Dva naloga, isti materijal, svaki ispod pola ploče → jedan prijedlog za nesting (D-54)."""
+    from hub.nalozi import spajanje as SP
+    k = K.trazi_kupce(baza, "", limit=2)
+    mid = baza.execute("SELECT id FROM materijal WHERE pantheon_ident = 'IV000090'").fetchone()[0]
+    n1 = N.novi_nalog(baza, "TEST", kupac_id=k[0]["id"], projekt="PRVI")["id"]
+    n2 = N.novi_nalog(baza, "TEST", kupac_id=k[-1]["id"], projekt="DRUGI")["id"]
+    for nid, kom in ((n1, 4), (n2, 5)):                                    # 4 x 0,72 m2 = 0,50 ploce; 5 x 0,72 = 0,62 — oba ispod ploce
+        nm = N.dodaj_materijal(baza, nid, "TEST", materijal_id=mid)[0]["id"]
+        N.dodaj_element(baza, nm, "TEST", L=1200, W=600, kom=kom, naziv="POD")
+        baza.execute("UPDATE nalog SET status = 'potvrdjeno' WHERE id = ?", (nid,))
+    baza.commit()
+    s = SP.sazetak(baza)
+    assert s["naloga"] == 2 and s["redaka"] == 2 and s["ispod_ploce"] == 2
+    assert len(s["prijedlozi"]) == 1
+    p = s["prijedlozi"][0]
+    assert (p["ident"], p["naloga"], p["ispod_ploce"], p["ploca_spojeno"]) == ("IV000090", 2, 2, 2)
+    assert p["ploca"] == 1.12 and [x["broj"] for x in p["stavke"]][0].endswith("00002")   # veći nalog prvi
+    assert SP.sazetak(baza, prag_ploca=3)["prijedlozi"] == []               # ispod praga nema prijedloga
+    baza.execute("UPDATE nalog_materijal SET ploca_L = 1200, ploca_W = 800 WHERE nalog_id = ?", (n1,))   # restl se ne spaja
+    baza.commit()
+    assert SP.sazetak(baza)["prijedlozi"] == [] and SP.sazetak(baza)["na_restlu"] == 1
+
+
+def test_izvoz_nesting(baza, tmp_path):
+    """CSV + CIX za bNest: paket po materijalu, jedinstvena imena CIX-a zauvijek (D-23), Winstore kod u SIFRA MAT (D-24)."""
+    from hub.nalozi import export_nesting as EX
+    from hub.formati import nalog_io
+    k = K.trazi_kupce(baza, "", limit=1)
+    mid = baza.execute("SELECT id FROM materijal WHERE pantheon_ident = 'IV000090'").fetchone()[0]
+    baza.execute("UPDATE materijal SET winstore_kod = 'W908ST2-18' WHERE id = ?", (mid,))
+    nid = N.novi_nalog(baza, "TEST", kupac_id=k[0]["id"], projekt="IZVOZ")["id"]
+    nm = N.dodaj_materijal(baza, nid, "TEST", materijal_id=mid)[0]["id"]
+    for L, W, kom in ((800, 560, 2), (400, 300, 1)):
+        N.dodaj_element(baza, nm, "TEST", L=L, W=W, kom=kom, naziv="POD", rubovi={"L": "ABS-ISTI"})
+    baza.commit()
+
+    suho = EX.izvezi(baza, nid, str(tmp_path), "TEST", suho=True)
+    assert len(suho["paketi"]) == 1 and suho["paketi"][0]["elemenata"] == 2 and suho["paketi"][0]["komada"] == 3
+    assert baza.execute("SELECT COUNT(*) FROM cix_registar").fetchone()[0] == 0      # suhi izvoz ne dira bazu
+
+    r = EX.izvezi(baza, nid, str(tmp_path), "TEST")
+    p = r["paketi"][0]
+    assert p["winstore_kod"] == "W908ST2-18" and len(p["cix"]) == 2
+    els = nalog_io.read_ppnest_csv(p["csv"])
+    assert [(e["L"], e["W"], e["kom"], e["sifra_mat"], e["deb"]) for e in els] == [
+        (800, 560, 2, "W908ST2-18", 18), (400, 300, 1, "W908ST2-18", 18)]
+    assert all(os.path.exists(x) for x in p["cix"])
+    imena = sorted(e["cix"] for e in els)
+    assert imena == ["H0000001", "H0000002"]
+
+    r2 = EX.izvezi(baza, nid, str(tmp_path), "TEST")                                 # ponovni izvoz ne troši nova imena
+    assert sorted(e["cix"] for e in nalog_io.read_ppnest_csv(r2["paketi"][0]["csv"])) == imena
+    assert baza.execute("SELECT COUNT(*) FROM cix_registar").fetchone()[0] == 2
+
+    baza.execute("UPDATE nalog_materijal SET put = 'pila' WHERE id = ?", (nm,))      # materijal na pili se preskače
+    baza.commit()
+    with pytest.raises(EX.ExportGreska):
+        EX.izvezi(baza, nid, str(tmp_path), "TEST")
+    assert EX.izvezi(baza, nid, str(tmp_path), "TEST", samo_nesting=False)["paketi"][0]["elemenata"] == 2
+
+
+def test_izvoz_pw(baza, tmp_path):
+    """CPW za PanelWizard: jedna datoteka po materijalu, zaglavlje ispred svakog elementa kao kod PPNEST-a (D-11)."""
+    from hub.nalozi import export_pw as EW
+    k = K.trazi_kupce(baza, "", limit=1)
+    mid = baza.execute("SELECT id FROM materijal WHERE pantheon_ident = 'IV000090'").fetchone()[0]
+    nid = N.novi_nalog(baza, "TEST", kupac_id=k[0]["id"], projekt="CPW")["id"]
+    nm = N.dodaj_materijal(baza, nid, "TEST", materijal_id=mid)[0]["id"]
+    N.dodaj_element(baza, nm, "TEST", L=800, W=560, kom=2, naziv="POD", rubovi={"L": "MEL-ISTI"})
+    N.dodaj_element(baza, nm, "TEST", L=400, W=300, kom=1, naziv="BOK")
+    baza.commit()
+
+    suho = EW.izvezi(baza, nid, str(tmp_path), "TEST", suho=True)
+    assert len(suho["paketi"]) == 1 and suho["paketi"][0]["komada"] == 3
+    assert not os.path.exists(suho["paketi"][0]["cpw"])
+
+    r = EW.izvezi(baza, nid, str(tmp_path), "TEST")
+    redovi = io.open(r["paketi"][0]["cpw"], encoding="cp1250").read().splitlines()
+    assert redovi.count("FORMAT;CORPUS->PW;002600;") == 2               # zaglavlje ispred svakog elementa (kao PPNEST)
+    el = [x for x in redovi if x.startswith("ELEMENT")]
+    assert el[0].split(";")[2:5] == ["800", "560", "2"]
+    assert el[0].split(";")[5] == "M" and el[1].split(";")[5] == ""      # MEL-ISTI -> M, bez ruba -> prazno
+    assert EW.izvezi(baza, nid, str(tmp_path), "TEST", header_once=True)["paketi"]   # uredniji zapis prolazi isto
+
+    baza.execute("UPDATE nalog_materijal SET put = 'nesting' WHERE id = ?", (nm,))
+    baza.commit()
+    assert EW.izvezi(baza, nid, str(tmp_path), "TEST", suho=True)["paketi"]          # PW dobiva i ono što ide na nesting
+    with pytest.raises(EW.ExportGreska):
+        EW.izvezi(baza, nid, str(tmp_path), "TEST", samo_pila=True, suho=True)
+
+
+def test_izvoz_pila(baza, tmp_path):
+    """Optimizacija + CPO za pilu: Hubov broj programa (D-22), kerf naloga za slaganje a 5 mm u datoteci (D-21)."""
+    from hub.nalozi import export_pila as EP
+    from hub.formati import cpo_rw
+    k = K.trazi_kupce(baza, "", limit=1)
+    mid = baza.execute("SELECT id FROM materijal WHERE pantheon_ident = 'IV000090'").fetchone()[0]
+    nid = N.novi_nalog(baza, "TEST", kupac_id=k[0]["id"], projekt="PILA")["id"]
+    nm = N.dodaj_materijal(baza, nid, "TEST", materijal_id=mid)[0]["id"]
+    N.dodaj_element(baza, nm, "TEST", L=800, W=560, kom=6, naziv="POD")
+    baza.commit()
+
+    suho = EP.izvezi(baza, nid, str(tmp_path), "TEST", suho=True)
+    assert suho["paketi"][0]["ploca"] == 1 and suho["paketi"][0]["komada"] == 6
+    assert not os.path.exists(suho["paketi"][0]["cpo"])
+    assert baza.execute("SELECT COUNT(*) FROM optimizacija").fetchone()[0] == 0      # suhi izvoz ne dira bazu
+
+    r = EP.izvezi(baza, nid, str(tmp_path), "TEST")
+    p = r["paketi"][0]
+    assert p["program"] == "HUB_00001" and r["kerf"] == 16.0
+    d = cpo_rw.parse(p["cpo"])
+    assert d["prog"] == "HUB_00001" and d["ctl2"][0] == EP.KERF_PILE and d["thk"][0] == 18.0
+    assert len(d["ord"]) == 1 and d["ord"][0]["qty"] == 6 and not cpo_rw.validate(d)
+    assert cpo_rw.write(d) == open(p["cpo"], "rb").read()                            # bajt po bajt kao PW
+    assert baza.execute("SELECT broj_ploca, rezova FROM optimizacija").fetchone()[0] == 1
+
+    assert EP.izvezi(baza, nid, str(tmp_path), "TEST")["paketi"][0]["program"] == "HUB_00002"   # brojač ide dalje
+    baza.execute("UPDATE nalog_materijal SET put = 'nesting' WHERE id = ?", (nm,))
+    baza.commit()
+    with pytest.raises(EP.ExportGreska):
+        EP.izvezi(baza, nid, str(tmp_path), "TEST", suho=True)
+
+
+def test_tip_ruba():
+    """M/A u CPW-u: odlučuje klasa prepoznate trake, a kad je nema — tekst oznake iz naloga."""
+    assert N.tip_ruba("0,5/22", "MEL-ISTI") == "M"           # tanka melaminska
+    assert N.tip_ruba("1/22", "1/22 AVIVA DEW") == "A"       # 1 mm je ABS i kad je operater upisao M
+    assert N.tip_ruba("1/44", "1/44 ISTI") == "A"
+    assert N.tip_ruba(None, "MEL-ISTI") == "M"               # traka neprepoznata: vrijedi tekst
+    assert N.tip_ruba("", "MEL 0.5/22 BIJELI NK") == "M"
+    assert N.tip_ruba(None, "ABS-ISTI") == "A"
+    assert N.tip_ruba(None, None) == "" and N.tip_ruba("", "") == ""
+
+
 # ------------------------------------------------------------------ B. stvarni testni nalozi
 from tests.test_sifrarnik import DATA, PH_CSV, WIN_XML, stvarni, stvarna_baza   # noqa: E402,F401
 
@@ -283,7 +419,7 @@ from tests.test_sifrarnik import DATA, PH_CSV, WIN_XML, stvarni, stvarna_baza   
 def test_prihvacanje_uvoz_naloga(stvarna_baza):
     rez = PR.provjeri(stvarna_baza, DATA)
     s = PR.sazetak(rez)
-    assert s["naloga"] == 9 and s["usporedivo"] == 8 and s["slaze_se"] >= 7    # MAZUR: CSV materijal za potvrdu zbog tipfelera 'K2739DC-19'
+    assert s["naloga"] == 8 and s["usporedivo"] == 8 and s["slaze_se"] >= 7    # 8 naloga s datotekama (ROMIC ide samo na pilu); MAZUR: tipfeler 'K2739DC-19'
     assert s["materijala_sigurno"] >= s["materijala"] - 1                   # jedini nesigurni: isti MAZUR CSV materijal
     assert s["elemenata"] >= 990 and s["komada"] >= 2200
     bratek = [r for r in rez if r["mapa"] == "_BRATEK_KUPAC1"][0]

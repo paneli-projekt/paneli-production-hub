@@ -25,13 +25,21 @@ def mape_naloga(koren):
         pw = sorted({os.path.normpath(p) for p in glob.glob(os.path.join(d, "04_export_nesting", "**", "PANEL WIZARD", "*.[cC][pP][wW]"), recursive=True)})
         csvs = sorted({os.path.normpath(p) for p in glob.glob(os.path.join(d, "04_export_nesting", "**", "NESTING", "*.[cC][sS][vV]"), recursive=True)})
         kupac = sorted({os.path.normpath(p) for p in glob.glob(os.path.join(d, "01_ulaz_kupca", "*.[cC][pP][wW]"))})
+        if not (pw or csvs or kupac):
+            continue                                   # prazna mapa ili _PREDLOZAK_NALOGA — nije nalog
         out.append(dict(mapa=os.path.basename(d), pw=pw, csv=csvs, kupac=kupac))
     return out
 
 
+_BROJAC = [0]
+
+
 def _uvezi(conn, naziv, datoteke, izvor, tko="PROVJERA"):
     dijelovi = naziv.split("_", 1)
-    n = N.novi_nalog(conn, tko, kupac_kratki=dijelovi[0], projekt=dijelovi[1] if len(dijelovi) > 1 else "", izvor="provjera")
+    _BROJAC[0] += 1
+    r = _BROJAC[0]
+    n = N.novi_nalog(conn, tko, kupac_kratki=dijelovi[0], projekt=dijelovi[1] if len(dijelovi) > 1 else "", izvor="provjera",
+                     broj="PROV-%03d" % r, redni=r)     # probni nalozi ne troše godišnji brojač naloga (D-46/1)
     datoteke, starije = U.najnovije_datoteke(datoteke)
     uk = dict(datoteke=0, materijali_novi=0, materijali_spojeni=0, elementi=0, komada=0, za_potvrdu_materijal=0, za_potvrdu_rub=0, preskoceno=0,
               preskocene_starije=[os.path.basename(p) for p in starije])
@@ -45,6 +53,7 @@ def _uvezi(conn, naziv, datoteke, izvor, tko="PROVJERA"):
 
 def provjeri(conn, koren):
     rez = []
+    _BROJAC[0] = max([0] + [int(r[0].split("-")[1]) for r in conn.execute("SELECT broj FROM nalog WHERE broj LIKE 'PROV-%'")])
     for m in mape_naloga(koren):
         r = dict(mapa=m["mapa"])
         for kljuc, dat, izvor in (("cpw", m["pw"], "cpw"), ("csv", m["csv"], "csv"), ("kupac", m["kupac"], "kupac_ppw")):

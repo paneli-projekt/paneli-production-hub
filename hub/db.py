@@ -11,7 +11,7 @@ import os
 import sqlite3
 from datetime import datetime
 
-SHEMA_VERZIJA = 3
+SHEMA_VERZIJA = 7
 
 # Migracije starijih baza (verzija → popis SQL naredbi); 'duplicate column' se preskače (svježa baza već ima stupce iz schema.sql).
 MIGRACIJE = {
@@ -26,6 +26,22 @@ MIGRACIJE = {
     3: [
         "ALTER TABLE kupac ADD COLUMN izvor TEXT NOT NULL DEFAULT 'pantheon'", "ALTER TABLE kupac ADD COLUMN vrsta TEXT",
         "ALTER TABLE kupac ADD COLUMN pantheon_subjekt_racun TEXT",
+    ],
+    4: [
+        "ALTER TABLE winstore_ploca ADD COLUMN ambalaza INTEGER NOT NULL DEFAULT 0",
+    ],
+    5: [                                # sifrarnik_ispravak nastaje iz schema.sql (CREATE IF NOT EXISTS)
+        "ALTER TABLE materijal ADD COLUMN debljina_rucno REAL",
+        "ALTER TABLE materijal ADD COLUMN ne_koristi_se INTEGER NOT NULL DEFAULT 0",
+    ],
+    6: [
+        "ALTER TABLE materijal ADD COLUMN debljina_izvor TEXT",
+        "UPDATE materijal SET debljina_izvor = 'naziv' WHERE debljina IS NOT NULL AND debljina_izvor IS NULL",
+    ],
+    7: [                                # cix_registar nastaje iz schema.sql; postojeća imena elemenata se upisuju u njega
+        "INSERT OR IGNORE INTO cix_registar (ime, element_id, nalog_id, izvor, kada) "
+        "SELECT e.cix_ime, e.id, nm.nalog_id, COALESCE(e.cix_izvor, 'hub'), datetime('now') "
+        "FROM element e JOIN nalog_materijal nm ON nm.id = e.nalog_materijal_id WHERE e.cix_ime IS NOT NULL AND e.cix_ime <> ''",
     ],
 }
 OVDJE = os.path.dirname(os.path.abspath(__file__))

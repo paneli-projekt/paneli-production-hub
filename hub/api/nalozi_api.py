@@ -22,6 +22,8 @@
     POST /api/nalog/{id}/uvoz?izvor=           multipart datoteka CPW ili PPNEST CSV → materijali + elementi kroz šifrarnik
     POST /api/nalog/{id}/ponovi-prepoznavanje  nakon potvrda
     GET  /api/nalog/{id}/elementi-export       element-zapis za exporte (korak 3)
+    GET  /api/spajanje?prag=1&status=          prijedlozi spajanja malih naloga u jedan nesting posao (D-54)
+    POST /api/nalog/{id}/izvoz/nesting         {mapa, stil, suho, tko} CSV + CIX za bNest po materijalu (korak 3, D-23/D-24)
 """
 import os
 import re
@@ -31,7 +33,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 from .. import db
-from ..nalozi import nalozi as N, kupci as K, uvoz_datoteka as U
+from ..nalozi import nalozi as N, kupci as K, uvoz_datoteka as U, spajanje as SP, export_nesting as EX
 
 router = APIRouter()
 _ctx = {}   # puni app.py: {"veza": callable, "brava": Lock}
@@ -226,6 +228,69 @@ def nalog_ponovi(nalog_id: int, tko: str = "web"):
     with _brava():
         _greska(N.nalog, _c(), nalog_id)
         return dict(za_potvrdu=N.ponovi_prepoznavanje(_c(), nalog_id, tko), stavke=N.za_potvrdu(_c(), nalog_id))
+
+
+class IzvozNesting(BaseModel):
+    mapa: str
+    stil: str = "bsolid"
+    suho: bool = False
+    sve: bool = False
+    tko: str = "web"
+
+
+@router.post("/api/nalog/{nalog_id}/izvoz/nesting")
+def nalog_izvoz_nesting(nalog_id: int, p: IzvozNesting):
+    """CSV + CIX za bNest, po materijalu. `suho=true` samo izračuna paket i ne dira ni disk ni bazu."""
+    with _ctx["brava"]:
+        try:
+            return EX.izvezi(_c(), nalog_id, p.mapa, p.tko, p.stil, samo_nesting=not p.sve, suho=p.suho)
+        except EX.ExportGreska as e:
+            raise HTTPException(400, str(e))
+
+
+
+class IzvozPW(BaseModel):
+    mapa: str
+    zaglavlje_jednom: bool = False
+    samo_pila: bool = False
+    suho: bool = False
+    tko: str = "web"
+
+
+@router.post("/api/nalog/{nalog_id}/izvoz/pw")
+def nalog_izvoz_pw(nalog_id: int, p: IzvozPW):
+    """CPW za PanelWizard, po materijalu (paralelni rad, D-11). Zadano izvozi sve materijale naloga."""
+    with _ctx["brava"]:
+        try:
+            return EW.izvezi(_c(), nalog_id, p.mapa, p.tko, header_once=p.zaglavlje_jednom, samo_pila=p.samo_pila, suho=p.suho)
+        except EX.ExportGreska as e:
+            raise HTTPException(400, str(e))
+
+
+class IzvozPila(BaseModel):
+    mapa: str
+    suho: bool = False
+    sve: bool = False
+    tko: str = "web"
+
+
+@router.post("/api/nalog/{nalog_id}/izvoz/pila")
+def nalog_izvoz_pila(nalog_id: int, p: IzvozPila):
+    """Optimizacija + CPO za pilu, po materijalu (D-19 izbor načina, D-21 kerf, D-22 broj programa).
+    `suho=true` složi sheme i vrati brojke bez pisanja — to ekran pokazuje prije slanja na pilu."""
+    with _ctx["brava"]:
+        try:
+            return EP.izvezi(_c(), nalog_id, p.mapa, p.tko, samo_pila=not p.sve, suho=p.suho)
+        except EX.ExportGreska as e:
+            raise HTTPException(400, str(e))
+
+@router.get("/api/spajanje")
+def spajanje_prijedlozi(prag: float = 1.0, status: Optional[str] = None):
+    """Materijali koje traži više naloga koji čekaju rezanje — prijedlog da se izrežu zajedno na nestingu (D-54).
+    Ništa ne mijenja; voditelj odlučuje. `status` = zarezom odvojeni statusi (zadano: potvrdjeno, skladiste, pila_nesting)."""
+    statusi = tuple(x.strip() for x in status.split(",") if x.strip()) if status else SP.STATUSI_ZA_REZANJE
+    with _ctx["brava"]:
+        return SP.sazetak(_c(), statusi, prag)
 
 
 @router.get("/api/nalog/{nalog_id}/elementi-export")

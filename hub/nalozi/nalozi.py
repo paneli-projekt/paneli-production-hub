@@ -68,8 +68,9 @@ def naziv_naloga(kupac_kratki, projekt, n):
 
 # ---------------------------------------------------------------- nalog
 def novi_nalog(conn, tko, kupac_id=None, kupac_kratki=None, projekt="", vrsta="usluga", izvor="rucno", kerf=None, napomena=None,
-               rok_kupca=None, corpus_projekt=None):
-    """Otvori nalog u statusu 'unos'. Rabat se kopira s kupca (ili zadani), broj i naziv dodjeljuje Hub."""
+               rok_kupca=None, corpus_projekt=None, broj=None, redni=None):
+    """Otvori nalog u statusu 'unos'. Rabat se kopira s kupca (ili zadani), broj i naziv dodjeljuje Hub.
+    broj / redni: samo za probne naloge (provjera) — vlastiti broj koji NE troši godišnji brojač naloga."""
     from .kupci import kratki_naziv
     if vrsta not in ("usluga", "vlastita_proizvodnja"):
         raise NalogGreska("vrsta mora biti usluga ili vlastita_proizvodnja")
@@ -78,7 +79,10 @@ def novi_nalog(conn, tko, kupac_id=None, kupac_kratki=None, projekt="", vrsta="u
         raise NalogGreska("nema kupca %s" % kupac_id)
     if not kupac_kratki:
         kupac_kratki = kratki_naziv(k["naziv"]) if k else "KUPAC"
-    godina, n, broj = sljedeci_broj(conn)
+    if broj:
+        n = redni if redni is not None else 0
+    else:
+        godina, n, broj = sljedeci_broj(conn)
     naziv = naziv_naloga(kupac_kratki, projekt, n)
     krajnji = bool(k) and k["vrsta"] == "krajnji"
     rab_m = (k["rabat_materijal"] if k and k["rabat_materijal"] is not None else float(postavka(conn, "rabat_krajnji_materijal" if krajnji else "rabat_materijal_zadano", "0" if krajnji else "15") or 0))
@@ -290,6 +294,23 @@ def _oznaka_ruba(tekst, tip, traka_zadana):
     return ""
 
 
+def tip_ruba(klasa, kod):
+    """Oznaka vrste ruba za CPW / obračun: 'M' tanka melaminska traka, 'A' ABS, prazno bez ruba.
+
+    Odlučuje klasa prepoznate trake (0,5 mm = M), a kad trake nema ili je klasa nepoznata — tekst oznake iz naloga
+    (`MEL-ISTI`, `MEL CRNA NK`). Bez toga bi rub koji je operater naručio kao melamin, a šifrarnik ga nije prepoznao,
+    otišao u PanelWizard kao ABS i bio skuplje naplaćen."""
+    klasa = (klasa or "").strip()
+    kod = (kod or "").strip().upper()
+    if not (klasa or kod):
+        return ""
+    if klasa.startswith("0,5"):
+        return "M"
+    if not klasa and (kod.startswith("MEL") or kod.startswith("0,5")):
+        return "M"
+    return "A"
+
+
 def dodaj_element(conn, nm_id, tko, L, W, kom, naziv=None, rubovi=None, tipovi=None, god=None, napomena=None, izvor="rucno",
                   cix_ime=None, cix_izvor=None, obrada=None, program1=None, program2=None, ljepljenje=None, cjelina=None, pozicija=None, gotova_mjera=None):
     """rubovi = {'L':tekst,'O':tekst,'D':tekst,'G':tekst} (lijevo, dolje, desno, gore); tipovi = {'L':'M'|'A'|''…} kad tekst nedostaje.
@@ -489,7 +510,7 @@ def elementi_za_export(conn, nalog_id):
                 naziv_t = el["rub%d_naziv" % i]
                 klasa = el["rub%d_klasa" % i] or ""
                 traka[r] = naziv_t or (el["rub%d_kod" % i] or "")
-                tip[r] = ("M" if klasa.startswith("0,5") else "A") if traka[r] else ""
+                tip[r] = tip_ruba(klasa, el["rub%d_kod" % i])
             out.append(dict(rb=rb, nalog=n["naziv"], kupac=n["kupac_naziv"] or "", L=el["L"], W=el["W"], kom=el["kom"],
                             sifra_mat=m["winstore_kod"] or "", deb=deb, mat=m["naziv_kratki"] or m["naziv_ulaz"] or "",
                             god=1 if el["god"] else 0, traka=traka, tip=tip, cix=el["cix_ime"] or "", napomena=el["napomena_etiketa"],

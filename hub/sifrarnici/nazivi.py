@@ -20,7 +20,7 @@ STOP = {"IV", "IVERAL", "IVERICA", "MDF", "HDF", "LESONIT", "PVC", "AK", "AKRIL"
 
 # sinonimi / kratice / tipfeleri koji se stalno ponavljaju (norm → kanonski oblik)
 SINONIMI = {
-    "HR": "HRAST", "GL": "GLATKI", "GLATKA": "GLATKI", "BIJELA": "BIJELI", "CRNA": "CRNI", "SIVA": "SIVI",
+    "HR": "HRAST", "GL": "GLATKI", "GLATKA": "GLATKI", "BIJELA": "BIJELI", "CRNA": "CRNI", "SIVA": "SIVI", "TAMNA": "TAMNI",
     "CASHMIR": "KASMIR", "CASHMERE": "KASMIR", "KASMIR": "KASMIR",
     "CHAMPAGE": "CHAMPAGNE", "CHAMPANGE": "CHAMPAGNE", "SAMPANJAC": "CHAMPAGNE",
     "TRESNJA": "TRESNJA", "SVJETLI": "SVIJETLI", "SVJETLA": "SVIJETLI", "SVIJETLA": "SVIJETLI",
@@ -29,7 +29,11 @@ SINONIMI = {
     "MODERNA": "MODERNO", "CANNOL": "CANNOLO",
 }
 
-DEBLJINE_PLOCA = {3, 4, 5, 6, 8, 10, 12, 15, 16, 18, 19, 22, 25, 28, 30, 36, 38, 40}
+DEBLJINE_PLOCA = {3, 4, 5, 6, 8, 10, 12, 13, 15, 16, 18, 19, 22, 25, 28, 30, 36, 38, 40}   # 13 = Fundermax compact
+
+# Debljina koja se podrazumijeva po vrsti kad je u nazivu nema (Igor, 14.9.2026.): radne ploče i ploče stola su 38 mm.
+# Zidne obloge i compact nisu ovdje — kod njih debljina varira (compact 6/8/12/13), pa ih ured potvrđuje po identu (D-51).
+ZADANA_DEBLJINA = {("RP", "radna"): 38.0, ("RP", "stola"): 38.0}
 PREFIKSI_KODA = {"VSM", "VHG", "VA", "FP", "TM", "ST"}  # prefiksi kodova dobavljača (VSM-06, VA-103), ne riječi dekora
 _SINONIMI_NORM = None   # ključevi i vrijednosti provučeni kroz norm() (BIJELA → BJELA → BJELI); puni se pri prvom pozivu
 
@@ -144,9 +148,21 @@ def kodovi(s):
     return out
 
 
+def zadana_debljina(vrsta_, obitelj_rp=None):
+    """Debljina po vrsti za materijale kojima je u nazivu nema (nazivi.ZADANA_DEBLJINA) ili None."""
+    return ZADANA_DEBLJINA.get((vrsta_, obitelj_rp))
+
+
+_DIM3 = re.compile(r"(?<!\d)(\d{3,4})\s*X\s*(\d{2,4})\s*X\s*(\d{1,2}(?:[,.]\d)?)(?![\dA-LN-Z])")   # 4100X640X8MM → 8 (M smije slijediti)
+
+
 def debljina(s):
-    """Debljina ploče iz naziva (mm) ili None: '18MM', '18 MM', '_18_', ' 18' (samo vjerojatne debljine), '18,6MM'; 'VHG-19' / 'VSM-06' su kodovi."""
+    """Debljina ploče iz naziva (mm) ili None: '18MM', '18 MM', '_18_', ' 18' (samo vjerojatne debljine), '18,6MM',
+    i iz dimenzije '4100X640X8MM'; 'VHG-19' / 'VSM-06' su kodovi."""
     n = norm(s)
+    m = _DIM3.search(n)
+    if m and float(m.group(3).replace(",", ".")) in DEBLJINE_PLOCA:
+        return float(m.group(3).replace(",", "."))
     m = re.search(r"(?<![\dA-Z])(\d{1,2}(?:[,.]\d)?)\s*M{1,2}\b", n)
     if m:
         return float(m.group(1).replace(",", "."))

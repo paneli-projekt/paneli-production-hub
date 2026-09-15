@@ -1,0 +1,285 @@
+<title>Skica elementa</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#F6F4EF; --surf:#FFFFFF; --ink:#1C2A33; --muted:#66727C;
+  --line:#DDD8CF; --line2:#EBE7DF; --field:#FBFAF6;
+  --acc:#2E6B57; --acc-soft:#E3EFE9;
+  --abs:#2F5D8C; --abs-soft:#E4ECF5;
+  --mel:#B7791F; --mel-soft:#F6E7C9;
+  --brand:#F37A20; --top:#5A5F64;
+  --shadow:0 1px 2px rgba(28,42,51,.06), 0 8px 24px rgba(28,42,51,.05);
+}
+:root:not([data-theme="light"]){}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#161C21; --surf:#1E262C; --ink:#E9EDF0; --muted:#96A2AC;
+    --line:#35414A; --line2:#2A343B; --field:#192126;
+    --acc:#6FB99C; --acc-soft:#22362F;
+    --abs:#8CB6DC; --abs-soft:#1F2E3C;
+    --mel:#E0AE5C; --mel-soft:#382C16;
+    --brand:#F79247; --top:#2A3239;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#161C21; --surf:#1E262C; --ink:#E9EDF0; --muted:#96A2AC;
+  --line:#35414A; --line2:#2A343B; --field:#192126;
+  --acc:#6FB99C; --acc-soft:#22362F;
+  --abs:#8CB6DC; --abs-soft:#1F2E3C;
+  --mel:#E0AE5C; --mel-soft:#382C16;
+  --brand:#F79247; --top:#2A3239;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:Inter,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.5}
+.wrap{max-width:1000px;margin:0 auto;padding-block:28px;padding-left:20px;padding-right:20px}
+h1{font-size:22px;font-weight:700;margin:0 0 4px;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);font-size:13.5px;margin:0 0 22px;max-width:62ch}
+.eyebrow{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.panel{background:var(--surf);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+.panel-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:11px 16px;border-bottom:1px solid var(--line2);background:linear-gradient(var(--field),var(--surf))}
+.panel-hd b{font-size:14.5px}
+.grow{flex:1 1 auto;min-width:0}
+
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 268px;gap:0}
+@media (max-width:760px){ .stage{grid-template-columns:1fr} .side{border-left:0!important;border-top:1px solid var(--line2)} }
+
+.canvas{padding:18px 16px 14px;display:flex;flex-direction:column;align-items:center;gap:12px}
+#skica{width:100%;max-width:460px;height:auto;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+#skica text{user-select:none}
+.hint{color:var(--muted);font-size:12px;text-align:center;max-width:44ch;text-wrap:balance}
+.hint kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;background:var(--field);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--ink)}
+
+.side{border-left:1px solid var(--line2);padding:16px;display:flex;flex-direction:column;gap:16px}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:4px}
+input[type=number],select{width:100%;background:var(--field);color:var(--ink);border:1px solid var(--line);
+  border-radius:6px;padding:7px 9px;font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;
+  font-variant-numeric:tabular-nums}
+select{font-family:Inter,sans-serif;font-size:13px;font-weight:500}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+
+.rowbtns{display:flex;gap:6px;flex-wrap:wrap}
+button{font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;
+  background:var(--surf);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+button:hover{border-color:var(--muted)}
+button.a{background:var(--abs-soft);border-color:var(--abs);color:var(--abs)}
+button.m{background:var(--mel-soft);border-color:var(--mel);color:var(--mel)}
+
+.slots{border-top:1px solid var(--line2);padding-top:14px}
+.slot{display:flex;align-items:baseline;gap:8px;padding:4px 0;border-bottom:1px dotted var(--line2)}
+.slot:last-child{border-bottom:0}
+.slot .nm{font-size:11.5px;color:var(--muted);width:62px;flex:none;letter-spacing:.03em}
+.slot .vl{font-family:"IBM Plex Mono",monospace;font-size:12.5px;flex:1 1 auto;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot .vl.off{color:var(--muted)}
+.chip{display:inline-block;font-size:10.5px;font-weight:700;border-radius:3px;padding:0 5px;line-height:17px;flex:none}
+.chip.a{background:var(--abs-soft);color:var(--abs)} .chip.m{background:var(--mel-soft);color:var(--mel)}
+.chip.n{background:var(--line2);color:var(--muted)}
+
+.notes{margin-top:24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.note{background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.note h3{margin:6px 0 6px;font-size:14px;font-weight:600}
+.note p{margin:0;color:var(--muted);font-size:13px}
+.note .bar{height:3px;width:26px;border-radius:2px;background:var(--brand)}
+.note.q .bar{background:var(--acc)}
+.foot{margin-top:22px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:12px}
+@media (prefers-reduced-motion:no-preference){ #skica rect,#skica line{transition:all .16s ease} }
+</style>
+
+<div class="wrap">
+  <h1>Skica elementa</h1>
+  <p class="sub">Proba za ekran „Unos naloga“: daska se crta prema upisanim mjerama, a dvoklik u sredinu
+  postavlja trake na sva četiri ruba odjednom. Kliknite, upišite druge mjere, pokušajte dvoklik.</p>
+
+  <div class="panel">
+    <div class="panel-hd">
+      <b>EL_BUSENJE — L_BOK</b>
+      <span class="eyebrow">IVERAL BIJELI NK 18 mm</span>
+      <span class="grow"></span>
+      <span class="eyebrow" id="mjerilo"></span>
+    </div>
+
+    <div class="stage">
+      <div class="canvas">
+        <svg id="skica" viewBox="0 0 460 320" role="img" aria-label="Skica daske s rubovima"></svg>
+        <p class="hint"><kbd>dvoklik</kbd> u sredinu: sve ABS → sve MEL → bez trake ·
+        <kbd>klik</kbd> na M ili A uz rub mijenja samo taj rub</p>
+      </div>
+
+      <div class="side">
+        <div class="fields">
+          <div>
+            <label for="mL">1. mjera · god</label>
+            <input id="mL" type="number" min="10" max="4100" step="1" value="800">
+          </div>
+          <div>
+            <label for="mW">2. mjera</label>
+            <input id="mW" type="number" min="10" max="2200" step="1" value="560">
+          </div>
+        </div>
+        <div>
+          <label for="zad">Zadana traka materijala</label>
+          <select id="zad">
+            <option value="ABS-ISTI">ABS-ISTI 1 mm</option>
+            <option value="ABS-ISTI 2mm">ABS-ISTI 2 mm</option>
+          </select>
+        </div>
+        <div class="rowbtns">
+          <button type="button" class="a" data-all="A">Sve ABS</button>
+          <button type="button" class="m" data-all="M">Sve MEL</button>
+          <button type="button" data-all="">Bez trake</button>
+        </div>
+
+        <div class="slots">
+          <div class="eyebrow" style="margin-bottom:6px">Što ide u nalog</div>
+          <div class="slot"><span class="nm">duža 1</span><span class="chip n" id="c0">—</span><span class="vl off" id="v0">bez trake</span></div>
+          <div class="slot"><span class="nm">kraća 1</span><span class="chip n" id="c1">—</span><span class="vl off" id="v1">bez trake</span></div>
+          <div class="slot"><span class="nm">duža 2</span><span class="chip n" id="c2">—</span><span class="vl off" id="v2">bez trake</span></div>
+          <div class="slot"><span class="nm">kraća 2</span><span class="chip n" id="c3">—</span><span class="vl off" id="v3">bez trake</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><div class="bar"></div>
+      <h3>Mjere mijenjaju crtež</h3>
+      <p>Pravokutnik prati odnos upisanih mjera i okreće se kad 2. mjera postane dulja. Vrlo uske daske
+      crtaju se blaže od stvarnog odnosa da ostanu čitljive — tada piše „nije u mjerilu“.</p></div>
+    <div class="note"><div class="bar"></div>
+      <h3>Rubovi ostaju na svom mjestu</h3>
+      <p>Trake se pamte po mjestu u nalogu (duža 1, kraća 1, duža 2, kraća 2), pa zamjena mjera ne
+      premješta oznake — mijenja se samo slika.</p></div>
+    <div class="note q"><div class="bar"></div>
+      <h3>Otvoreno pitanje</h3>
+      <p>Dvoklik sada vrti ABS → MEL → bez trake. Traka od 2 mm bira se iz izbornika zadane trake —
+      ili da uđe i u krug dvoklika, kao četvrti korak?</p></div>
+  </div>
+
+  <p class="foot">Proba interakcije za mockup ekrana „Unos naloga“ — Paneli projekt d.o.o.</p>
+</div>
+
+<script>
+(function () {
+  var edges = ["", "", "", ""];          // duža1, kraća1, duža2, kraća2  →  "" | "M" | "A"
+  var MAXR = 3.2;                        // najveći odnos koji crtamo doslovno
+  var svg = document.getElementById("skica");
+  var iL = document.getElementById("mL"), iW = document.getElementById("mW"), iZ = document.getElementById("zad");
+  var mj = document.getElementById("mjerilo");
+  var css = getComputedStyle(document.documentElement);
+  function tok(n) { return css.getPropertyValue(n).trim(); }
+
+  function traka(v) { return v === "A" ? iZ.value : (v === "M" ? "MEL-ISTI" : ""); }
+  function opis(v) { return v === "A" ? (iZ.value === "ABS-ISTI" ? "ABS-ISTI 1 mm" : "ABS-ISTI 2 mm")
+                                      : (v === "M" ? "MEL-ISTI 0,5 mm" : "bez trake"); }
+  function boja(v) { return v === "A" ? tok("--abs") : (v === "M" ? tok("--mel") : tok("--line")); }
+
+  function crtaj() {
+    var L = Math.max(10, +iL.value || 10), W = Math.max(10, +iW.value || 10);
+    var vodoravno = W > L;                       // 2. mjera dulja → daska leži
+    var duga = Math.max(L, W), kratka = Math.min(L, W);
+    var r = duga / kratka, clamped = r > MAXR;
+    var rr = clamped ? MAXR : r;
+    var maxW = 250, maxH = 200;
+    var bw, bh;
+    if (vodoravno) { bw = maxW; bh = maxW / rr; if (bh > maxH) { bh = maxH; bw = maxH * rr; } }
+    else { bh = maxH; bw = maxH / rr; if (bw > maxW) { bw = maxW; bh = maxW * rr; } }
+    var bx = 230 - bw / 2, by = 165 - bh / 2;
+    mj.textContent = clamped ? "nije u mjerilu" : "";
+
+    // koji slot leži na kojoj strani crteža
+    var strane = vodoravno
+      ? [{k:"gore", x1:bx, y1:by, x2:bx+bw, y2:by}, {k:"desno", x1:bx+bw, y1:by, x2:bx+bw, y2:by+bh},
+         {k:"dolje", x1:bx, y1:by+bh, x2:bx+bw, y2:by+bh}, {k:"lijevo", x1:bx, y1:by, x2:bx, y2:by+bh}]
+      : [{k:"lijevo", x1:bx, y1:by, x2:bx, y2:by+bh}, {k:"gore", x1:bx, y1:by, x2:bx+bw, y2:by},
+         {k:"desno", x1:bx+bw, y1:by, x2:bx+bw, y2:by+bh}, {k:"dolje", x1:bx, y1:by+bh, x2:bx+bw, y2:by+bh}];
+
+    var s = [];
+    s.push('<rect x="' + bx + '" y="' + by + '" width="' + bw + '" height="' + bh +
+           '" fill="' + tok("--field") + '" stroke="' + tok("--line") + '"/>');
+    if (!vodoravno) {                              // strelica goda uz 1. mjeru
+      s.push('<path d="M' + (bx + bw / 2) + ' ' + (by + 16) + ' V' + (by + bh - 16) +
+             '" stroke="' + tok("--line") + '" stroke-width="1" stroke-dasharray="3 5"/>');
+    } else {
+      s.push('<path d="M' + (bx + 16) + ' ' + (by + bh / 2) + ' H' + (bx + bw - 16) +
+             '" stroke="' + tok("--line") + '" stroke-width="1" stroke-dasharray="3 5"/>');
+    }
+    strane.forEach(function (e, i) {
+      s.push('<line x1="' + e.x1 + '" y1="' + e.y1 + '" x2="' + e.x2 + '" y2="' + e.y2 +
+             '" stroke="' + boja(edges[i]) + '" stroke-width="' + (edges[i] ? 6 : 1.5) +
+             '" stroke-linecap="round"/>');
+    });
+
+    // prekidači M / A uz svaki rub
+    strane.forEach(function (e, i) {
+      var mx = (e.x1 + e.x2) / 2, my = (e.y1 + e.y2) / 2, ox = 0, oy = 0;
+      if (e.k === "gore") oy = -30; else if (e.k === "dolje") oy = 22;
+      else if (e.k === "lijevo") { ox = -58; oy = -9; } else { ox = 10; oy = -9; }
+      [["M", 0], ["A", 24]].forEach(function (p) {
+        var on = edges[i] === p[0];
+        var x = mx + ox + p[1] - (e.k === "gore" || e.k === "dolje" ? 24 : 0);
+        s.push('<g class="tgl" data-i="' + i + '" data-v="' + p[0] + '" style="cursor:pointer">' +
+          '<rect x="' + x + '" y="' + my + oy + '" width="22" height="18" rx="4" fill="' +
+            (on ? (p[0] === "A" ? tok("--abs-soft") : tok("--mel-soft")) : tok("--surf")) +
+          '" stroke="' + (on ? boja(p[0]) : tok("--line")) + '"/>' +
+          '<text x="' + (x + 11) + '" y="' + (my + oy + 13) + '" text-anchor="middle" font-size="11" font-weight="700" fill="' +
+            (on ? boja(p[0]) : tok("--muted")) + '">' + p[0] + "</text></g>");
+      });
+    });
+
+    // mjere
+    var lab = 'font-family="IBM Plex Mono, monospace" font-weight="600" font-size="14" fill="' + tok("--ink") + '"';
+    var cap = 'font-family="Inter, sans-serif" font-size="10" fill="' + tok("--muted") + '"';
+    if (vodoravno) {
+      s.push('<text x="' + (bx + bw / 2) + '" y="' + (by + bh / 2 - 4) + '" text-anchor="middle" ' + lab + ">" + L + "</text>");
+      s.push('<text x="' + (bx + bw / 2) + '" y="' + (by + bh / 2 + 9) + '" text-anchor="middle" ' + cap + ">1. mjera · god</text>");
+      s.push('<text x="' + (bx + bw + 14) + '" y="' + (by - 6) + '" ' + lab + ">" + W + "</text>");
+    } else {
+      s.push('<text x="' + (bx + bw / 2) + '" y="' + (by + bh / 2 - 4) + '" text-anchor="middle" ' + lab + ">" + L + "</text>");
+      s.push('<text x="' + (bx + bw / 2) + '" y="' + (by + bh / 2 + 9) + '" text-anchor="middle" ' + cap + ">1. mjera · god</text>");
+      s.push('<text x="' + (bx + bw / 2) + '" y="' + (by - 34) + '" text-anchor="middle" ' + lab + ">" + W + "</text>");
+    }
+    s.push('<text x="' + (bx + bw / 2) + '" y="' + (by + bh + 46) + '" text-anchor="middle" ' + cap + ">" +
+           (vodoravno ? "2. mjera je dulja — daska leži" : "1. mjera je dulja") + "</text>");
+    svg.innerHTML = s.join("");
+
+    ["0", "1", "2", "3"].forEach(function (n) {
+      var i = +n, v = edges[i];
+      var c = document.getElementById("c" + n), t = document.getElementById("v" + n);
+      c.className = "chip " + (v === "A" ? "a" : v === "M" ? "m" : "n");
+      c.textContent = v || "—";
+      t.textContent = opis(v);
+      t.className = "vl" + (v ? "" : " off");
+    });
+  }
+
+  function sve(v) { edges = [v, v, v, v]; crtaj(); }
+
+  svg.addEventListener("click", function (ev) {
+    var g = ev.target.closest(".tgl");
+    if (!g) return;
+    var i = +g.dataset.i, v = g.dataset.v;
+    edges[i] = edges[i] === v ? "" : v;
+    crtaj();
+  });
+  svg.addEventListener("dblclick", function (ev) {
+    if (ev.target.closest(".tgl")) return;                 // dvoklik na prekidač ne broji
+    var prvi = edges[0], isti = edges.every(function (e) { return e === prvi; });
+    sve(!isti ? "A" : prvi === "A" ? "M" : prvi === "M" ? "" : "A");
+  });
+  document.querySelectorAll("[data-all]").forEach(function (b) {
+    b.addEventListener("click", function () { sve(b.dataset.all); });
+  });
+  [iL, iW, iZ].forEach(function (el) { el.addEventListener("input", crtaj); });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+    css = getComputedStyle(document.documentElement); crtaj();
+  });
+  crtaj();
+})();
+</script>

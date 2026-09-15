@@ -57,19 +57,41 @@ def read_ppnest_txt(path):
         i += 1
     return els
 
+# Isti CSV profil pišu PPNEST i Corpus, ali ne jednako: PPNEST ima 28 stupaca s tipfelerom 'TRS2IFRA' i 'NAPOMENA',
+# Corpus 6.2 (modul V55) ih ima 29 — 'TR2SIFRA', 'bSolid' umjesto 'NAPOMENA' i višak 'Primjedba' (True/False) na kraju.
+# bNest oba čita istim uvoznim profilom (odgovor tehničke pripreme 14.9.2026.), pa ih i Hub čita istim čitačem.
+_CSV_ALIASI = {'TR2SIFRA': ('TR2SIFRA', 'TRS2IFRA'), 'NAPOMENA': ('NAPOMENA', 'bSolid', 'Primjedba'),
+               'KONACNA DIMENZIJA': ('KONACNA DIMENZIJA', 'KONACNADIMENZIJA')}
+
+
+def _st(r, ime, zadano=''):
+    """Vrijednost stupca po imenu, uz dopuštena druga pisanja istog stupca (PPNEST vs Corpus)."""
+    for k in _CSV_ALIASI.get(ime, (ime,)):
+        if k in r and r[k] is not None:
+            return r[k]
+    return zadano
+
+
 def read_ppnest_csv(path, kupac=None):
     raw = open(path, 'rb').read()
     txt = raw.decode('utf-8-sig') if b'\xef\xbb\xbf' == raw[:3] or _is_utf8(raw) else raw.decode('cp1250')
     els = []
     for r in csv.DictReader(io.StringIO(txt), delimiter=';'):
+        if not (r.get('RB') or '').strip():
+            continue                                   # prazan zadnji redak (Corpus izvoz završava s ';')
+        t1, t2 = _st(r, 'TR1SIFRA'), _st(r, 'TR2SIFRA')
+        t3, t4 = _st(r, 'TR3SIFRA'), _st(r, 'TR4SIFRA')
+        nap = _st(r, 'NAPOMENA')
         els.append(dict(rb=int(r['RB']), nalog=r['RN'], kupac=kupac or r['RN'], L=_num(r['DUZINA']), W=_num(r['SIRINA']),
                         kom=int(_num(r['KOLICINA'])), sifra_mat=r['SIFRA MAT'], deb=_num(r['MAT DEB']), mat=r['MAT NAZIV'],
                         god=int(_num(r['GOD'] or 0)),
-                        traka={'L': r['TR1SIFRA'], 'D': r['TRS2IFRA'], 'G': r['TR3SIFRA'], 'O': r['TR4SIFRA']},
+                        traka={'L': t1, 'D': t2, 'G': t3, 'O': t4},
                         tip={k: ('A' if v.upper().startswith('ABS') else ('M' if v else '')) for k, v in
-                             (('L', r['TR1SIFRA']), ('D', r['TRS2IFRA']), ('G', r['TR3SIFRA']), ('O', r['TR4SIFRA']))},
-                        cix=r['CIX'], napomena=r['NAPOMENA'], prolaza=int(_num(r['GLODANJE'] or 1)),
-                        glodalo=14 if _num(r['MAT DEB']) > 20 else 12))
+                             (('L', t1), ('D', t2), ('G', t3), ('O', t4))},
+                        cix=_st(r, 'CIX'), napomena='' if nap in ('True', 'False') else nap,
+                        prolaza=int(_num(_st(r, 'GLODANJE') or 1)), glodalo=14 if _num(r['MAT DEB']) > 20 else 12,
+                        cjelina=_st(r, 'NAZIV ELEMENTA'), pozicija=_st(r, 'IME DASKE'),
+                        program1=_st(r, 'PROGRAM1'), program2=_st(r, 'PROGRAM2')))
     return els
 
 def _is_utf8(b):

@@ -1,0 +1,404 @@
+<title>Trake naloga</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --paper:#F6F4EF; --surf:#FFFFFF; --ink:#1C2A33; --muted:#66727C;
+  --line:#DDD8CF; --line2:#EBE7DF; --field:#FBFAF6;
+  --acc:#2E6B57; --acc-soft:#E3EFE9;
+  --abs:#2F5D8C; --abs-soft:#E4ECF5;
+  --mel:#B7791F; --mel-soft:#F6E7C9;
+  --brand:#F37A20; --sel:#EFF4F8;
+  --t1:#2F5D8C; --t2:#2A7B72; --t3:#B7791F; --t4:#6A4C93; --t5:#A8435C; --t6:#6B7A2E;
+  --shadow:0 1px 2px rgba(28,42,51,.06), 0 8px 24px rgba(28,42,51,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#161C21; --surf:#1E262C; --ink:#E9EDF0; --muted:#96A2AC;
+    --line:#35414A; --line2:#2A343B; --field:#192126;
+    --acc:#6FB99C; --acc-soft:#22362F;
+    --abs:#8CB6DC; --abs-soft:#1F2E3C;
+    --mel:#E0AE5C; --mel-soft:#382C16;
+    --brand:#F79247; --sel:#243039;
+    --t1:#8CB6DC; --t2:#6FC4B8; --t3:#E0AE5C; --t4:#B39BDC; --t5:#E38AA0; --t6:#B3C46B;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#161C21; --surf:#1E262C; --ink:#E9EDF0; --muted:#96A2AC;
+  --line:#35414A; --line2:#2A343B; --field:#192126;
+  --acc:#6FB99C; --acc-soft:#22362F;
+  --abs:#8CB6DC; --abs-soft:#1F2E3C;
+  --mel:#E0AE5C; --mel-soft:#382C16;
+  --brand:#F79247; --sel:#243039;
+  --t1:#8CB6DC; --t2:#6FC4B8; --t3:#E0AE5C; --t4:#B39BDC; --t5:#E38AA0; --t6:#B3C46B;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:Inter,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.5}
+.wrap{max-width:1060px;margin:0 auto;padding-block:28px;padding-left:20px;padding-right:20px}
+h1{font-size:22px;font-weight:700;margin:0 0 4px;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);font-size:13.5px;margin:0 0 20px;max-width:66ch}
+.eyebrow{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+.panel{background:var(--surf);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);margin-bottom:16px}
+.panel-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:11px 16px;border-bottom:1px solid var(--line2);background:linear-gradient(var(--field),var(--surf))}
+.panel-hd b{font-size:14.5px}
+.grow{flex:1 1 auto;min-width:0}
+.body{padding:14px 16px}
+
+button{font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;
+  background:var(--surf);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+button:hover{border-color:var(--muted)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+button.add-a{background:var(--abs-soft);border-color:var(--abs);color:var(--abs)}
+button.add-m{background:var(--mel-soft);border-color:var(--mel);color:var(--mel)}
+button.x{border:0;background:none;color:var(--muted);padding:2px 6px;font-size:15px;line-height:1}
+button.x:hover{color:var(--ink)}
+
+select,input[type=number]{background:var(--field);color:var(--ink);border:1px solid var(--line);
+  border-radius:6px;padding:6px 8px;font-family:Inter,sans-serif;font-size:13px}
+input[type=number]{font-family:"IBM Plex Mono",monospace;font-weight:600;font-variant-numeric:tabular-nums;width:100%}
+
+/* --- popis traka --- */
+.trake{display:flex;flex-direction:column;gap:0}
+.tr{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid transparent;border-radius:8px;cursor:pointer}
+.tr + .tr{margin-top:2px}
+.tr:hover{background:var(--field)}
+.tr.on{background:var(--sel);border-color:var(--line)}
+.sw{width:12px;height:22px;border-radius:3px;flex:none}
+.oz{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:700;border-radius:4px;
+  padding:1px 6px;line-height:19px;flex:none;min-width:30px;text-align:center;color:#fff}
+.tr .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.tr .tip{font-size:11px;font-weight:700;letter-spacing:.05em;flex:none}
+.tr .act{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--acc);font-weight:700;flex:none}
+.addrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+
+/* --- elementi --- */
+.split{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:0}
+@media (max-width:820px){ .split{grid-template-columns:1fr} .canvas{border-left:0!important;border-top:1px solid var(--line2)} }
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:4px 8px;border-bottom:1px solid var(--line2)}
+tr.el{cursor:pointer}
+tr.el:hover td{background:var(--field)}
+tr.el.on td{background:var(--sel)}
+.num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-weight:600}
+th.rub,td.rub{text-align:center;padding-left:3px;padding-right:3px}
+.cell{display:inline-block;min-width:32px;border-radius:4px;padding:1px 5px;line-height:20px;
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:700;color:#fff;cursor:pointer;border:1px solid transparent}
+.cell.none{background:transparent;color:var(--muted);border-color:var(--line);border-style:dashed}
+.cell.none:hover{border-color:var(--acc);color:var(--acc)}
+.canvas{border-left:1px solid var(--line2);padding:14px;display:flex;flex-direction:column;align-items:center;gap:10px}
+#skica{width:100%;max-width:280px;height:auto;user-select:none;-webkit-user-select:none}
+.hint{color:var(--muted);font-size:12px;text-align:center;max-width:40ch;text-wrap:balance}
+kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;background:var(--field);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--ink)}
+
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:20px}
+.note{background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.note h3{margin:6px 0 6px;font-size:14px;font-weight:600}
+.note p{margin:0;color:var(--muted);font-size:13px}
+.note .bar{height:3px;width:26px;border-radius:2px;background:var(--brand)}
+.note.q .bar{background:var(--acc)}
+.foot{margin-top:20px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:12px}
+@media (prefers-reduced-motion:no-preference){ #skica line{transition:stroke .16s ease,stroke-width .16s ease} }
+</style>
+
+<div class="wrap">
+  <h1>Trake naloga</h1>
+  <p class="sub">Proba za ekran „Unos naloga“. Materijal više nema dva polja za traku („ABS“ i „MEL“) nego popis
+  koji na početku ima samo <b>ABS-ISTI</b> i <b>MEL-ISTI</b> — isti dekor kao materijal. Sve ostale trake dodaje
+  korisnik gumbom <b>+</b>, koliko ih nalog treba. Svaka dobije svoju oznaku i boju, pa se uz element upisuje oznaka
+  umjesto cijelog naziva. Kućice uz rubove uvijek stoje, i prazne, pa se traka stavlja jednim klikom na onaj rub
+  koji treba.</p>
+
+  <div class="panel">
+    <div class="panel-hd">
+      <b>Trake · IVERAL BIJELI NK 18 mm</b>
+      <span class="grow"></span>
+      <span class="eyebrow" id="brojac"></span>
+    </div>
+    <div class="body">
+      <div class="trake" id="popis"></div>
+      <div class="addrow">
+        <button type="button" class="add-a" id="dodajA">+ ABS traka</button>
+        <button type="button" class="add-m" id="dodajM">+ MEL traka</button>
+        <span class="grow"></span>
+        <span class="eyebrow" style="align-self:center">klik na redak bira aktivnu traku</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-hd">
+      <b>Elementi</b>
+      <span class="grow"></span>
+      <span class="eyebrow">klik na kućicu uz rub stavlja aktivnu traku</span>
+    </div>
+    <div class="split">
+      <div class="tblwrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:34%">Element</th><th class="num">1. mjera</th><th class="num">2. mjera</th><th class="num">Kom</th>
+              <th class="rub">duža 1</th><th class="rub">kraća 1</th><th class="rub">duža 2</th><th class="rub">kraća 2</th>
+            </tr>
+          </thead>
+          <tbody id="elementi"></tbody>
+        </table>
+      </div>
+      <div class="canvas">
+        <svg id="skica" viewBox="0 0 280 300" role="img" aria-label="Skica odabranog elementa"></svg>
+        <p class="hint"><kbd>klik</kbd> na kućicu uz rub stavlja aktivnu traku, ponovni klik je miče ·
+        <kbd>dvoklik</kbd> u sredinu stavlja je na sva četiri, sljedeći dvoklik briše sve</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><div class="bar"></div>
+      <h3>Zašto popis, a ne dva polja</h3>
+      <p>U PanelWizardu druga ABS traka ide u MEL polje jer drugog mjesta nema. Ovdje popis kreće od ABS-ISTI i
+      MEL-ISTI, a svaka sljedeća se doda gumbom <b>+</b> i dobije svoju oznaku — nema razloga za zaobilaznicu,
+      a u obračun ide prava vrsta.</p></div>
+    <div class="note"><div class="bar"></div>
+      <h3>Oznaka umjesto naziva</h3>
+      <p>Uz element stoji A1 ili M1, ne cijeli naziv. Kad kupac na papiru izmjenjuje dvije trake iz elementa u
+      element, to je jedan klik umjesto brisanja i pretipkavanja.</p></div>
+    <div class="note q"><div class="bar"></div>
+      <h3>Kućice stoje i kad su prazne</h3>
+      <p>Uz svaki rub je kućica, prazna dok traka nije odabrana. Klik stavlja aktivnu traku na taj rub, ponovni klik
+      je miče. Dvoklik u sredinu stavlja je na sva četiri ruba, sljedeći dvoklik briše sve.</p></div>
+  </div>
+
+  <p class="foot">Proba interakcije za mockup ekrana „Unos naloga“ — Paneli projekt d.o.o.</p>
+</div>
+
+<script>
+(function () {
+  var BOJE = ["--t1", "--t2", "--t3", "--t4", "--t5", "--t6"];
+  var SIFRARNIK = [
+    { tip: "A", naziv: "ABS-ISTI" },                  // isti dekor kao materijal (D-31)
+    { tip: "A", naziv: "ABS 1/22 OF CHAMPAGNE" },
+    { tip: "A", naziv: "ABS 1/22 AVIVA DEW" },
+    { tip: "A", naziv: "ABS 1/22 BIJELA NK" },
+    { tip: "A", naziv: "ABS 2/22 BIJELA NK" },
+    { tip: "A", naziv: "ABS 1/44 JELA CLAY" },
+    { tip: "M", naziv: "MEL-ISTI" },
+    { tip: "M", naziv: "MEL 0,5/22 BIJELA NK" },
+    { tip: "M", naziv: "MEL 0,5/22 SIVI TAMNI" }
+  ];
+  var trake = [                                       // zadano su samo ove dvije, ostale dodaje korisnik
+    { tip: "A", naziv: "ABS-ISTI", boja: 0 },
+    { tip: "M", naziv: "MEL-ISTI", boja: 2 }
+  ];
+  var elementi = [
+    { nz: "KORPUS — bok",     L: 1133, W: 595, kom: 2, rub: [0, 0, null, 0] },
+    { nz: "KORPUS — bok",     L: 1780, W: 595, kom: 2, rub: [0, 0, null, 0] },
+    { nz: "VITRINA — polica", L: 263,  W: 580, kom: 1, rub: [0, null, null, null] },
+    { nz: "VITRINA — polica", L: 264,  W: 595, kom: 4, rub: [0, null, null, null] },
+    { nz: "LEĐA — pregrada",  L: 820,  W: 550, kom: 16, rub: [1, 1, 1, 1] }
+  ];
+  var aktivna = 0, odabran = 0;
+
+  var css = getComputedStyle(document.documentElement);
+  function tok(n) { return css.getPropertyValue(n).trim(); }
+  function boja(i) { return i === null || i === undefined ? tok("--line") : tok(BOJE[trake[i].boja]); }
+  function oznaka(i) {
+    var t = trake[i], n = 0;
+    for (var k = 0; k <= i; k++) if (trake[k].tip === t.tip) n++;
+    return t.tip + n;
+  }
+  function slobodnaBoja() {
+    for (var b = 0; b < BOJE.length; b++) {
+      var zauzeta = trake.some(function (t) { return t.boja === b; });
+      if (!zauzeta) return b;
+    }
+    return trake.length % BOJE.length;
+  }
+
+  // ---------- popis traka ----------
+  var popis = document.getElementById("popis");
+  function crtajPopis() {
+    popis.innerHTML = "";
+    trake.forEach(function (t, i) {
+      var row = document.createElement("div");
+      row.className = "tr" + (i === aktivna ? " on" : "");
+      row.tabIndex = 0;
+      row.innerHTML =
+        '<span class="sw" style="background:' + boja(i) + '"></span>' +
+        '<span class="oz" style="background:' + boja(i) + '">' + oznaka(i) + "</span>" +
+        '<span class="tip" style="color:' + (t.tip === "A" ? tok("--abs") : tok("--mel")) + '">' +
+          (t.tip === "A" ? "ABS" : "MEL") + "</span>";
+      var sel = document.createElement("select");
+      sel.className = "nm";
+      sel.setAttribute("aria-label", "Naziv trake " + oznaka(i));
+      SIFRARNIK.filter(function (s) { return s.tip === t.tip; }).forEach(function (s) {
+        var o = document.createElement("option");
+        o.value = s.naziv; o.textContent = s.naziv;
+        if (s.naziv === t.naziv) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener("change", function () { t.naziv = sel.value; });
+      sel.addEventListener("click", function (e) { e.stopPropagation(); });
+      row.appendChild(sel);
+      if (i === aktivna) {
+        var a = document.createElement("span");
+        a.className = "act"; a.textContent = "aktivna";
+        row.appendChild(a);
+      }
+      var x = document.createElement("button");
+      x.type = "button"; x.className = "x"; x.textContent = "×";
+      x.setAttribute("aria-label", "Ukloni traku " + oznaka(i));
+      x.addEventListener("click", function (e) { e.stopPropagation(); ukloni(i); });
+      row.appendChild(x);
+      row.addEventListener("click", function () { aktivna = i; crtaj(); });
+      row.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); aktivna = i; crtaj(); }
+      });
+      popis.appendChild(row);
+    });
+    document.getElementById("brojac").textContent =
+      trake.length + (trake.length === 1 ? " traka" : trake.length < 5 ? " trake" : " traka");
+  }
+
+  function dodaj(tip) {
+    var uzeti = trake.map(function (t) { return t.naziv; });
+    var kand = SIFRARNIK.filter(function (s) { return s.tip === tip && uzeti.indexOf(s.naziv) < 0; })[0]
+            || SIFRARNIK.filter(function (s) { return s.tip === tip; })[0];
+    trake.push({ tip: tip, naziv: kand.naziv, boja: slobodnaBoja() });
+    aktivna = trake.length - 1;
+    crtaj();
+  }
+  function ukloni(i) {
+    if (trake.length === 1) return;
+    trake.splice(i, 1);
+    elementi.forEach(function (e) {
+      e.rub = e.rub.map(function (r) { return r === i ? null : (r !== null && r > i ? r - 1 : r); });
+    });
+    if (aktivna >= trake.length) aktivna = trake.length - 1;
+    crtaj();
+  }
+
+  // ---------- tablica elemenata ----------
+  var tbody = document.getElementById("elementi");
+  function crtajTablicu() {
+    tbody.innerHTML = "";
+    elementi.forEach(function (e, ei) {
+      var tr = document.createElement("tr");
+      tr.className = "el" + (ei === odabran ? " on" : "");
+      var td = document.createElement("td");
+      td.textContent = e.nz;
+      tr.appendChild(td);
+      [e.L, e.W, e.kom].forEach(function (v) {
+        var c = document.createElement("td");
+        c.className = "num"; c.textContent = v;
+        tr.appendChild(c);
+      });
+      e.rub.forEach(function (r, ri) {
+        var c = document.createElement("td");
+        c.className = "rub";
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "cell" + (r === null ? " none" : "");
+        b.textContent = r === null ? "+" : oznaka(r);
+        if (r !== null) b.style.background = boja(r);
+        b.setAttribute("aria-label", "Rub " + (ri + 1) + " elementa " + e.nz);
+        b.addEventListener("click", function (ev) { ev.stopPropagation(); rubKlik(ei, ri); });
+        c.appendChild(b);
+        tr.appendChild(c);
+      });
+      tr.addEventListener("click", function () { odabran = ei; crtaj(); });
+      tbody.appendChild(tr);
+    });
+  }
+
+  function rubKlik(ei, ri) {
+    odabran = ei;
+    var e = elementi[ei];
+    e.rub[ri] = (e.rub[ri] === aktivna) ? null : aktivna;   // klik stavlja aktivnu, ponovni klik je miče
+    crtaj();
+  }
+
+  // ---------- skica ----------
+  var svg = document.getElementById("skica");
+  var MAXR = 3.2;
+  function crtajSkicu() {
+    var e = elementi[odabran];
+    var L = e.L, W = e.W;
+    var vodoravno = W > L;
+    var r = Math.max(L, W) / Math.min(L, W);
+    var rr = Math.min(r, MAXR);
+    var maxW = 168, maxH = 176, bw, bh;
+    if (vodoravno) { bw = maxW; bh = maxW / rr; if (bh > maxH) { bh = maxH; bw = maxH * rr; } }
+    else { bh = maxH; bw = maxH / rr; if (bw > maxW) { bw = maxW; bh = maxW * rr; } }
+    var bx = 140 - bw / 2, by = 150 - bh / 2;
+
+    var strane = vodoravno
+      ? [{ k: "gore", x1: bx, y1: by, x2: bx + bw, y2: by },
+         { k: "desno", x1: bx + bw, y1: by, x2: bx + bw, y2: by + bh },
+         { k: "dolje", x1: bx, y1: by + bh, x2: bx + bw, y2: by + bh },
+         { k: "lijevo", x1: bx, y1: by, x2: bx, y2: by + bh }]
+      : [{ k: "lijevo", x1: bx, y1: by, x2: bx, y2: by + bh },
+         { k: "gore", x1: bx, y1: by, x2: bx + bw, y2: by },
+         { k: "desno", x1: bx + bw, y1: by, x2: bx + bw, y2: by + bh },
+         { k: "dolje", x1: bx, y1: by + bh, x2: bx + bw, y2: by + bh }];
+
+    var s = ['<rect x="' + bx + '" y="' + by + '" width="' + bw + '" height="' + bh +
+             '" fill="' + tok("--field") + '" stroke="' + tok("--line") + '"/>'];
+    strane.forEach(function (p, i) {
+      s.push('<line x1="' + p.x1 + '" y1="' + p.y1 + '" x2="' + p.x2 + '" y2="' + p.y2 +
+             '" stroke="' + boja(e.rub[i]) + '" stroke-width="' + (e.rub[i] === null ? 1.5 : 7) +
+             '" stroke-linecap="round"/>');
+    });
+    strane.forEach(function (p, i) {
+      var r = e.rub[i], puna = r !== null;
+      var mx = (p.x1 + p.x2) / 2, my = (p.y1 + p.y2) / 2, ox = 0, oy = 0;
+      if (p.k === "gore") oy = -13; else if (p.k === "dolje") oy = 19;
+      else if (p.k === "lijevo") { ox = -26; oy = 4; } else { ox = 26; oy = 4; }
+      s.push('<g class="tag" data-i="' + i + '" style="cursor:pointer" role="button" tabindex="0" ' +
+        'aria-label="Rub ' + (i + 1) + (puna ? ", traka " + oznaka(r) : ", bez trake") + '">' +
+        '<rect x="' + (mx + ox - 14) + '" y="' + (my + oy - 12) + '" width="28" height="17" rx="4" fill="' +
+          (puna ? boja(r) : tok("--surf")) + '" stroke="' + (puna ? "none" : tok("--line")) +
+          '" stroke-dasharray="' + (puna ? "0" : "3 3") + '"/>' +
+        '<text x="' + (mx + ox) + '" y="' + (my + oy) + '" text-anchor="middle" font-size="11" font-weight="700" ' +
+          'font-family="IBM Plex Mono, monospace" fill="' + (puna ? "#FFFFFF" : tok("--muted")) + '">' +
+          (puna ? oznaka(r) : "+") + "</text></g>");
+    });
+    var lab = 'font-family="IBM Plex Mono, monospace" font-weight="600" font-size="13" fill="' + tok("--ink") + '"';
+    var cap = 'font-family="Inter, sans-serif" font-size="10" fill="' + tok("--muted") + '"';
+    s.push('<text x="140" y="' + (by + bh / 2 - 3) + '" text-anchor="middle" ' + lab + ">" + L + " × " + W + "</text>");
+    s.push('<text x="140" y="' + (by + bh / 2 + 11) + '" text-anchor="middle" ' + cap + ">" + e.kom + " kom</text>");
+    s.push('<text x="140" y="24" text-anchor="middle" ' + cap + ">" + e.nz + "</text>");
+    svg.innerHTML = s.join("");
+  }
+
+  svg.addEventListener("click", function (ev) {
+    var g = ev.target.closest(".tag");
+    if (g) rubKlik(odabran, +g.dataset.i);
+  });
+  svg.addEventListener("keydown", function (ev) {
+    var g = ev.target.closest(".tag");
+    if (g && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); rubKlik(odabran, +g.dataset.i); }
+  });
+  svg.addEventListener("dblclick", function (ev) {
+    if (ev.target.closest(".tag")) return;
+    var e = elementi[odabran];
+    var svi = e.rub.every(function (r) { return r === aktivna; });   // već sva četiri → sljedeći dvoklik briše
+    e.rub = [0, 1, 2, 3].map(function () { return svi ? null : aktivna; });
+    crtaj();
+  });
+
+  document.getElementById("dodajA").addEventListener("click", function () { dodaj("A"); });
+  document.getElementById("dodajM").addEventListener("click", function () { dodaj("M"); });
+  function crtaj() { crtajPopis(); crtajTablicu(); crtajSkicu(); }
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+    css = getComputedStyle(document.documentElement); crtaj();
+  });
+  crtaj();
+})();
+</script>

@@ -44,8 +44,9 @@ def _broj(x):
 
 
 def je_materijal(r):
-    ident = r["acIdent"]
-    return (ident.startswith("IV") or ident.startswith("RP")) and norm(r["acName"]) not in ("", "PRAZNO")
+    """IV* i RP* identi su ploče — osim onih koji su u Pantheonu krivo klasificirani: 'TRAKA ZA R.P. …' pod RP identom nije ploča (D-52)."""
+    ident, n = r["acIdent"], norm(r["acName"])
+    return (ident.startswith("IV") or ident.startswith("RP")) and n not in ("", "PRAZNO") and not n.startswith("TRAKA")
 
 
 def je_traka(r):
@@ -87,6 +88,20 @@ def uvezi_pantheon(conn, putanja, tko="uvoz"):
     return st
 
 
+def primijeni_zadane_debljine(conn, tko="uvoz"):
+    """Upiši debljinu po vrsti (nazivi.ZADANA_DEBLJINA — radne ploče i ploče stola 38 mm) svima kojima je Hub još ne zna.
+    Zove se NAKON ispravaka ureda, pa naziv iz Pantheona i ručni upis uvijek imaju prednost (D-52)."""
+    from .nazivi import ZADANA_DEBLJINA
+    st = []
+    for (vrsta_, ob), d in sorted(ZADANA_DEBLJINA.items()):
+        n = conn.execute("UPDATE materijal SET debljina = ?, debljina_izvor = 'vrsta' WHERE vrsta = ? AND obitelj_rp IS ? "
+                         "AND debljina IS NULL AND ne_koristi_se = 0", (d, vrsta_, ob)).rowcount
+        if n:
+            st.append(("%s %s" % (vrsta_, ob or ""), d, n))
+    conn.commit()
+    return st
+
+
 def tekst_za_pretragu(*dijelovi):
     """Oba pisanja (BIJELI i BJELI, KAŠMIR → KASMIR) + ident + kod, da pretraga radi kako god čovjek utipka."""
     t = " ".join(x for x in dijelovi if x)
@@ -110,13 +125,18 @@ def _upisi_materijal(cur, r):
     kratki = naziv_kratki(vrsta_, dekor, p["debljina"], ob)
     postoji = cur.execute("SELECT id, winstore_kod FROM materijal WHERE pantheon_ident = ?", (ident,)).fetchone()
     if postoji:
-        cur.execute("UPDATE materijal SET naziv_pantheon = ?, vrsta = ?, obitelj_rp = COALESCE(obitelj_rp, ?), debljina = COALESCE(debljina, ?), "
+        # debljina iz naziva uvijek pobjeđuje (kad ured ispravi naziv u Pantheonu, Hub to odmah preuzme); inače ostaje što je bilo
+        cur.execute("UPDATE materijal SET naziv_pantheon = ?, vrsta = ?, obitelj_rp = COALESCE(obitelj_rp, ?), "
+                    "debljina = COALESCE(?, CASE WHEN debljina_izvor = 'naziv' THEN NULL ELSE debljina END), "
+                    "debljina_izvor = CASE WHEN ? IS NOT NULL THEN 'naziv' WHEN debljina_izvor = 'naziv' THEN NULL ELSE debljina_izvor END, "
                     "dekor = ?, dekor_kod = ?, aktivan = ?, naziv_kratki = COALESCE(naziv_kratki, ?), trazi = ? WHERE id = ?",
-                    (naziv, vrsta_, ob, p["debljina"], dekor, kod, aktivan, kratki, tekst_za_pretragu(ident, naziv, kratki, postoji["winstore_kod"]), postoji[0]))
+                    (naziv, vrsta_, ob, p["debljina"], p["debljina"], dekor, kod, aktivan, kratki,
+                     tekst_za_pretragu(ident, naziv, kratki, postoji["winstore_kod"]), postoji[0]))
         return 0
-    cur.execute("INSERT INTO materijal (pantheon_ident, naziv_pantheon, naziv_kratki, vrsta, obitelj_rp, debljina, dekor, dekor_kod, "
-                "ploca_L, ploca_W, sirina_rp, aktivan, trazi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (ident, naziv, kratki, vrsta_, ob, p["debljina"], dekor, kod, L, W, SIRINA_RP.get(ob) if ob else None, aktivan, tekst_za_pretragu(ident, naziv, kratki)))
+    cur.execute("INSERT INTO materijal (pantheon_ident, naziv_pantheon, naziv_kratki, vrsta, obitelj_rp, debljina, debljina_izvor, dekor, dekor_kod, "
+                "ploca_L, ploca_W, sirina_rp, aktivan, trazi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (ident, naziv, kratki, vrsta_, ob, p["debljina"], "naziv" if p["debljina"] else None, dekor, kod, L, W,
+                 SIRINA_RP.get(ob) if ob else None, aktivan, tekst_za_pretragu(ident, naziv, kratki)))
     return 1
 
 

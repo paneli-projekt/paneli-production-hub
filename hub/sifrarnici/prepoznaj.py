@@ -55,7 +55,8 @@ def ocisti_kes():
 def _materijali(conn):
     k = ("materijali", id(conn))
     if k not in _KES:
-        rows = conn.execute("SELECT id, pantheon_ident, naziv_pantheon, vrsta, obitelj_rp, debljina, dekor, dekor_kod, winstore_kod, aktivan FROM materijal").fetchall()
+        rows = conn.execute("SELECT id, pantheon_ident, naziv_pantheon, vrsta, obitelj_rp, debljina, dekor, dekor_kod, winstore_kod, aktivan "
+                            "FROM materijal WHERE ne_koristi_se = 0").fetchall()     # ured je rekao da se ident ne koristi (D-51) → Hub ga ne nudi
         mats = []
         for r in rows:
             mats.append(dict(id=r["id"], ident=r["pantheon_ident"], naziv=r["naziv_pantheon"], vrsta=r["vrsta"], ob=r["obitelj_rp"],
@@ -111,7 +112,7 @@ def moguc(q_rijeci, q_kodovi, kand):
     return not q_rijeci and not q_kodovi
 
 
-def _bodovi(q_rijeci, q_kodovi, kand, df, n_ukupno, q_sufiksi=()):
+def _bodovi(q_rijeci, q_kodovi, kand, df, n_ukupno, q_sufiksi=(), winstore_prednost=True):
     """Vrati (score, promasaji): riječi upita koje kandidat nema su promašaji (svaki −0,6); kodovi dekora nose najviše.
     Dvoslovni sufiksi kodova (PE, MN, AE, UM) su slab dokaz: u upitu iza koda (q_sufiksi) ne rade promašaj; 'UM' bez koda u upitu
     pogađa kandidata koji ima '27045 UM' u nazivu (sufiks u slijepljenom nazivu)."""
@@ -143,7 +144,7 @@ def _bodovi(q_rijeci, q_kodovi, kand, df, n_ukupno, q_sufiksi=()):
     score -= 0.1 * max(0, len(kand["rijeci"] - set(q_rijeci) - kand.get("sufiksi", set())))
     if kand.get("aktivan"):
         score += 0.2
-    if kand.get("winstore"):
+    if winstore_prednost and kand.get("winstore"):
         score += 0.3                                              # materijal koji postoji u Winstoreu se stvarno koristi — prednost pri izjednačenju
     if jak_kod and promasaji and not any(re.search(r"\d", x) for x in promasaji):
         promasaji = []                                            # riječi se razlikuju (EVOKE LIGHT vs EVOKE SVIJETLI), ali kod je isti
@@ -176,8 +177,10 @@ def _odluka(upit, kandidati, potpuni, objasnjenje, q_rijeci=()):
 
 
 # ---------------------------------------------------------------- materijali
-def prepoznaj_materijal(conn, naziv, debljina=None, winstore_kod=None, sirina_ploce=None):
-    """naziv = kako piše u CPW/CPO/CSV/nalogu; debljina i sirina_ploce iz datoteke (CPO THK1/INV1, CPW MATERIJAL) ako naziv nema."""
+def prepoznaj_materijal(conn, naziv, debljina=None, winstore_kod=None, sirina_ploce=None, winstore_prednost=True):
+    """naziv = kako piše u CPW/CPO/CSV/nalogu; debljina i sirina_ploce iz datoteke (CPO THK1/INV1, CPW MATERIJAL) ako naziv nema.
+    winstore_prednost=False koristi sam uvoz Winstorea: dok se veze tek grade, „postoji u Winstoreu“ ne smije utjecati na poredak
+    kandidata — inače bi isti izvoz dao drukčije prijedloge u prvom i u drugom prolazu."""
     upit = (naziv or "").strip()
     n = norm(upit)
     # 1. alias
@@ -185,15 +188,17 @@ def prepoznaj_materijal(conn, naziv, debljina=None, winstore_kod=None, sirina_pl
                      "WHERE a.alias_norm = ?", (n,)).fetchone()
     if r:
         return Rezultat(upit=upit, razina="alias", ident=r[1], id=r[0], naziv=r[2], score=9.0, objasnjenje="alias (%s)" % (r[3] or "—"))
-    # 2. Winstore kod
-    wk = _norm_winstore(winstore_kod)
-    if wk:
-        r = conn.execute("SELECT id, pantheon_ident, naziv_pantheon FROM materijal WHERE UPPER(winstore_kod) = ?", (wk,)).fetchone()
+    # 2. Winstore kod — iz zasebnog polja (PPNEST SIFRA MAT) ili iz samog naziva: Corpusov CPW u polje MATERIJAL
+    #    piše upravo Winstore kod (W908ST2-18, IV000054-3), a ne tekstualni naziv (dokument 14 §3.5).
+    wk = _norm_winstore(winstore_kod)                     # samo ovaj ulazi u bodovanje naziva (korak 3)
+    for k in [x for x in (wk, (winstore_kod or "").strip().upper() or None,
+                          _norm_winstore(upit), (upit or "").strip().upper()) if x]:
+        r = conn.execute("SELECT id, pantheon_ident, naziv_pantheon FROM materijal WHERE UPPER(winstore_kod) = ? AND ne_koristi_se = 0", (k,)).fetchone()
         if not r:   # dodatni kod istog materijala (varijanta A/B/C) — veza je na razini ploče u zadnjem Winstore izvozu
             r = conn.execute("SELECT m.id, m.pantheon_ident, m.naziv_pantheon FROM winstore_ploca w JOIN materijal m ON m.id = w.materijal_id "
-                             "WHERE UPPER(w.materijal_kod) = ? LIMIT 1", (wk,)).fetchone()
+                             "WHERE UPPER(w.materijal_kod) = ? AND m.ne_koristi_se = 0 LIMIT 1", (k,)).fetchone()
         if r:
-            return Rezultat(upit=upit, razina="winstore", ident=r[1], id=r[0], naziv=r[2], score=8.0, objasnjenje="Winstore kod %s" % wk)
+            return Rezultat(upit=upit, razina="winstore", ident=r[1], id=r[0], naziv=r[2], score=8.0, objasnjenje="Winstore kod %s" % k)
     # 3. naziv
     p = rasclani_materijal(upit, debljina, sirina_ploce)
     mats, df = _materijali(conn)
@@ -216,7 +221,7 @@ def prepoznaj_materijal(conn, naziv, debljina=None, winstore_kod=None, sirina_pl
             continue                                                  # ploča šira od 1 m nije radna/zidna ploča (600/640/900)
         if not moguc(q_rijeci, q_kodovi, m):
             continue
-        s, promasaji = _bodovi(q_rijeci, q_kodovi, m, df, len(mats), q_sufiksi)
+        s, promasaji = _bodovi(q_rijeci, q_kodovi, m, df, len(mats), q_sufiksi, winstore_prednost)
         if q_jaki and not any(k in m["glue"] for k in q_jaki):
             m_jaki = _jaki(m["kodovi"])
             if m_jaki and not any(k in p["glue"] for k in m_jaki):

@@ -4,7 +4,7 @@
 Dio A — čiste funkcije (bez baze, uvijek se izvode): normalizacija, kodovi dekora, debljina, vrsta, oznake traka.
 Dio B — mali sintetički šifrarnik u privremenoj bazi (uvijek): uvoz, prepoznavanje, aliasi, zadane trake, Winstore.
 Dio C — prihvaćanje na stvarnim podacima (samo ako je HUB_TEST_DATA postavljen na Paneli_Production_Hub\\05_NALOZI_ZA_TEST):
-        svih 50 CPO materijala mapirano osim zidnih obloga bez identa, 40/40 točno prema identu u ponudi, CPW 37/37, trake ≥ 42/48.
+        svih 50 CPO materijala mapirano osim zidnih obloga bez identa, 40/40 točno prema identu u ponudi, CPW 40/40, trake ≥ 44/51.
 """
 import os
 import sys
@@ -43,6 +43,16 @@ def test_kodovi():
     assert "VSM06" in N.kodovi("PVC KASMIR VSM-06 18MM")
     assert {"H1180", "ST37", "H1180ST37"} <= N.kodovi("IV EGGER H1180 ST37")
     assert N.kodovi("IV BIJELI NK 18mm") == set()               # debljina nije kod
+
+
+def test_debljina_iz_dimenzije():
+    assert N.debljina("ZIDNA PLOČA H3303 ST10 4100X640X8MM") == 8          # debljina iz L x W x T
+    assert N.debljina("COMPACT F1861 4100X650X12 JEZGRA U BOJI") == 12
+    assert N.debljina("RADNA PLOČA QUARTZ - VEGA 30MM, 2070X600MM") == 30  # dvije mjere nisu debljina, '30MM' jest
+    assert N.debljina("IVERAL HRAST SONOMA 517 18MM - 2840X1830") == 18
+    assert N.debljina("COMPACT PRADO AGATE GREY 13 0027/NN/CF") == 13      # 13 mm = Fundermax compact
+    assert N.zadana_debljina("RP", "radna") == 38 and N.zadana_debljina("RP", "stola") == 38
+    assert N.zadana_debljina("ZO", "zidna") is None and N.zadana_debljina("CP", None) is None   # tu debljina varira — ured kaže (D-52)
 
 
 def test_vrsta():
@@ -247,11 +257,57 @@ def test_alias_csv_i_potvrdjeni(baza, tmp_path):
     assert P.prepoznaj_materijal(baza, "PVC_CRNI_MAT_18").razina == "alias"
 
 
+def test_corpus_kod_u_nazivu_i_rod(baza):
+    """Corpusov CPW u polje MATERIJAL piše Winstore kod, a dekore u ženskom rodu (D-57, D-58; dokument 14)."""
+    winstore.uvezi_winstore(baza, str(baza.xml_p), "TEST")
+    r = P.prepoznaj_materijal(baza, "W908ST2-18", debljina=18)              # kod u nazivu, bez zasebnog polja
+    assert (r.razina, r.ident) == ("winstore", "IV000090")
+    r = P.prepoznaj_materijal(baza, "VSM02-18", debljina=4)                 # kod je jači od deklarirane debljine (MDF nut, D-57)
+    assert (r.razina, r.ident) == ("winstore", "IV000671")
+    assert N.rijeci("SIVA_TAMNA") == N.rijeci("SIVI TAMNI") == ["SIVI", "TAMNI"]    # ženski rod = muški rod (D-58)
+    assert N.rijeci("BIJELA NK") == N.rijeci("BIJELI NK")
+    r = P.prepoznaj_traku(baza, "SIVA_TAMNA-1/22")                          # Corpusov ženski rod nađe Pantheonov muški
+    assert (r.razina, r.ident) == ("naziv", "TR000103") and "SIVI TAMNI" in r.naziv
+
+
+def test_traka_pod_rp_identom_nije_materijal(baza):
+    """RP ident s nazivom 'TRAKA ZA R.P. …' je kriva klasifikacija u Pantheonu — nije ploča (D-52)."""
+    assert pantheon.je_materijal({"acIdent": "RP000020", "acName": "TRAKA ZA R.P. NERO AFRIKA"}) is False
+    assert pantheon.je_materijal({"acIdent": "RP000001", "acName": "RADNA PLOČA BIJELA MAT 1106 PE"}) is True
+    assert baza.execute("SELECT COUNT(*) FROM materijal WHERE naziv_pantheon LIKE 'TRAKA%'").fetchone()[0] == 0
+
+
+def test_prednost_izvora_debljine(baza):
+    """Redoslijed prednosti (D-52): naziv > ručno > vrsta > Winstore; jedina iznimka je 'debljina_umjesto_naziva' (D-51)."""
+    from hub.sifrarnici import ispravci
+    ispravci.upisi(baza, "debljina", "RP000102", 25, "test", "IGOR")       # ploča stola bez debljine u nazivu: ured kaže 25
+    ispravci.primijeni(baza, "TEST")
+    assert baza.execute("SELECT debljina, debljina_izvor FROM materijal WHERE pantheon_ident = 'RP000102'").fetchone()[:] == (25.0, "rucno")
+    pantheon.primijeni_zadane_debljine(baza, "TEST")                       # zadanih 38 mm NE gazi ručni upis
+    assert baza.execute("SELECT debljina FROM materijal WHERE pantheon_ident = 'RP000102'").fetchone()[0] == 25.0
+
+    ispravci.upisi(baza, "debljina", "IV000221", 25, "test", "IGOR")       # naziv 'IVERAL CRNI NK 18MM' je jači od običnog ručnog upisa
+    ispravci.primijeni(baza, "TEST")
+    assert baza.execute("SELECT debljina, debljina_izvor FROM materijal WHERE pantheon_ident = 'IV000221'").fetchone()[:] == (18.0, "naziv")
+
+    assert baza.execute("SELECT debljina, debljina_izvor FROM materijal WHERE pantheon_ident = 'IV000090'").fetchone()[:] == (18.0, "naziv")
+    ispravci.upisi(baza, "debljina_umjesto_naziva", "IV000090", 19, "naziv u Pantheonu je kriv", "IGOR")   # jedini ispravak jači od naziva
+    ispravci.primijeni(baza, "TEST")
+    assert baza.execute("SELECT debljina, debljina_izvor FROM materijal WHERE pantheon_ident = 'IV000090'").fetchone()[:] == (19.0, "rucno_umjesto_naziva")
+    assert ispravci.naziv_ispravljen(baza) == []                           # naziv još kaže 18 MM — ispravak je i dalje potreban
+    baza.execute("UPDATE materijal SET naziv_pantheon = 'IVERAL BIJELI NK W908 ST2 19 MM' WHERE pantheon_ident = 'IV000090'")
+    assert [x["ident"] for x in ispravci.naziv_ispravljen(baza)] == ["IV000090"]        # Pantheon ispravljen → ispravak se može maknuti
+    ispravci.makni(baza, "debljina_umjesto_naziva", "IV000090", "IGOR")                 # brisanje vraća debljinu iz naziva
+    assert baza.execute("SELECT debljina, debljina_rucno, debljina_izvor FROM materijal WHERE pantheon_ident = 'IV000090'").fetchone()[:] == (19.0, None, "naziv")
+
+
 def test_winstore(baza):
     st = winstore.uvezi_winstore(baza, str(baza.xml_p), "TEST")
     assert (st["stavke"], st["kodova"], st["povezano"]) == (5, 4, 3)
     assert st["po_razini"] == {"naziv": 2, "ident": 1}
-    assert [k for k, _, _ in st["nepovezano"]] == ["AMBALAZA-16"]
+    assert st["nepovezano"] == [] and st["ambalaza"] == 1                      # AMBALAZA-16 = podloga za slaganje (D-49): ne povezuje se
+    assert "AMBALAZA-16" not in winstore.stanje_po_kodu(baza)                  # i ne ulazi u stanje skladišta
+    assert winstore.je_ambalaza("AMABALAZA JANC 18MM") and winstore.je_ambalaza("AMB KRUNO") and not winstore.je_ambalaza("IVERAL BIJELI NK")
     m = baza.execute("SELECT winstore_kod, god, ploca_L, ploca_W FROM materijal WHERE pantheon_ident = 'IV000671'").fetchone()
     assert tuple(m) == ("VSM02-18", 1, 2800, 1220)
     assert baza.execute("SELECT winstore_kod FROM materijal WHERE pantheon_ident = 'IV000221'").fetchone()[0] == "IV000221A-18"
@@ -261,7 +317,65 @@ def test_winstore(baza):
     assert (r.razina, r.ident) == ("winstore", "IV000671")
     assert winstore.stanje_po_kodu(baza)["W908ST2-18"][0] == 12          # ostatak (Drop) se ne broji
     st2 = winstore.uvezi_winstore(baza, str(baza.xml_p), "TEST")          # ponovni uvoz istog izvoza: zamjena, veze ostaju
-    assert st2["vec_povezano"] == 3 and baza.execute("SELECT COUNT(*) FROM winstore_ploca").fetchone()[0] == 5
+    assert st2["vec_povezano"] == 3 and st2["povezano"] == 0 and baza.execute("SELECT COUNT(*) FROM winstore_ploca").fetchone()[0] == 5
+
+
+def test_ispravci(baza):
+    from hub.sifrarnici import ispravci
+    ident = "IV000090"
+    ispravci.upisi(baza, "debljina", "RP000001", 38, "test", "IGOR")           # naziv nema debljinu → upiše se ručna
+    ispravci.upisi(baza, "ne_koristi_se", ident, "1", "test", "IGOR")
+    ispravci.upisi(baza, "winstore_kod", "W908ST2-18", "IV000671", "test", "IGOR")
+    st = ispravci.primijeni(baza, "TEST")
+    assert (st["debljina"], st["ne_koristi_se"], st["winstore_kod"], st["nepoznati"]) == (1, 1, 1, [])
+    m = baza.execute("SELECT debljina, debljina_rucno FROM materijal WHERE pantheon_ident = 'RP000001'").fetchone()
+    assert tuple(m) == (38.0, 38.0)
+    ispravci.upisi(baza, "debljina", "IV000090", 25, "test", "IGOR")           # naziv IMA debljinu (18) → Pantheon ostaje glavni
+    ispravci.primijeni(baza, "TEST")
+    assert baza.execute("SELECT debljina FROM materijal WHERE pantheon_ident = 'IV000090'").fetchone()[0] == 18.0
+    assert P.prepoznaj_materijal(baza, "IV BIJELI NK 18 MM").ident != ident    # ident koji se ne koristi Hub više ne nudi
+    assert ispravci.veze_winstore(baza) == {"W908ST2-18": _ident(baza, "materijal", "IV000671")}
+    st = winstore.uvezi_winstore(baza, str(baza.xml_p), "TEST")                # ručna veza ima prednost pred prepoznavanjem po nazivu
+    assert st["rucno"] == 1
+    assert baza.execute("SELECT m.pantheon_ident FROM winstore_ploca w JOIN materijal m ON m.id = w.materijal_id WHERE w.materijal_kod = 'W908ST2-18'"
+                        ).fetchone()[0] == "IV000671"
+    obr = str(baza.csv_p.parent / "obrazac.csv")                            # obrazac iz Excela: zarez kao razdjelnik, višak stupaca, neispravan redak
+    open(obr, "w", encoding="utf-8-sig").write(
+        "vrsta,kljuc,vrijednost,napomena,,\n"
+        "winstore_kod,VSM02-18,IV000090,prebaceno na bijeli,dodatni stupac,\n"
+        "winstore_kod,XYZ-18,NIŠTA,roba bez identa,,\n"
+        "debljina,RP000102,25,ploca stola,,\n"
+        "debljina,RP000001,,jos nije odluceno,,\n")
+    n, presk = ispravci.ucitaj_csv(baza, obr, "IVANA")
+    assert n == 2 and [(x[1], x[3]) for x in presk] == [("XYZ-18", "nije postojeći ident materijala"), ("RP000001", "prazno — ured još nije odlučio")]
+    vsm = [x for x in ispravci.popis(baza, "winstore_kod") if x["kljuc"] == "VSM02-18"][0]
+    assert vsm["vrijednost"] == "IV000090" and vsm["napomena"] == "prebaceno na bijeli, dodatni stupac"   # višak stupaca ide u napomenu
+    ispravci.primijeni(baza, "TEST")
+    assert ispravci.makni(baza, "ne_koristi_se", ident, "IGOR") == 1
+    P.ocisti_kes()
+    assert baza.execute("SELECT ne_koristi_se FROM materijal WHERE pantheon_ident = ?", (ident,)).fetchone()[0] == 0
+    assert P.prepoznaj_materijal(baza, "IV BIJELI NK 18 MM").ident == ident
+
+
+def test_nalazi(baza):
+    from hub.sifrarnici import nalazi
+    winstore.uvezi_winstore(baza, str(baza.xml_p), "TEST")
+    s = nalazi.sazetak(baza)
+    assert s["ambalaza"]["kodova"] == 1                                   # ambalaža se broji odvojeno (D-49), ne kao nepovezani kod
+    assert [x["kod"] for x in s["winstore_bez_identa"]] == []             # u testnom XML-u su svi kodovi povezani
+    identi = {x["ident"]: x["prioritet"] for x in s["bez_debljine"]}
+    assert "RP000102" in identi                                           # ploča stola još nema debljinu
+    assert all(p in nalazi.REDOSLIJED for p in identi.values())
+    assert pantheon.primijeni_zadane_debljine(baza, "TEST") == [("RP radna", 38.0, 1), ("RP stola", 38.0, 1)]   # D-52
+    assert baza.execute("SELECT debljina, debljina_izvor FROM materijal WHERE pantheon_ident = 'RP000102'").fetchone()[:] == (38.0, "vrsta")
+    assert "RP000102" not in {x["ident"] for x in nalazi.bez_debljine(baza)}
+    md = nalazi.markdown(s)
+    assert md.startswith("# Nalazi o šifrarniku") and "## 0." not in md          # bez ispravaka nema sekcije 0
+    from hub.sifrarnici import ispravci
+    ispravci.upisi(baza, "debljina", "RP000001", 38, "test", "IGOR")
+    assert "## 0." in nalazi.markdown(nalazi.sazetak(baza))
+    for naslov in ("### 1.1", "### 1.3", "### 2.1", "## 3."):
+        assert naslov in md, naslov
 
 
 def test_trake_zadane_i_po_nazivu(baza):
@@ -341,9 +455,9 @@ def test_prihvacanje_cpo_i_ponude(stvarna_baza):
     assert all(N.vrsta(n)[0] == "ZO" for _, n, _ in nesigurni), nesigurni
     assert s["cpo"]["sigurno"] >= 47
     assert s["cpo"]["krivo_vs_ponuda"] == [] and s["cpo"]["tocno_vs_ponuda"] == s["cpo"]["s_ponudom"] >= 40
-    assert s["cpw"]["sigurno"] == s["cpw"]["ukupno"] >= 37
+    assert s["cpw"]["sigurno"] == s["cpw"]["ukupno"] >= 40   # +3 Corpus materijala iz uzorka (dokument 14)
     assert s["csv"]["sigurno"] >= s["csv"]["ukupno"] - 1            # K2739DC-19: tipfeler u SIFRA MAT, ispravno 'za potvrdu'
-    assert s["trake"]["sigurno"] >= 42
+    assert s["trake"]["sigurno"] >= 44
 
 
 @stvarni
@@ -352,4 +466,5 @@ def test_prihvacanje_winstore(stvarna_baza):
         pytest.skip("nema Winstore XML")
     st = stvarna_baza.st_winstore
     assert st["kodova"] >= 500 and st["povezano"] >= 400
-    assert all(("AMBALA" in opis.upper()) or True for _, opis, _ in st["nepovezano"])   # popis je izvještaj, ne greška
+    assert all(kom >= 0 for _, _, _, kom in st["nepovezano"])   # popis je izvještaj, ne greška
+    assert st["ambalaza"] >= 15                                  # ambalažne ploče se ne povezuju (D-49)

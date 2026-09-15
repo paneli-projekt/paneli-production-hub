@@ -1,5 +1,6 @@
--- Paneli Production Hub — shema baze (SQLite), verzija 3 (13. 9. 2026.; v1 = 12. 9., v2 = 13. 9.)
--- Migracije starijih baza: hub/db.py MIGRACIJE (v2: kupac adresa/OIB, nalog_materijal ulazni naziv; v3: vrsta kupca i subjekt za Pantheon, D-48).
+-- Paneli Production Hub — shema baze (SQLite), verzija 4 (14. 9. 2026.; v1 = 12. 9., v2 i v3 = 13. 9.)
+-- Migracije starijih baza: hub/db.py MIGRACIJE (v2: kupac adresa/OIB, nalog_materijal ulazni naziv; v3: vrsta kupca i subjekt za Pantheon, D-48;
+-- v4: winstore_ploca.ambalaza — podloge za slaganje ploča ne vode se na stanju, D-49).
 -- Model po docs/04 §2, dopune po docs/10 §4 (događaji, rokovi, rezervacije, narudžbenice, operacije) i D-40 (rabat, ponuda iz Huba).
 -- Korak 1 kralježnice puni samo šifrarnike (pantheon_ident, materijal, materijal_alias, winstore_ploca, traka, traka_alias,
 -- materijal_traka); ostale tablice postoje od početka da ih kasniji koraci ne moraju mijenjati (D-12, D-42).
@@ -85,11 +86,25 @@ CREATE TABLE IF NOT EXISTS materijal (
     sirina_rp       INTEGER,                           -- 600 / 640 / 900 za radne, zidne i ploče stola
     samo_cijela     INTEGER NOT NULL DEFAULT 0,        -- dekor po narudžbi → prodaje se samo cijela ploča (D-37b)
     aktivan         INTEGER NOT NULL DEFAULT 1,
+    debljina_rucno  REAL,                              -- debljinu upisao ured u Hubu jer je naziv u Pantheonu nema (D-51)
+    debljina_izvor  TEXT,                              -- naziv | rucno | vrsta | winstore — po tom redu ima prednost (D-52)
+    ne_koristi_se   INTEGER NOT NULL DEFAULT 0,        -- ured: ident postoji u Pantheonu, ali se ne koristi → Hub ga ne nudi (D-51)
     trazi           TEXT,                              -- normalizirani tekst za pretragu (naziv u oba pisanja, ident, Winstore kod)
     napomena        TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_materijal_vrsta ON materijal (vrsta, debljina);
 CREATE INDEX IF NOT EXISTS ix_materijal_winstore ON materijal (winstore_kod);
+
+CREATE TABLE IF NOT EXISTS sifrarnik_ispravak (       -- odluke ureda o šifrarniku koje žive u Hubu, a Pantheon ih nema (D-51)
+    id           INTEGER PRIMARY KEY,
+    vrsta        TEXT NOT NULL,                        -- debljina | ne_koristi_se | winstore_kod
+    kljuc        TEXT NOT NULL,                        -- Pantheon ident (debljina, ne_koristi_se) ili Winstore kod (winstore_kod)
+    vrijednost   TEXT,                                 -- debljina u mm | 1 | Pantheon ident na koji taj kod ide
+    napomena     TEXT,
+    tko          TEXT,
+    kada         TEXT NOT NULL,
+    UNIQUE (vrsta, kljuc)
+);
 
 CREATE TABLE IF NOT EXISTS materijal_alias (          -- kako materijal pišu PW, PPNEST, kupci, Corpus → materijal (D-24, 08 §3.3)
     id           INTEGER PRIMARY KEY,
@@ -113,7 +128,8 @@ CREATE TABLE IF NOT EXISTS winstore_ploca (           -- Winstore inventar (XML 
     kom_eksterno   INTEGER NOT NULL DEFAULT 0,
     drop_ploca     INTEGER NOT NULL DEFAULT 0,         -- Drop = ostatak (restl u Winstoreu)
     izvoz          TEXT NOT NULL,                      -- naziv/datum izvoza (11092026.XML)
-    materijal_id   INTEGER REFERENCES materijal (id)   -- veza na Pantheon materijal (NULL = nije povezano)
+    materijal_id   INTEGER REFERENCES materijal (id),  -- veza na Pantheon materijal (NULL = nije povezano)
+    ambalaza       INTEGER NOT NULL DEFAULT 0          -- podloga na koju se slažu ploče (AMBALAZA …) — ne vodi se na stanju (D-49)
 );
 CREATE INDEX IF NOT EXISTS ix_winstore_kod ON winstore_ploca (materijal_kod);
 
@@ -274,6 +290,14 @@ CREATE TABLE IF NOT EXISTS dokument (
     putanja   TEXT NOT NULL,
     hash      TEXT,
     datum     TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS cix_registar (            -- ime CIX datoteke mora biti jedinstveno ZAUVIJEK (D-23):
+    ime         TEXT PRIMARY KEY,                     -- bNest datoteku s istim imenom pregazi bez pitanja, a to se već dogodilo
+    element_id  INTEGER REFERENCES element (id),      -- NULL kad je element obrisan — ime se NIKAD ne oslobađa
+    nalog_id    INTEGER REFERENCES nalog (id),
+    izvor       TEXT NOT NULL,                        -- hub | corpus | ppnest
+    kada        TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS dogadjaj (                 -- vremenska crta naloga (D-42, 10 §1)
