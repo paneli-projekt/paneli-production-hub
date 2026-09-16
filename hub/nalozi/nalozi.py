@@ -14,18 +14,19 @@ from ..db import sada, dnevnik, postavka, postavi
 from ..sifrarnici import prepoznaj as P
 from ..sifrarnici.nazivi import norm
 
-STATUSI = ["unos", "ponuda", "potvrdjeno", "skladiste", "pila_nesting", "proizvodnja", "zatvoren"]
+STATUSI = ["unos", "ponuda", "potvrdjeno", "skladiste", "pila_nesting", "proizvodnja", "izdatnica", "zatvoren"]
 PRIJELAZI = {                                    # D-35; natrag samo dok kupac nije potvrdio (ispravak ponude)
     "unos": ["ponuda", "zatvoren"],
     "ponuda": ["potvrdjeno", "unos", "zatvoren"],
     "potvrdjeno": ["skladiste", "ponuda"],
     "skladiste": ["pila_nesting", "potvrdjeno"],
     "pila_nesting": ["proizvodnja", "skladiste"],
-    "proizvodnja": ["zatvoren", "pila_nesting"],
+    "proizvodnja": ["zatvoren", "izdatnica", "pila_nesting"],
+    "izdatnica": ["zatvoren", "proizvodnja"],        # samo vlastita proizvodnja (D-56): korekcija po stvarnom stanju → interna izdatnica
     "zatvoren": [],
 }
 STATUS_NAZIV = {"unos": "Unos", "ponuda": "Ponuda — čeka kupca", "potvrdjeno": "Potvrđeno", "skladiste": "Skladište",
-                "pila_nesting": "Pila / nesting", "proizvodnja": "Proizvodnja", "zatvoren": "Zatvoren"}
+                "pila_nesting": "Pila / nesting", "proizvodnja": "Proizvodnja", "izdatnica": "Izdatnica", "zatvoren": "Zatvoren"}
 RUBOVI = ("L", "O", "D", "G")                    # rub1..rub4
 TRAKE_ZADANE = ("MEL-ISTI", "ABS-ISTI", "ABS-ISTI 2mm")   # izbornik iznad daske (D-31, D-36)
 NAPOMENA_ETIKETA = 14                            # znakova napomene koji stanu na etiketu (D-38)
@@ -170,6 +171,8 @@ def postavi_status(conn, nalog_id, novi, tko, razlog=None, veza=None, **potvrda)
     n = nalog(conn, nalog_id)
     if novi not in STATUSI:
         raise NalogGreska("nepoznat status %s" % novi)
+    if novi == "izdatnica" and n["vrsta"] != "vlastita_proizvodnja":
+        raise NalogGreska("status 'izdatnica' je samo za vlastitu proizvodnju (D-56)")
     if novi not in PRIJELAZI[n["status"]]:
         raise NalogGreska("iz statusa '%s' ne može u '%s' (dopušteno: %s)" % (n["status"], novi, ", ".join(PRIJELAZI[n["status"]]) or "ništa"))
     tko_id = korisnik_id(conn, tko)
@@ -269,14 +272,49 @@ def potvrdi_materijal_naloga(conn, nm_id, materijal_id, tko, zapamti=True):
     return materijal_naloga(conn, nm_id)
 
 
+def _odvezi_elemente(conn, nm_id=None, nalog_id=None):
+    """Prije brisanja elemenata: ime CIX datoteke ostaje ZAUVIJEK zauzeto (D-23/D-60), pa se u registru samo odveže od elementa."""
+    if nm_id is not None:
+        conn.execute("UPDATE cix_registar SET element_id = NULL WHERE element_id IN (SELECT id FROM element WHERE nalog_materijal_id = ?)", (nm_id,))
+    if nalog_id is not None:
+        conn.execute("UPDATE cix_registar SET element_id = NULL, nalog_id = NULL WHERE nalog_id = ? OR element_id IN "
+                     "(SELECT e.id FROM element e JOIN nalog_materijal m ON m.id = e.nalog_materijal_id WHERE m.nalog_id = ?)", (nalog_id, nalog_id))
+
+
+def _obrisi_materijal_bez_provjere(conn, nm_id):
+    """Sve što visi na materijalu naloga (optimizacija, obračun, rezervacije, narudžbe, operacije), pa elementi, pa materijal."""
+    _odvezi_elemente(conn, nm_id=nm_id)
+    for t in ("optimizacija", "obracun_stavka", "rezervacija", "operacija", "spojeni_posao_stavka"):
+        conn.execute("DELETE FROM %s WHERE nalog_materijal_id = ?" % t, (nm_id,))
+    conn.execute("UPDATE narudzbenica_st SET nalog_materijal_id = NULL WHERE nalog_materijal_id = ?", (nm_id,))
+    conn.execute("DELETE FROM element WHERE nalog_materijal_id = ?", (nm_id,))
+    conn.execute("DELETE FROM nalog_materijal WHERE id = ?", (nm_id,))
+
+
 def obrisi_materijal(conn, nm_id, tko):
     nm = materijal_naloga(conn, nm_id)
     n = nalog(conn, nm["nalog_id"])
     if n["status"] not in ("unos", "ponuda"):
         raise NalogGreska("materijali se mijenjaju samo u statusu unos / ponuda")
-    conn.execute("DELETE FROM element WHERE nalog_materijal_id = ?", (nm_id,))
-    conn.execute("DELETE FROM nalog_materijal WHERE id = ?", (nm_id,))
+    _obrisi_materijal_bez_provjere(conn, nm_id)
     dnevnik(conn, tko, "nalog_materijal", nm_id, "obrisi", nm["naziv_ulaz"] or nm["ident"] or "")
+    conn.commit()
+
+
+def obrisi_nalog(conn, nalog_id, tko, forsiraj=False):
+    """Obriši cijeli nalog sa svime što na njemu visi. Dopušteno samo za probne naloge (izvor 'provjera') i naloge u statusu
+    'unos' — stvarni nalog koji je krenuo dalje se ne briše nego zatvara (D-35); forsiraj=True preskače tu zaštitu."""
+    n = nalog(conn, nalog_id)
+    if not forsiraj and n["izvor"] != "provjera" and n["status"] != "unos":
+        raise NalogGreska("nalog %s je u statusu '%s' — ne briše se nego zatvara" % (n["naziv"], n["status"]))
+    _odvezi_elemente(conn, nalog_id=nalog_id)
+    for (nm_id,) in conn.execute("SELECT id FROM nalog_materijal WHERE nalog_id = ?", (nalog_id,)).fetchall():
+        _obrisi_materijal_bez_provjere(conn, nm_id)
+    conn.execute("UPDATE spojeni_posao SET mno_dokument_id = NULL WHERE mno_dokument_id IN (SELECT id FROM dokument WHERE nalog_id = ?)", (nalog_id,))
+    for t in ("dogadjaj", "dokument", "okov_stavka", "obracun_stavka", "operacija", "ponuda_verzija", "spojeni_posao_stavka"):
+        conn.execute("DELETE FROM %s WHERE nalog_id = ?" % t, (nalog_id,))
+    conn.execute("DELETE FROM nalog WHERE id = ?", (nalog_id,))
+    dnevnik(conn, tko, "nalog", nalog_id, "obrisi", "%s %s" % (n["broj"], n["naziv"]))
     conn.commit()
 
 
@@ -312,7 +350,8 @@ def tip_ruba(klasa, kod):
 
 
 def dodaj_element(conn, nm_id, tko, L, W, kom, naziv=None, rubovi=None, tipovi=None, god=None, napomena=None, izvor="rucno",
-                  cix_ime=None, cix_izvor=None, obrada=None, program1=None, program2=None, ljepljenje=None, cjelina=None, pozicija=None, gotova_mjera=None):
+                  cix_ime=None, cix_izvor=None, obrada=None, program1=None, program2=None, ljepljenje=None, cjelina=None, pozicija=None, gotova_mjera=None,
+                  prolaza=None):
     """rubovi = {'L':tekst,'O':tekst,'D':tekst,'G':tekst} (lijevo, dolje, desno, gore); tipovi = {'L':'M'|'A'|''…} kad tekst nedostaje.
     Rub s tekstom prolazi prepoznavanje trake uz materijal; nesiguran rub → element.provjeri = 1."""
     nm = materijal_naloga(conn, nm_id)
@@ -328,8 +367,9 @@ def dodaj_element(conn, nm_id, tko, L, W, kom, naziv=None, rubovi=None, tipovi=N
     if god is None:
         god = "H" if nm.get("god") else None
     cur = conn.execute("INSERT INTO element (nalog_materijal_id, rb, naziv, L, W, kom, god, gotova_mjera, obrada, program1, program2, ljepljenje, napomena, "
-                       "cix_ime, cix_izvor, cjelina, pozicija, izvor, provjeri) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
-                       (nm_id, rb, naziv, L, W, kom, god, gotova_mjera, obrada, program1, program2, ljepljenje, napomena, cix_ime, cix_izvor, cjelina, pozicija, izvor))
+                       "cix_ime, cix_izvor, cjelina, pozicija, izvor, prolaza, provjeri) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+                       (nm_id, rb, naziv, L, W, kom, god, gotova_mjera, obrada, program1, program2, ljepljenje, napomena, cix_ime, cix_izvor, cjelina, pozicija, izvor,
+                        int(prolaza) if prolaza else None))
     eid = cur.lastrowid
     kodovi = {r: _oznaka_ruba(rubovi.get(r), tipovi.get(r), nm["traka_zadana"]) for r in RUBOVI}
     conn.execute("UPDATE element SET rub1_kod = ?, rub2_kod = ?, rub3_kod = ?, rub4_kod = ? WHERE id = ?", (kodovi["L"] or None, kodovi["O"] or None, kodovi["D"] or None, kodovi["G"] or None, eid))
@@ -378,11 +418,18 @@ def _prepoznaj_rubove(conn, nm_id, samo_provjeri=True):
 
 
 def uredi_element(conn, eid, tko, **polja):
-    """Mjere, količina, god, napomena, rubovi (rubovi={'L':…}) — ponovno prepoznaje rubove."""
+    """Mjere, količina, god, napomena, rubovi (rubovi={'L':…}) — ponovno prepoznaje rubove. Samo u statusu unos / ponuda:
+    nakon potvrde kupca mjere u bazi moraju ostati ono što je otišlo na ponudu i na stroj."""
     e = element(conn, eid)
     nm = materijal_naloga(conn, e["nalog_materijal_id"])
-    dopusteno = {"naziv", "L", "W", "kom", "god", "gotova_mjera", "obrada", "program1", "program2", "ljepljenje", "napomena", "cjelina", "pozicija", "rb"}
+    if nalog(conn, nm["nalog_id"])["status"] not in ("unos", "ponuda"):
+        raise NalogGreska("elementi se mijenjaju samo u statusu unos / ponuda")
+    dopusteno = {"naziv", "L", "W", "kom", "god", "gotova_mjera", "obrada", "program1", "program2", "ljepljenje", "napomena", "cjelina", "pozicija", "rb", "prolaza"}
     p = {k: v for k, v in polja.items() if k in dopusteno}
+    if "L" in p or "W" in p or "kom" in p:
+        L, W, kom = float(p.get("L", e["L"])), float(p.get("W", e["W"])), int(p.get("kom", e["kom"]))
+        if L <= 0 or W <= 0 or kom <= 0:
+            raise NalogGreska("mjere i količina moraju biti veće od 0")
     rubovi = polja.get("rubovi")
     if rubovi:
         for i, r in enumerate(RUBOVI, 1):
@@ -399,6 +446,10 @@ def uredi_element(conn, eid, tko, **polja):
 
 def obrisi_element(conn, eid, tko):
     e = element(conn, eid)
+    nm = materijal_naloga(conn, e["nalog_materijal_id"])
+    if nalog(conn, nm["nalog_id"])["status"] not in ("unos", "ponuda"):
+        raise NalogGreska("elementi se mijenjaju samo u statusu unos / ponuda")
+    conn.execute("UPDATE cix_registar SET element_id = NULL WHERE element_id = ?", (eid,))   # ime ostaje zauzeto (D-23)
     conn.execute("DELETE FROM element WHERE id = ?", (eid,))
     dnevnik(conn, tko, "element", eid, "obrisi", "%gx%g x%d" % (e["L"], e["W"], e["kom"]))
     conn.commit()
@@ -419,14 +470,23 @@ def potvrdi_traku_naloga(conn, nm_id, oznaka, traka_id, tko, zapamti=True):
         raise NalogGreska("prvo potvrditi materijal")
     if zapamti:
         P.potvrdi_traku(conn, oznaka, traka_id, tko, materijal_id=nm["materijal_id"] if oznaka_ovisi_o_materijalu(oznaka) else None, izvor="nalog")
-    else:
-        n = norm(oznaka)
+        dnevnik(conn, tko, "nalog_materijal", nm_id, "potvrda_trake", "%s → traka %s" % (oznaka, traka_id))
+        conn.commit()
+        for (x,) in conn.execute("SELECT id FROM nalog_materijal WHERE nalog_id = ? AND materijal_id IS NOT NULL", (nm["nalog_id"],)).fetchall():
+            _prepoznaj_rubove(conn, x, samo_provjeri=True)
+        return
+    # samo za ovaj nalog, bez aliasa: upiši traku u rubove s tom oznakom i ne prepoznavaj ih ponovno (ponovno prepoznavanje bi ih vratilo na prazno)
+    n = norm(oznaka)
+    for e in conn.execute("SELECT id, rub1_kod, rub2_kod, rub3_kod, rub4_kod FROM element WHERE nalog_materijal_id = ?", (nm_id,)).fetchall():
         for i in range(1, 5):
-            conn.execute("UPDATE element SET rub%d_traka_id = ? WHERE nalog_materijal_id = ? AND rub%d_kod IS NOT NULL AND UPPER(rub%d_kod) = ?" % (i, i, i), (traka_id, nm_id, n))
-    dnevnik(conn, tko, "nalog_materijal", nm_id, "potvrda_trake", "%s → traka %s" % (oznaka, traka_id))
+            if norm(e["rub%d_kod" % i] or "") == n:
+                conn.execute("UPDATE element SET rub%d_traka_id = ? WHERE id = ?" % i, (traka_id, e["id"]))
+    for e in conn.execute("SELECT id, rub1_kod, rub2_kod, rub3_kod, rub4_kod, rub1_traka_id, rub2_traka_id, rub3_traka_id, rub4_traka_id "
+                          "FROM element WHERE nalog_materijal_id = ? AND provjeri = 1", (nm_id,)).fetchall():
+        otvoren = any(e["rub%d_kod" % i] and not e["rub%d_traka_id" % i] for i in range(1, 5))
+        conn.execute("UPDATE element SET provjeri = ? WHERE id = ?", (1 if otvoren else 0, e["id"]))
+    dnevnik(conn, tko, "nalog_materijal", nm_id, "potvrda_trake", "%s → traka %s (samo ovaj nalog)" % (oznaka, traka_id))
     conn.commit()
-    for (x,) in conn.execute("SELECT id FROM nalog_materijal WHERE nalog_id = ? AND materijal_id IS NOT NULL", (nm["nalog_id"],)).fetchall():
-        _prepoznaj_rubove(conn, x, samo_provjeri=True)
 
 
 def ponovi_prepoznavanje(conn, nalog_id, tko="sustav"):
@@ -514,6 +574,10 @@ def elementi_za_export(conn, nalog_id):
             out.append(dict(rb=rb, nalog=n["naziv"], kupac=n["kupac_naziv"] or "", L=el["L"], W=el["W"], kom=el["kom"],
                             sifra_mat=m["winstore_kod"] or "", deb=deb, mat=m["naziv_kratki"] or m["naziv_ulaz"] or "",
                             god=1 if el["god"] else 0, traka=traka, tip=tip, cix=el["cix_ime"] or "", napomena=el["napomena_etiketa"],
-                            prolaza=2 if (el["L"] < 200 or el["W"] < 200) else 1, glodalo=14 if deb > 20 else 12,
-                            element_id=el["id"], materijal_ident=m["ident"], nalog_materijal_id=nm["id"]))
+                            naziv=el["naziv"] or "", cjelina=el["cjelina"] or "", pozicija=el["pozicija"] or "",
+                            program1=el["program1"] or "", program2=el["program2"] or "",
+                            prolaza=int(el["prolaza"]) if el["prolaza"] else (2 if (el["L"] < 200 or el["W"] < 200) else 1),
+                            glodalo=14 if deb > 20 else 12,
+                            element_id=el["id"], materijal_ident=m["ident"], nalog_materijal_id=nm["id"],
+                            cix_izvor=el["cix_izvor"] or "", obrada_json=el["obrada_json"] or ""))
     return out

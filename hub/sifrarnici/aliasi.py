@@ -31,6 +31,7 @@ ALIASI_MATERIJALA = [
     ("IV EGGER H1180 ST37", "IV000315", "ponuda 26-010-002924"),    # IVERAL H1180 HRAST HALIFAX 18MM
     ("MDF_CHAMPAGNE_19", "IV001038", "ponuda 26-010-003213"),       # MDF CHAMPAGNE 27045 OF 19MM (Winstore 27045OF-19)
     ("IV_SIVI_TAMNI_19", "IV001168", "ponuda 26-010-002924"),       # IVERAL SIVI TAMNI 2162 MN (ne 2162 PE) — Winstore 2162MN-19
+    ("MDF BIJELI 4 MM", "IV000054", "Corpus uzorak, D-57"),         # Corpus deklarira 4 mm (nut), ploča je MDF BIJELI 3 MM; u CPO-u dolazi bez Winstore šifre (Igor, 15. 9. 2026.)
 ]
 
 # opći aliasi traka (oznaka u nalogu → traka), neovisno o materijalu — potvrđeno u ponudama

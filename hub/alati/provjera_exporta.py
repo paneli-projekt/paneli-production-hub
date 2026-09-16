@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """Provjera koraka 3: je li ono što Hub izveze isti posao kao ono što danas izlazi iz PPNEST-a / PanelWizarda.
 
-Za svaki testni nalog: uveze se PPNEST-ov izvoz (CPW za PW, CSV za bNest), pa se iz Huba izveze natrag i usporedi s
-originalom. Uspoređuje se ono što stroj i obračun stvarno troše — debljina, mjere, komadi i maska rubova po elementu —
-a ne tekst naziva (Hub namjerno piše svoj kratki naziv materijala i pravi naziv trake iz Pantheona).
+Za svaki testni nalog: uveze se PPNEST-ov izvoz (CPW za PW, CSV za bNest), pa se iz Huba NAPIŠU datoteke natrag
+(istim funkcijama kojima pišu `export_pw` i `export_nesting`, u privremenu mapu, bez provjere statusa jer su probni
+nalozi u 'unos') i pročitaju istim čitačem kao original. Uspoređuje se ono što stroj i obračun stvarno troše — debljina,
+mjere, komadi i maska rubova po elementu — a ne tekst naziva (Hub namjerno piše svoj kratki naziv materijala i pravi
+naziv trake iz Pantheona).
 
     py -m hub.alati.provjera_exporta --db hub.db --nalozi ..\\05_NALOZI_ZA_TEST [--md ..\\20_ANALIZA\\provjera_exporta.md] [--obrisi]
 
@@ -19,7 +21,8 @@ import sys
 import tempfile
 
 from .. import db
-from ..nalozi import nalozi as N, provjera as P, export_nesting as EN, export_pw as EPW
+from ..nalozi import nalozi as N, provjera as P
+from ..nalozi.export_nesting import _po_materijalu, _bez_dij
 from ..formati import nalog_io
 
 
@@ -51,12 +54,23 @@ def citaj_csv(putanja):
     return sorted(out)
 
 
-def iz_huba(paketi_els):
+def napisi_iz_huba(conn, nid, mapa, vrsta):
+    """Napiši CPW ('cpw') ili PPNEST CSV ('csv') po materijalu iz Hubovog naloga u `mapa` — istim funkcijama kao
+    export_pw / export_nesting — i vrati putanje. Bez provjere statusa i bez upisa u bazu (probni nalozi)."""
+    els = N.elementi_za_export(conn, nid)
     out = []
-    for e in paketi_els:
-        out.append((str(float(e["deb"] or 0)), nalog_io._fmt(e["L"]), nalog_io._fmt(e["W"]), str(e["kom"]),
-                    _maska(e["tip"][r] for r in ("L", "O", "D", "G"))))
-    return sorted(out)
+    os.makedirs(mapa, exist_ok=True)
+    for nm_id, grupa in _po_materijalu(els):
+        for i, e in enumerate(grupa, 1):
+            e["rb"] = i
+            e["mat"] = _bez_dij(e["mat"])
+        put = os.path.join(mapa, "%d_%s.%s" % (nm_id, grupa[0]["mat"], vrsta.upper()))
+        if vrsta == "cpw":
+            nalog_io.write_cpw(grupa, put, header_once=False)
+        else:
+            nalog_io.write_ppnest_csv(grupa, put)
+        out.append(put)
+    return out
 
 
 def bez_tipa(red):
@@ -129,8 +143,10 @@ def provjeri(conn, koren, mapa_izvoza):
             izvor = []
             for p in P.U.najnovije_datoteke(m["pw"])[0]:
                 izvor += citaj_cpw(p)
-            hub = iz_huba(N.elementi_za_export(conn, nid))
-            isti, raz = usporedi(sorted(izvor), hub)
+            hub = []
+            for p in napisi_iz_huba(conn, nid, os.path.join(mapa_izvoza, m["mapa"], "PANEL WIZARD"), "cpw"):
+                hub += citaj_cpw(p)
+            isti, raz = usporedi(sorted(izvor), sorted(hub))
             r["cpw"] = dict(nalog_id=nid, original=len(izvor), hub=len(hub),
                             kom_original=sum(int(x[3]) for x in izvor), kom_hub=sum(int(x[3]) for x in hub),
                             isti=isti, razlike=raz)
@@ -139,8 +155,9 @@ def provjeri(conn, koren, mapa_izvoza):
             izvor = []
             for p in P.U.najnovije_datoteke(m["csv"])[0]:
                 izvor += citaj_csv(p)
-            hub = iz_huba(N.elementi_za_export(conn, nid))
-            hub = [(a, b, c, d, _maska("T" if x != "-" else "" for x in e)) for a, b, c, d, e in hub]
+            hub = []
+            for p in napisi_iz_huba(conn, nid, os.path.join(mapa_izvoza, m["mapa"], "NESTING"), "csv"):
+                hub += citaj_csv(p)
             isti, raz = usporedi(sorted(izvor), sorted(hub))
             r["csv"] = dict(nalog_id=nid, original=len(izvor), hub=len(hub),
                             kom_original=sum(int(x[3]) for x in izvor), kom_hub=sum(int(x[3]) for x in hub),
@@ -231,11 +248,7 @@ def main(argv=None):
             io.open(a.md, "w", encoding="utf-8").write(markdown(rez, ok, uk, n, po_nalogu))
             print("\nzapisano:", a.md)
         if a.obrisi:
-            n = conn.execute("SELECT COUNT(*) FROM nalog WHERE izvor = 'provjera'").fetchone()[0]
-            for r in conn.execute("SELECT id FROM nalog WHERE izvor = 'provjera'").fetchall():
-                N.obrisi_nalog(conn, r["id"], "PROVJERA")
-            conn.commit()
-            print("obrisano probnih naloga:", n)
+            print("obrisano probnih naloga:", P.obrisi_provjere(conn))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
         conn.close()

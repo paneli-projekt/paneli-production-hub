@@ -1,6 +1,7 @@
--- Paneli Production Hub — shema baze (SQLite), verzija 4 (14. 9. 2026.; v1 = 12. 9., v2 i v3 = 13. 9.)
+-- Paneli Production Hub — shema baze (SQLite), verzija 10 (16. 9. 2026.; v1 = 12. 9., v2 i v3 = 13. 9., v4–v7 = 14. 9., v8 i v9 = 15. 9., v10 = 16. 9.)
 -- Migracije starijih baza: hub/db.py MIGRACIJE (v2: kupac adresa/OIB, nalog_materijal ulazni naziv; v3: vrsta kupca i subjekt za Pantheon, D-48;
--- v4: winstore_ploca.ambalaza — podloge za slaganje ploča ne vode se na stanju, D-49).
+-- v4: winstore_ploca.ambalaza, D-49; v5: ispravci ureda, D-51; v6: materijal.debljina_izvor, D-52; v7: cix_registar, D-60;
+-- v8: element.prolaza iz PPNEST CSV-a + brojač naloga se briše dok nema stvarnih naloga, D-47; v9: spojeni_posao + stavke, D-54/B; v10: optimizacija s potvrdom i snimkom slaganja, D-75).
 -- Model po docs/04 §2, dopune po docs/10 §4 (događaji, rokovi, rezervacije, narudžbenice, operacije) i D-40 (rabat, ponuda iz Huba).
 -- Korak 1 kralježnice puni samo šifrarnike (pantheon_ident, materijal, materijal_alias, winstore_ploca, traka, traka_alias,
 -- materijal_traka); ostale tablice postoje od početka da ih kasniji koraci ne moraju mijenjati (D-12, D-42).
@@ -182,7 +183,7 @@ CREATE TABLE IF NOT EXISTS nalog (
     vrsta                TEXT NOT NULL DEFAULT 'usluga',   -- usluga | vlastita_proizvodnja (D-30)
     izvor                TEXT,                         -- kupac_ppw | kupac_excel | kupac_rukopis | corpus | rucno
     corpus_projekt       TEXT,
-    status               TEXT NOT NULL DEFAULT 'unos', -- unos | ponuda | potvrdjeno | skladiste | pila_nesting | proizvodnja | zatvoren (D-35)
+    status               TEXT NOT NULL DEFAULT 'unos', -- unos | ponuda | potvrdjeno | skladiste | pila_nesting | proizvodnja | izdatnica (samo vlastita proizvodnja, D-56) | zatvoren (D-35)
     datum                TEXT NOT NULL,
     izradio_id           INTEGER REFERENCES korisnik (id),
     kerf                 REAL NOT NULL DEFAULT 16,     -- za obračun; u CPO ide 5 (D-21)
@@ -247,6 +248,7 @@ CREATE TABLE IF NOT EXISTS element (
     obrada_json         TEXT,
     cjelina             TEXT, pozicija TEXT,           -- iz Corpusa (08 §4)
     izvor               TEXT,                          -- cpw | excel | rukopis | rucno | corpus
+    prolaza             INTEGER,                       -- GLODANJE iz PPNEST CSV-a (1 | 2); NULL = Hub računa iz mjera (< 200 mm → 2)
     provjeri            INTEGER NOT NULL DEFAULT 0
 );
 
@@ -280,7 +282,36 @@ CREATE TABLE IF NOT EXISTS optimizacija (
     datum              TEXT NOT NULL,
     broj_ploca         INTEGER, iskoristenje REAL, m2_dijelova REAL, m2_ploca REAL, m2_za_naplatu REAL, rezova INTEGER,
     sheme_json         TEXT,
-    dokument_id        INTEGER
+    dokument_id        INTEGER,
+    status             TEXT,                           -- v10 (D-75): prijedlog | potvrdjeno | zamijenjeno | zastarjelo; NULL = stari zapis / bNest
+    nacin_trazen       TEXT,                           -- auto | uzduzno | poprecno | trake (što je korisnik tražio)
+    dubina             TEXT,                           -- brzo | najbolje
+    slaganje_json      TEXT,                           -- snimka slaganja: sheets + element_ids + ploca/obrez/kerf — iz nje idu ponuda, CPO i nabava
+    elementi_hash      TEXT,                           -- hash mjera/komada elemenata u trenutku slaganja; promjena elemenata → zastarjelo
+    kerf               REAL, obrez REAL,
+    potvrdio_id        INTEGER REFERENCES korisnik (id),
+    potvrdjeno         TEXT,
+    napomena           TEXT
+);
+
+CREATE TABLE IF NOT EXISTS spojeni_posao (           -- jedan nesting posao iz više naloga istog materijala (D-54/B, v9)
+    id            INTEGER PRIMARY KEY,
+    naziv         TEXT NOT NULL UNIQUE,                 -- SPOJ_<MATERIJAL>_<ddmmyy_HHmmss> = ime mape i CSV-a za bNest
+    materijal_id  INTEGER REFERENCES materijal (id),
+    kada          TEXT NOT NULL,
+    tko_id        INTEGER REFERENCES korisnik (id),
+    mapa          TEXT, csv TEXT,
+    elemenata     INTEGER, komada INTEGER, m2 REAL, cix INTEGER,
+    mno_dokument_id INTEGER REFERENCES dokument (id),  -- popunjeno kad se .mno vrati (rezultat_nesting)
+    napomena      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS spojeni_posao_stavka (
+    id                 INTEGER PRIMARY KEY,
+    posao_id           INTEGER NOT NULL REFERENCES spojeni_posao (id),
+    nalog_id           INTEGER NOT NULL REFERENCES nalog (id),
+    nalog_materijal_id INTEGER NOT NULL REFERENCES nalog_materijal (id),
+    elemenata          INTEGER, komada INTEGER, m2 REAL
 );
 
 CREATE TABLE IF NOT EXISTS dokument (
@@ -294,7 +325,7 @@ CREATE TABLE IF NOT EXISTS dokument (
 
 CREATE TABLE IF NOT EXISTS cix_registar (            -- ime CIX datoteke mora biti jedinstveno ZAUVIJEK (D-23):
     ime         TEXT PRIMARY KEY,                     -- bNest datoteku s istim imenom pregazi bez pitanja, a to se već dogodilo
-    element_id  INTEGER REFERENCES element (id),      -- NULL kad je element obrisan — ime se NIKAD ne oslobađa
+    element_id  INTEGER REFERENCES element (id),      -- NULL kad je element obrisan (nalozi.obrisi_* ga odvežu) — ime se NIKAD ne oslobađa
     nalog_id    INTEGER REFERENCES nalog (id),
     izvor       TEXT NOT NULL,                        -- hub | corpus | ppnest
     kada        TEXT NOT NULL
@@ -387,7 +418,12 @@ CREATE TABLE IF NOT EXISTS dnevnik (                  -- audit trail (04 §2) + 
 INSERT OR IGNORE INTO korisnik (oznaka, ime, uloga) VALUES ('IVANA', 'Ivana', 'ured'), ('GORAN', 'Goran', 'ured'), ('SANELA', 'Sanela', 'nabava'),
     ('VP', 'Voditelj proizvodnje', 'voditelj'), ('IGOR', 'Igor', 'admin'), ('UVOZ', 'Automatski uvoz', 'sustav'), ('WEB', 'Neprijavljeni korisnik', 'sustav');
 INSERT OR IGNORE INTO postavke (kljuc, vrijednost, opis) VALUES
-    ('kerf', '16', 'širina reza za obračun (D-21); u CPO ide 5'),
+    ('kerf', '16', 'širina reza za obračun korisnog ostatka (D-21/D-72, PW „Podesi alat“)'),
+    ('kerf_pile', '5', 'fizički kerf pile — slaganje i CPO (D-72, D-77)'),
+    ('nadmjera_trake', '10', 'nadmjera trake u % iznad Σ stranica (PW 10 %, D-20/D-77)'),
+    ('obracun_rezanja', 'm2', 'usluga rezanja: m2 (po m² ploče, US000002/13) | rezova (po broju rezova, ident_rezanje_rez) | m_reza (po dužnom metru reza, ident_rezanje_m) — D-77'),
+    ('ident_rezanje_rez', 'US000303', 'Pantheon ident usluge rezanja po rezu (D-77)'),
+    ('ident_rezanje_m', '', 'Pantheon ident usluge rezanja po dužnom metru reza (D-77) — prazno dok se ne otvori'),
     ('rabat_materijal_zadano', '15', 'zadani rabat novog kupca — materijal, okov, ostalo (D-40)'),
     ('rabat_usluge_zadano', '20', 'zadani rabat novog kupca — rezanje i kantiranje (D-40)'),
     ('brojac_naloga_pocetak', '1', 'prvi broj naloga u godini kad brojač još ne postoji (Igor može podesiti, npr. 3300)'),

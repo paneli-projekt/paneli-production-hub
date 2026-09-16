@@ -11,7 +11,7 @@ import os
 import sqlite3
 from datetime import datetime
 
-SHEMA_VERZIJA = 7
+SHEMA_VERZIJA = 10
 
 # Migracije starijih baza (verzija → popis SQL naredbi); 'duplicate column' se preskače (svježa baza već ima stupce iz schema.sql).
 MIGRACIJE = {
@@ -43,6 +43,14 @@ MIGRACIJE = {
         "SELECT e.cix_ime, e.id, nm.nalog_id, COALESCE(e.cix_izvor, 'hub'), datetime('now') "
         "FROM element e JOIN nalog_materijal nm ON nm.id = e.nalog_materijal_id WHERE e.cix_ime IS NOT NULL AND e.cix_ime <> ''",
     ],
+    8: [                                # prolaza iz PPNEST CSV-a; brojač naloga koji su potrošile probe se briše dok nema stvarnih naloga (D-47)
+        "ALTER TABLE element ADD COLUMN prolaza INTEGER",
+        "DELETE FROM postavke WHERE kljuc GLOB 'brojac_naloga_[0-9]*' AND NOT EXISTS (SELECT 1 FROM nalog WHERE broj NOT LIKE 'PROV-%')",
+    ],
+    9: [],                              # spojeni_posao + spojeni_posao_stavka nastaju iz schema.sql (CREATE IF NOT EXISTS), D-54/B
+    10: ["ALTER TABLE optimizacija ADD COLUMN %s" % c for c in           # potvrda i snimka slaganja, D-75
+         ("status TEXT", "nacin_trazen TEXT", "dubina TEXT", "slaganje_json TEXT", "elementi_hash TEXT", "kerf REAL", "obrez REAL",
+          "potvrdio_id INTEGER REFERENCES korisnik (id)", "potvrdjeno TEXT", "napomena TEXT")],
 }
 OVDJE = os.path.dirname(os.path.abspath(__file__))
 

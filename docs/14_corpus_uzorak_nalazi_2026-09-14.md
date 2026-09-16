@@ -119,7 +119,7 @@ stvarna dvojba, ne promašaj — jedna potvrda ureda pretvara je u alias zauvije
    registriraj imena (D-23) i proslijedi.
 4. **Obračun za vlastitu proizvodnju** (D-40 dopuna): ponuda kao radni dokument → korekcija po stvarnom stanju →
    interna izdatnica. Treba mu vlastiti status u toku naloga.
-5. **Mjereno nakon popravaka** (uzorak je ušao u redovnu provjeru): CPO 47 / 50 i 40 / 40 prema ponudi nepromijenjeno;
+5. **Mjereno nakon popravaka** (uzorak je ušao u redovnu provjeru): CPO 47 / 50 i 40 / 40 prema ponudi nepromijenjeno (s Corpusovim CPO-ima ukupno 53; `MDF BIJELI 4 MM` u CPO-u dolazi bez šifre pa je od 15. 9. alias na IV000054, D-65/6 — bez toga je bio „za potvrdu“);
    **CPW 40 / 40 sigurno** (bila 37 / 37 — sva tri Corpusova materijala prolaze); PPNEST CSV 32 / 33; trake 44 / 51.
    58 testova prolazi.
 

@@ -8,7 +8,7 @@ Struktura (po redcima, CRLF, cp1250, fiksne širine polja, datoteka završava 'E
   CTL1,M,M,<god Y/N>,   1,0                CTL2,<kerf>,<kerf>,0,0.63,0,0   CTL3, THK1,<debljina>,<visina paketa=5×deb>
   STA1, STA2 (konst.)
   INV1,  999,<n ploča>,  49.000,<W>,<L>,<trim×4>   INV2,<naziv:24>,0,0,0   INV3      — jedan INV blok PO SHEMI (n ploča ponovljeno)
-  ORD1,<kom>,<kom>,<W>,<L>,H,Y   ORD2,<cijena 5.995>,<napomena:40>   ORD3,1,<rb>     — jedan blok po ELEMENTU (naručeno)
+  ORD1,<kom>,<kom>,<W>,<L>,H,Y   ORD2,<cijena 5.995>,<napomena:40>,<oznaka:5>   ORD3,1,<rb>     — jedan blok po ELEMENTU (naručeno; oznaku piše Corpus, PW ne)
   PRT1,<kom>,<rb-1>,<W>,<L>, 1,<napomena:40>,<:40>,<Element N:16>,<:16>   PRT2   PRT3,<maska rubova>,4×(šifra:8,naziv:20,kratki:10)
   PRT4,<kupac/nalog:16>,...   PRT5,H,N,<rb>,<rb>                                   — jedan blok po ELEMENTU (dijelovi)
   PAT1,<br. sheme:02>,<L|S>,1,1   PAT2..PAT5 (konst.)   BCUT   CUT1,<razina:02>,<pozicija>,<1 ako je dio>,<rb dijela:03>
@@ -66,6 +66,7 @@ def parse(path_or_bytes):
             d['ord'].append(dict(qty=_i(f[0]), qty2=_i(f[1]), W=_f(f[2]), L=_f(f[3]), grain=f[4], flag=f[5].strip()))
         elif tag == 'ORD2':
             f = rest.split(','); d['ord'][-1]['price'] = _f(f[0]); d['ord'][-1]['note'] = f[1].rstrip()
+            d['ord'][-1]['oznaka'] = f[2].rstrip() if len(f) > 2 else ''     # 3. polje (5 znakova): PW prazno, Corpus oznaka elementa (EL_BU, FR1 -)
         elif tag == 'ORD3':
             f = rest.split(','); d['ord'][-1]['a'] = _i(f[0]); d['ord'][-1]['idx'] = _i(f[1])
         elif tag == 'PRT1':
@@ -130,7 +131,7 @@ def write(d):
         o.append('INV3,' + s.get('inv3', INV3))
     for r in d['ord']:
         o.append('ORD1,%5d,%5d,%9.2f,%9.2f,%s,%-3s' % (r['qty'], r['qty2'], r['W'], r['L'], r['grain'], r['flag']))
-        o.append('ORD2,%8.3f,%-40s,     ' % (r.get('price', 5.995), r.get('note', '')[:40]))
+        o.append('ORD2,%8.3f,%-40s,%-5s' % (r.get('price', 5.995), r.get('note', '')[:40], (r.get('oznaka') or '')[:5]))
         o.append('ORD3,%5d,%5d' % (r.get('a', 1), r['idx']) + ' ' * 44)
     for p in d['prt']:
         o.append('PRT1,%5d,%5d,%9.2f,%9.2f,%2d,%-40s,%-40s,%-16s,%-16s' % (

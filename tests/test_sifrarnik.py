@@ -437,6 +437,10 @@ def stvarna_baza(tmp_path_factory):
     pantheon.uvezi_pantheon(b, PH_CSV, "TEST")
     from hub.sifrarnici.uvoz import ALIAS_ZADANI
     aliasi.uvezi_alias_csv(b, ALIAS_ZADANI, "TEST")
+    from hub.sifrarnici import ispravci                      # isti redoslijed kao hub.sifrarnici.uvoz: ispravci ureda prije Winstorea (D-51/D-52)
+    ispravci.ucitaj_csv(b, ispravci.ZADANI_CSV, "TEST")
+    ispravci.primijeni(b, "TEST")
+    pantheon.primijeni_zadane_debljine(b, "TEST")
     aliasi.upisi_potvrdjene(b, "TEST")
     if os.path.exists(WIN_XML):
         b.st_winstore = winstore.uvezi_winstore(b, WIN_XML, "TEST")
@@ -456,7 +460,7 @@ def test_prihvacanje_cpo_i_ponude(stvarna_baza):
     assert s["cpo"]["sigurno"] >= 47
     assert s["cpo"]["krivo_vs_ponuda"] == [] and s["cpo"]["tocno_vs_ponuda"] == s["cpo"]["s_ponudom"] >= 40
     assert s["cpw"]["sigurno"] == s["cpw"]["ukupno"] >= 40   # +3 Corpus materijala iz uzorka (dokument 14)
-    assert s["csv"]["sigurno"] >= s["csv"]["ukupno"] - 1            # K2739DC-19: tipfeler u SIFRA MAT, ispravno 'za potvrdu'
+    assert s["csv"]["sigurno"] >= s["csv"]["ukupno"] - 2            # K2739DC-19: tipfeler u SIFRA MAT; AMBALAZA-19 (ROMIC_Kuhinja, Corpus) nije roba (D-49) — oba ispravno 'za potvrdu'
     assert s["trake"]["sigurno"] >= 44
 
 
@@ -465,6 +469,6 @@ def test_prihvacanje_winstore(stvarna_baza):
     if "st_winstore" not in stvarna_baza.__dict__:
         pytest.skip("nema Winstore XML")
     st = stvarna_baza.st_winstore
-    assert st["kodova"] >= 500 and st["povezano"] >= 400
+    assert st["kodova"] >= 500 and st["povezano"] + st["rucno"] >= 400        # + ručne veze ureda (D-51)
     assert all(kom >= 0 for _, _, _, kom in st["nepovezano"])   # popis je izvještaj, ne greška
     assert st["ambalaza"] >= 15                                  # ambalažne ploče se ne povezuju (D-49)

@@ -39,7 +39,8 @@ def main(argv=None):
     conn = db.spoji(a.db)
     if a.pantheon:
         st = pantheon.uvezi_pantheon(conn, a.pantheon, a.tko)
-        print("Pantheon: %(identi)d identa, %(materijali)d materijala (%(novi_materijali)d novih), %(trake)d traka (%(nove_trake)d novih)" % st)
+        print("Pantheon: %(identi)d identa, %(materijali)d materijala (%(novi_materijali)d novih, %(izbaceni_materijali)d izbačenih), "
+              "%(trake)d traka (%(nove_trake)d novih, %(izbacene_trake)d izbačenih)" % st)
     alias = a.alias or (ALIAS_ZADANI if os.path.exists(ALIAS_ZADANI) else None)
     if alias and not a.bez_aliasa:
         st = aliasi.uvezi_alias_csv(conn, alias, a.tko)

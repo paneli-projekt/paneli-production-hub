@@ -22,11 +22,12 @@ from .. import db
 from ..db import sada, dnevnik
 from ..formati import nalog_io
 from . import nalozi as N
-from .export_nesting import ExportGreska, _bez_dij, _po_materijalu
+from .export_nesting import ExportGreska, _bez_dij, _po_materijalu, _dogadjaj_izvoza, uz_rollback
 
 MAPA = "PANEL WIZARD"
 
 
+@uz_rollback
 def izvezi(conn, nalog_id, mapa, tko="web", header_once=False, samo_pila=False, suho=False, vrijeme=None):
     """Napiši po jednu CPW datoteku za svaki materijal naloga u `<mapa>/<NAZIV NALOGA>/PANEL WIZARD/`.
 
@@ -70,10 +71,7 @@ def izvezi(conn, nalog_id, mapa, tko="web", header_once=False, samo_pila=False, 
     if not suho:
         dnevnik(conn, tko, "nalog", nalog_id, "izvoz_cpw",
                 "%s: %d datoteka, %d elemenata" % (n["naziv"], len(paketi), sum(x["elemenata"] for x in paketi)))
-        conn.execute("INSERT INTO dogadjaj (nalog_id, kada, tko_id, iz_statusa, u_status, razlog, veza) "
-                     "VALUES (?, ?, (SELECT id FROM korisnik WHERE oznaka = ?), ?, ?, ?, ?)",
-                     (nalog_id, sada(), tko, n["status"], n["status"],
-                      "izvoz za PanelWizard: %d datoteka" % len(paketi), "mapa:" + korijen))
+        _dogadjaj_izvoza(conn, n, tko, "izvoz za PanelWizard: %d datoteka" % len(paketi), "mapa:" + korijen)
         conn.commit()
     return dict(nalog=n["naziv"], mapa=korijen, paketi=paketi, preskoceno=preskoceno, suho=suho)
 

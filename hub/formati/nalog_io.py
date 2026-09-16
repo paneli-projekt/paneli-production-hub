@@ -108,13 +108,31 @@ def read_cpw(path, nalog='', kupac=''):
         if f[0] == 'MATERIJAL':
             mat, deb = f[1], _num(f[2])
         elif f[0] == 'ELEMENT':
-            t = f[5:9] + [''] * 4; n = f[9:13] + [''] * 4
-            els.append(dict(rb=len(els) + 1, nalog=nalog, kupac=kupac, L=_num(f[2]), W=_num(f[3]), kom=int(_num(f[4])),
-                            sifra_mat='', deb=deb, mat=mat, god=0,
-                            traka={'L': n[0], 'O': n[1], 'D': n[2], 'G': n[3]}, tip={'L': t[0], 'O': t[1], 'D': t[2], 'G': t[3]},
-                            cix='', napomena=f[1], prolaza=2 if (_num(f[2]) < 200 or _num(f[3]) < 200) else 1,
-                            glodalo=14 if deb > 20 else 12))
+            t = [x.strip() for x in f[5:9]] + [''] * 4; n = [x.strip() for x in f[9:13]] + [''] * 4   # Corpus piše ' M'
+            e = dict(rb=len(els) + 1, nalog=nalog, kupac=kupac, L=_num(f[2]), W=_num(f[3]), kom=int(_num(f[4])),
+                     sifra_mat='', deb=deb, mat=mat, god=0,
+                     traka={'L': n[0], 'O': n[1], 'D': n[2], 'G': n[3]}, tip={'L': t[0], 'O': t[1], 'D': t[2], 'G': t[3]},
+                     cix='', naziv=f[1], napomena='', prolaza=2 if (_num(f[2]) < 200 or _num(f[3]) < 200) else 1,
+                     glodalo=14 if deb > 20 else 12)     # 2. polje = naziv elementa (kupčev PPW, Corpus); PPNEST ga piše prazno
+            if len(f) >= 18 and f[13].strip():           # Corpus (V55) dodaje: 'CJELINA - POZICIJA'; CIX1; CIX2 (kant); ?; Winstore šifra
+                e.update(_corpus_stupci(f))
+            els.append(e)
     return els
+
+
+def _cix_ime(s):
+    s = (s or '').strip()
+    return s[:-4] if s.upper().endswith('.CIX') else s   # '.CIX' bez imena = nema programa
+
+
+def _corpus_stupci(f):
+    """Corpusov CPW: 14. polje 'EL_BUSENJE - L_BOK' (cjelina - pozicija), 15. CIX vertikalni, 16. CIX horizontalno bušenje,
+    18. Winstore šifra materijala (ista kao u MATERIJAL retku). Naziv elementa (2. polje) Corpus piše kao ','."""
+    puni = f[13].strip()
+    cjelina, _, pozicija = puni.partition(' - ')
+    p1, p2 = _cix_ime(f[14]), _cix_ime(f[15]) if len(f) > 15 else ''
+    return dict(naziv=puni, cjelina=cjelina.strip(), pozicija=pozicija.strip() or None, program1=p1, program2=p2, cix=p1,
+                sifra_mat=(f[17].strip() if len(f) > 17 else ''), corpus=True)
 
 # ------------------------------------------------------------------ pisanje
 _CIX_SEQ = [None]
@@ -135,11 +153,13 @@ def dodijeli_cix_ids(els, start=None, brojac=None):
     return els
 
 def write_ppnest_csv(els, path):
-    """Identičan zapis kao KROJNA.vb BTNSNIMI (UTF-8 bez BOM, CRLF, ';')."""
+    """Identičan zapis kao KROJNA.vb BTNSNIMI (UTF-8 bez BOM, CRLF, ';'). Corpusovi stupci (NAZIV ELEMENTA = cjelina,
+    IME DASKE = pozicija, PROGRAM1/2) pišu se kad ih element ima; inače kao PPNEST (prazno, `<rb>_ELEMENT`)."""
     rows = [CSV_HEADER]
     for e in els:
-        rows.append(';'.join([str(e['rb']), e['nalog'], '', '', '%d_ELEMENT' % e['rb'], '', _fmt(e['W']), _fmt(e['L']),
-                              str(e['kom']), e['sifra_mat'], _fmt(e['deb']), e['mat'], str(e['god']), '', '', '', '',
+        rows.append(';'.join([str(e['rb']), e['nalog'], e.get('cjelina') or '', '', e.get('pozicija') or ('%d_ELEMENT' % e['rb']), '',
+                              _fmt(e['W']), _fmt(e['L']), str(e['kom']), e['sifra_mat'], _fmt(e['deb']), e['mat'], str(e['god']),
+                              e.get('program1') or '', e.get('program2') or '', '', '',
                               e['traka']['L'], '', e['traka']['D'], '', e['traka']['G'], '', e['traka']['O'], '',
                               e['cix'], e['napomena'], str(e['prolaza'])]))
     open(path, 'wb').write(('\r\n'.join(rows) + '\r\n').encode('utf-8'))
@@ -213,7 +233,7 @@ def write_cpw(els, path, header_once=True, enc='cp1250'):
     for e in els:
         if not header_once: o += hdr
         t = e['tip']; n = {k: bez_dijakritika(v) for k, v in e['traka'].items()}
-        o.append('ELEMENT;%s;%s;%s;%d;%s;%s;%s;%s;%s;%s;%s;%s;' % (bez_dijakritika(e['napomena']), _fmt(e['L']), _fmt(e['W']), e['kom'],
+        o.append('ELEMENT;%s;%s;%s;%d;%s;%s;%s;%s;%s;%s;%s;%s;' % (bez_dijakritika(e.get('naziv') or ''), _fmt(e['L']), _fmt(e['W']), e['kom'],
                  t['L'], t['O'], t['D'], t['G'], n['L'], n['O'], n['D'], n['G']))
     open(path, 'wb').write(('\r\n'.join(o) + '\r\n').encode(enc, errors='replace'))
 

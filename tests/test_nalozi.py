@@ -254,7 +254,7 @@ def test_api_nalozi(baza, monkeypatch):
         assert r["rok_obecan"] == "2026-10-01" and r["potvrdio"] == "GORAN"
         assert c.post("/api/nalog/%d/status" % n["id"], json=dict(status="zatvoren", tko="GORAN")).status_code == 400
         lst = c.get("/api/nalozi", params=dict(status="potvrdjeno")).json()
-        assert lst["nalozi"][0]["id"] == n["id"] and lst["nalozi"][0]["elemenata"] == 3 and len(lst["statusi"]) == 7
+        assert lst["nalozi"][0]["id"] == n["id"] and lst["nalozi"][0]["elemenata"] == 3 and len(lst["statusi"]) == 8
         assert c.get("/api/kupci/%d" % k["id"]).json()["nalozi"][0]["id"] == n["id"]
         assert c.put("/api/kupci/%d" % k["id"], json=dict(email="a@b.hr", tko="IVANA")).json()["email"] == "a@b.hr"
         r = c.post("/api/kupci", json=dict(ime="Ana Anić", telefon="098 111 222", mjesto="Đakovo", tko="IVANA"))
@@ -313,11 +313,17 @@ def test_izvoz_nesting(baza, tmp_path):
         N.dodaj_element(baza, nm, "TEST", L=L, W=W, kom=kom, naziv="POD", rubovi={"L": "ABS-ISTI"})
     baza.commit()
 
-    suho = EX.izvezi(baza, nid, str(tmp_path), "TEST", suho=True)
+    suho = EX.izvezi(baza, nid, str(tmp_path), "TEST", suho=True)                    # suho radi i iz 'unos', ali upozori
     assert len(suho["paketi"]) == 1 and suho["paketi"][0]["elemenata"] == 2 and suho["paketi"][0]["komada"] == 3
+    assert suho["upozorenja"] and "unos" in suho["upozorenja"][0]
     assert baza.execute("SELECT COUNT(*) FROM cix_registar").fetchone()[0] == 0      # suhi izvoz ne dira bazu
+    with pytest.raises(EX.ExportGreska):                                             # na stroj tek nakon potvrde kupca (D-35)
+        EX.izvezi(baza, nid, str(tmp_path), "TEST")
+    N.postavi_status(baza, nid, "ponuda", "TEST")
+    N.postavi_status(baza, nid, "potvrdjeno", "TEST")
 
     r = EX.izvezi(baza, nid, str(tmp_path), "TEST")
+    assert r["upozorenja"] == []
     p = r["paketi"][0]
     assert p["winstore_kod"] == "W908ST2-18" and len(p["cix"]) == 2
     els = nalog_io.read_ppnest_csv(p["csv"])
@@ -336,6 +342,20 @@ def test_izvoz_nesting(baza, tmp_path):
     with pytest.raises(EX.ExportGreska):
         EX.izvezi(baza, nid, str(tmp_path), "TEST")
     assert EX.izvezi(baza, nid, str(tmp_path), "TEST", samo_nesting=False)["paketi"][0]["elemenata"] == 2
+
+    # nakon izvoza nalog je potvrđen pa se elementi ne mijenjaju; vraćen u 'ponuda' → brisanje radi, ime u registru ostaje zauzeto
+    eid = baza.execute("SELECT id FROM element WHERE cix_ime = 'H0000002'").fetchone()[0]
+    with pytest.raises(N.NalogGreska):
+        N.obrisi_element(baza, eid, "TEST")
+    N.postavi_status(baza, nid, "ponuda", "TEST")
+    N.obrisi_element(baza, eid, "TEST")
+    assert baza.execute("SELECT element_id FROM cix_registar WHERE ime = 'H0000002'").fetchone()[0] is None
+    N.dodaj_element(baza, nm, "TEST", L=300, W=200, kom=1)
+    N.postavi_status(baza, nid, "potvrdjeno", "TEST")
+    novi = EX.izvezi(baza, nid, str(tmp_path), "TEST", samo_nesting=False)
+    assert sorted(e["cix"] for e in nalog_io.read_ppnest_csv(novi["paketi"][0]["csv"])) == ["H0000001", "H0000003"]   # H0000002 se ne dijeli ponovno
+    N.obrisi_nalog(baza, nid, "TEST", forsiraj=True)
+    assert baza.execute("SELECT COUNT(*) FROM cix_registar").fetchone()[0] == 3 and baza.execute("SELECT COUNT(*) FROM nalog WHERE id = ?", (nid,)).fetchone()[0] == 0
 
 
 def test_izvoz_pw(baza, tmp_path):
@@ -383,17 +403,27 @@ def test_izvoz_pila(baza, tmp_path):
     assert suho["paketi"][0]["ploca"] == 1 and suho["paketi"][0]["komada"] == 6
     assert not os.path.exists(suho["paketi"][0]["cpo"])
     assert baza.execute("SELECT COUNT(*) FROM optimizacija").fetchone()[0] == 0      # suhi izvoz ne dira bazu
+    with pytest.raises(EP.ExportGreska):
+        EP.izvezi(baza, nid, str(tmp_path), "TEST")                                  # iz 'unos' samo uz forsiraj
+    assert EP.izvezi(baza, nid, str(tmp_path), "TEST", forsiraj=True)["paketi"][0]["program"] == "HUB_00001"
+    (tmp_path / "blok").write_text("datoteka umjesto mape")
+    with pytest.raises(OSError):                                                     # pad pri pisanju → rollback, brojač netaknut
+        EP.izvezi(baza, nid, str(tmp_path / "blok"), "TEST", forsiraj=True)
+    assert not baza.conn.in_transaction and baza.execute("SELECT vrijednost FROM postavke WHERE kljuc = 'brojac_pila'").fetchone()[0] == "1"
+    N.postavi_status(baza, nid, "ponuda", "TEST")
+    N.postavi_status(baza, nid, "potvrdjeno", "TEST")
 
     r = EP.izvezi(baza, nid, str(tmp_path), "TEST")
     p = r["paketi"][0]
-    assert p["program"] == "HUB_00001" and r["kerf"] == 16.0
+    assert p["program"] == "HUB_00002" and r["kerf"] == 16.0
     d = cpo_rw.parse(p["cpo"])
-    assert d["prog"] == "HUB_00001" and d["ctl2"][0] == EP.KERF_PILE and d["thk"][0] == 18.0
+    assert d["prog"] == "HUB_00002" and d["ctl2"][0] == EP.KERF_PILE and d["thk"][0] == 18.0
     assert len(d["ord"]) == 1 and d["ord"][0]["qty"] == 6 and not cpo_rw.validate(d)
     assert cpo_rw.write(d) == open(p["cpo"], "rb").read()                            # bajt po bajt kao PW
-    assert baza.execute("SELECT broj_ploca, rezova FROM optimizacija").fetchone()[0] == 1
-
-    assert EP.izvezi(baza, nid, str(tmp_path), "TEST")["paketi"][0]["program"] == "HUB_00002"   # brojač ide dalje
+    o = baza.execute("SELECT broj_ploca, status, dokument_id FROM optimizacija WHERE nalog_materijal_id = ?", (nm,)).fetchall()
+    assert len(o) == 1 and o[0]["broj_ploca"] == 1 and o[0]["status"] == "potvrdjeno" and o[0]["dokument_id"]   # D-75: jedno potvrđeno slaganje, izvoz ga ne duplira
+    assert EP.izvezi(baza, nid, str(tmp_path), "ivana")["paketi"][0]["program"] == "HUB_00003"   # brojač ide dalje
+    assert [d["tko"] for d in N.dogadjaji(baza, nid)][-1] == "IVANA"               # događaj izvoza nosi korisnika (oznaka bez obzira na velika/mala slova)
     baza.execute("UPDATE nalog_materijal SET put = 'nesting' WHERE id = ?", (nm,))
     baza.commit()
     with pytest.raises(EP.ExportGreska):
@@ -419,12 +449,17 @@ from tests.test_sifrarnik import DATA, PH_CSV, WIN_XML, stvarni, stvarna_baza   
 def test_prihvacanje_uvoz_naloga(stvarna_baza):
     rez = PR.provjeri(stvarna_baza, DATA)
     s = PR.sazetak(rez)
-    assert s["naloga"] == 8 and s["usporedivo"] == 8 and s["slaze_se"] >= 7    # 8 naloga s datotekama (ROMIC ide samo na pilu); MAZUR: tipfeler 'K2739DC-19'
+    assert s["naloga"] == 9 and s["usporedivo"] == 8 and s["slaze_se"] >= 7    # 8 PPNEST naloga (ROMIC ide samo na pilu) + Corpus uzorak; MAZUR: tipfeler 'K2739DC-19'
     assert s["materijala_sigurno"] >= s["materijala"] - 1                   # jedini nesigurni: isti MAZUR CSV materijal
     assert s["elemenata"] >= 990 and s["komada"] >= 2200
     bratek = [r for r in rez if r["mapa"] == "_BRATEK_KUPAC1"][0]
     assert bratek["cpw"]["sazetak"]["komada"] == 108 and bratek["cpw"]["uvoz"]["preskocene_starije"]   # stariji izvoz istog materijala preskočen (65 kom kao u CPO-u)
     humer = [r for r in rez if r["mapa"] == "_HUMER_OMIS"][0]
     assert humer["kupac"]["sazetak"] == dict(materijala=5, elemenata=121, komada=278, m2=98.534, za_potvrdu=0)
-    assert all(z["vrsta"] == "traka" or z["tekst"] == "IV_HR_CREMONA_CANNOLO_19" for r in rez for k in ("cpw", "csv", "kupac") if r[k] for z in r[k]["za_potvrdu"])
+    assert all(z["vrsta"] == "traka" or z["tekst"] == "IV_HR_CREMONA_CANNOLO_19" for r in rez for k in ("cpw", "csv", "kupac", "corpus") if r[k] for z in r[k]["za_potvrdu"])
+    corpus = [r for r in rez if r["mapa"] == "_CORPUS_UZORAK"][0]["corpus"]   # Corpus paket kao jedan nalog (D-55): 15 el, 13 na nesting, 2 leđa na pilu, 17 CIX
+    assert not corpus.get("greska") and corpus["sazetak"]["elemenata"] == 15 and corpus["corpus"] == dict(corpus["corpus"], nesting=13, pila=2, cix=17)
+    assert {m["put"] for m in corpus["materijali"]} == {"nesting", "pila"} and all(m["ident"] and not m["provjeri"] for m in corpus["materijali"])
+    assert len(corpus["za_potvrdu"]) == 1 and corpus["za_potvrdu"][0]["tekst"] == "SIVA_TAMNA-1/22"   # jedina dvojba: dva kandidata (D-58)
     PR.obrisi_provjere(stvarna_baza)
+    assert not stvarna_baza.execute("SELECT 1 FROM cix_registar WHERE element_id IS NOT NULL").fetchone()   # probni nalog obrisan → imena odvezana

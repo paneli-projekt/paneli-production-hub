@@ -13,19 +13,16 @@ def test_cpo_roundtrip_identican():
         raw = open(f, 'rb').read()
         assert cpo_rw.write(cpo_rw.parse(raw)) == raw, f
 
-def test_ppnest_csv_iz_txt_identican():
+def test_ppnest_csv_iz_txt_identican(tmp_path):
     n = 0
     for t in glob.glob(os.path.join(DATA, '*', '04_export_nesting', '*', '*.txt')):
         c = os.path.join(os.path.dirname(t), 'NESTING', os.path.basename(t)[:-4] + '.CSV')
         if not os.path.exists(c):
             continue
         els = nalog_io.read_ppnest_txt(t)
-        out = os.path.join(os.path.dirname(t), '_hub_test.csv')
+        out = str(tmp_path / ('%d_hub_test.csv' % n))          # u tmp, nikad u mapu stvarnih naloga
         nalog_io.write_ppnest_csv(els, out)
-        try:
-            assert open(out, 'rb').read() == open(c, 'rb').read(), t
-        finally:
-            os.remove(out)
+        assert open(out, 'rb').read() == open(c, 'rb').read(), t
         n += 1
     if not n:
         pytest.skip('nema PPNEST TXT uz CSV u testnim nalozima (mapa 04_export_nesting)')

@@ -8,37 +8,9 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
 def sheme(d):
-    """Vraća listu shema; shema = (dir, [(x, y, w, h, idx|None)]) u koordinatama ploče (x uz duljinu L, y uz širinu W)."""
-    s = d['inv'][0]
-    UL, UW = s['L'] - s['trim'][0] - s['trim'][1], s['W'] - s['trim'][2] - s['trim'][3]
-    kerf = d['ctl2'][0]
-    out = []
-    for q in d['pat']:
-        rects = []
-        # stog: po razini (početak x, početak y, dostupno w, dostupno h, orijentacija reza)
-        # razina 1 u 'L' shemi: reže se po y (širina), traka = puna duljina
-        # razina n: alternira smjer
-        cursor = {}   # razina -> (x0, y0, dx, dy) pomak unutar roditelja
-        stack = {0: (s['trim'][0], s['trim'][2], UL, UW)}
-        pos = {}
-        for (L, p, isp, idx) in q['cuts']:
-            px, py, pw, ph = stack[L - 1]
-            horiz = (L % 2 == 1) if q['dir'] == 'L' else (L % 2 == 0)   # rez razine 1 kod 'L' dijeli širinu (y)
-            off = pos.get(L, 0)
-            if horiz:
-                rect = (px, py + off, pw, p)
-                pos[L] = off + p + kerf
-            else:
-                rect = (px + off, py, p, ph)
-                pos[L] = off + p + kerf
-            stack[L] = rect
-            for k in list(pos):
-                if k > L: del pos[k]
-            for k in list(stack):
-                if k > L: del stack[k]
-            rects.append(rect + (idx if isp else None,))
-        out.append((q['dir'], rects))
-    return out
+    """Zadržano radi starih poziva — geometrija je sada u hub.nalozi.sheme.geometrija."""
+    from hub.nalozi.sheme import geometrija
+    return [(sh['dir'], sh['pravokutnici']) for sh in geometrija(d)]
 
 def crtaj(path, out=None):
     d = cpo_rw.parse(path)

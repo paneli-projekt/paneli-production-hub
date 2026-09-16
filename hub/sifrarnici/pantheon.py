@@ -7,6 +7,8 @@ Pravila (CLAUDE.md + 04 §2):
 - Trake = identi TR* + identi drugih prefiksa čiji naziv počinje s 'ABS' (OK004510, US000558, OK002749 — poznate iznimke).
 - Cijena: anSalePrice (s PDV-om) i anRTPrice (neto = / 1,25) — u Hubu se ne mijenjaju (D-40).
 Uvoz je idempotentan: ponovni uvoz osvježava nazive/cijene/aktivnost, ne briše veze (aliasi, winstore_kod, materijal_traka).
+Ident koji više nije ploča / traka (D-53: 'TRAKA ZA R.P.' pod RP identom; preimenovan ili obrisan u Pantheonu) izlazi iz
+šifrarnika: briše se ako ga ništa ne koristi, inače se označi 'ne koristi se' + neaktivan pa ga Hub više ne nudi.
 """
 import csv
 import io
@@ -44,7 +46,7 @@ def _broj(x):
 
 
 def je_materijal(r):
-    """IV* i RP* identi su ploče — osim onih koji su u Pantheonu krivo klasificirani: 'TRAKA ZA R.P. …' pod RP identom nije ploča (D-52)."""
+    """IV* i RP* identi su ploče — osim onih koji su u Pantheonu krivo klasificirani: 'TRAKA ZA R.P. …' pod RP identom nije ploča (D-53)."""
     ident, n = r["acIdent"], norm(r["acName"])
     return (ident.startswith("IV") or ident.startswith("RP")) and n not in ("", "PRAZNO") and not n.startswith("TRAKA")
 
@@ -61,8 +63,9 @@ def uvezi_pantheon(conn, putanja, tko="uvoz"):
     """Upiše/osvježi sve idente, izvede materijale i trake. Vraća statistiku."""
     rows = ucitaj_ph_identi(putanja)
     kada = sada()
-    st = dict(identi=0, materijali=0, trake=0, novi_materijali=0, nove_trake=0)
+    st = dict(identi=0, materijali=0, trake=0, novi_materijali=0, nove_trake=0, izbaceni_materijali=0, izbacene_trake=0)
     cur = conn.cursor()
+    identi_materijala, identi_traka = set(), set()
     for r in rows:
         ident = (r.get("acIdent") or "").strip()
         if not ident:
@@ -79,13 +82,56 @@ def uvezi_pantheon(conn, putanja, tko="uvoz"):
         if je_materijal(r):
             st["materijali"] += 1
             st["novi_materijali"] += _upisi_materijal(cur, r)
+            identi_materijala.add(ident)
         elif je_traka(r):
             st["trake"] += 1
             st["nove_trake"] += _upisi_traku(cur, r)
-    dnevnik(conn, tko, "pantheon_ident", None, "uvoz", "%s: %d identa, %d materijala (%d novih), %d traka (%d novih)"
-            % (os.path.basename(putanja), st["identi"], st["materijali"], st["novi_materijali"], st["trake"], st["nove_trake"]))
+            identi_traka.add(ident)
+    if st["identi"]:
+        st["izbaceni_materijali"], st["izbacene_trake"] = _izbaci_sto_vise_nije(cur, identi_materijala, identi_traka)
+    dnevnik(conn, tko, "pantheon_ident", None, "uvoz", "%s: %d identa, %d materijala (%d novih, %d izbačenih), %d traka (%d novih, %d izbačenih)"
+            % (os.path.basename(putanja), st["identi"], st["materijali"], st["novi_materijali"], st["izbaceni_materijali"],
+               st["trake"], st["nove_trake"], st["izbacene_trake"]))
     conn.commit()
     return st
+
+
+def _izbaci_sto_vise_nije(cur, identi_materijala, identi_traka):
+    """Materijali / trake u Hubu čiji ident u ovom uvozu više nije ploča / traka (D-53) ili ga u Pantheonu više nema:
+    obriši ako ih ništa ne koristi (nalog, potvrđeni alias, Winstore, restl, stanje), inače označi 'ne koristi se' + neaktivan."""
+    m_out = t_out = 0
+    for r in cur.execute("SELECT id, pantheon_ident FROM materijal").fetchall():
+        if r["pantheon_ident"] in identi_materijala:
+            continue
+        mid = r["id"]
+        koristi = any(cur.execute(q, (mid,)).fetchone() for q in (
+            "SELECT 1 FROM nalog_materijal WHERE materijal_id = ? LIMIT 1", "SELECT 1 FROM materijal_alias WHERE materijal_id = ? AND potvrdio IS NOT NULL LIMIT 1",
+            "SELECT 1 FROM winstore_ploca WHERE materijal_id = ? LIMIT 1", "SELECT 1 FROM restl WHERE materijal_id = ? LIMIT 1",
+            "SELECT 1 FROM ploca_stanje WHERE materijal_id = ? LIMIT 1", "SELECT 1 FROM materijal_traka WHERE materijal_id = ? AND potvrdio IS NOT NULL LIMIT 1",
+            "SELECT 1 FROM traka_alias WHERE materijal_id = ? LIMIT 1"))
+        if koristi:
+            cur.execute("UPDATE materijal SET aktivan = 0, ne_koristi_se = 1 WHERE id = ? AND (aktivan = 1 OR ne_koristi_se = 0)", (mid,))
+        else:
+            cur.execute("DELETE FROM materijal_traka WHERE materijal_id = ?", (mid,))
+            cur.execute("DELETE FROM materijal_alias WHERE materijal_id = ?", (mid,))
+            cur.execute("DELETE FROM materijal WHERE id = ?", (mid,))
+        m_out += 1
+    for r in cur.execute("SELECT id, pantheon_ident FROM traka").fetchall():
+        if r["pantheon_ident"] in identi_traka:
+            continue
+        tid = r["id"]
+        koristi = any(cur.execute(q, (tid,)).fetchone() for q in (
+            "SELECT 1 FROM element WHERE ? IN (rub1_traka_id, rub2_traka_id, rub3_traka_id, rub4_traka_id) LIMIT 1",
+            "SELECT 1 FROM traka_alias WHERE traka_id = ? AND potvrdio IS NOT NULL LIMIT 1",
+            "SELECT 1 FROM materijal_traka WHERE traka_id = ? AND potvrdio IS NOT NULL LIMIT 1"))
+        if koristi:
+            cur.execute("UPDATE traka SET aktivan = 0 WHERE id = ?", (tid,))
+        else:
+            cur.execute("DELETE FROM materijal_traka WHERE traka_id = ?", (tid,))
+            cur.execute("DELETE FROM traka_alias WHERE traka_id = ?", (tid,))
+            cur.execute("DELETE FROM traka WHERE id = ?", (tid,))
+        t_out += 1
+    return m_out, t_out
 
 
 def primijeni_zadane_debljine(conn, tko="uvoz"):

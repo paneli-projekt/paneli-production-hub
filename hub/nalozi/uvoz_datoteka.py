@@ -21,6 +21,12 @@ def _hash(putanja):
     return hashlib.sha1(open(putanja, "rb").read()).hexdigest()
 
 
+def _pozicija(p):
+    """IME DASKE iz CSV-a: Corpus tu piše poziciju elementa, PPNEST samo `<rb>_ELEMENT` — to nije podatak."""
+    p = (p or "").strip()
+    return None if (not p or re.fullmatch(r"\d+_ELEMENT", p)) else p
+
+
 def _kljuc(mat, deb):
     return (norm(mat), round(float(deb or 0), 1))
 
@@ -33,7 +39,7 @@ def _nadji_materijal(conn, nalog_id, mat, deb):
     return None
 
 
-def uvezi_elemente(conn, nalog_id, elementi, tko, izvor, datoteka=None, vrsta_dok=None):
+def uvezi_elemente(conn, nalog_id, elementi, tko, izvor, datoteka=None, vrsta_dok=None, ids=None):
     """Zajednički dio: elementi u nalog_io zapisu (mat, deb, sifra_mat, L, W, kom, god, traka{}, tip{}, cix, napomena) → materijali + elementi."""
     st = dict(materijali_novi=0, materijali_spojeni=0, elementi=0, komada=0, za_potvrdu_materijal=0, za_potvrdu_rub=0, preskoceno=0)
     if datoteka:
@@ -41,7 +47,7 @@ def uvezi_elemente(conn, nalog_id, elementi, tko, izvor, datoteka=None, vrsta_do
         vec = conn.execute("SELECT id FROM dokument WHERE nalog_id = ? AND hash = ?", (nalog_id, h)).fetchone()
         if vec:
             st["preskoceno"] = 1
-            return st
+            return st                                  # (ids ostaje prazan — pozivatelj zna da ništa nije uvezeno)
         conn.execute("INSERT INTO dokument (nalog_id, vrsta, putanja, hash, datum) VALUES (?, ?, ?, ?, ?)", (nalog_id, vrsta_dok or "cpw_ulaz", os.path.abspath(datoteka), h, sada()))
     nm_po_kljucu = {}
     for e in elementi:
@@ -61,7 +67,12 @@ def uvezi_elemente(conn, nalog_id, elementi, tko, izvor, datoteka=None, vrsta_do
         el = N.dodaj_element(conn, nm_po_kljucu[k], tko, e["L"], e["W"], e["kom"], naziv=(e.get("naziv") or None),
                              rubovi=e.get("traka") or {}, tipovi=e.get("tip") or {}, god=("H" if e.get("god") else None),
                              napomena=(e.get("napomena") or None), izvor=izvor, cix_ime=(e.get("cix") or None),
-                             cix_izvor=("ppnest" if izvor == "csv" else None))
+                             cix_izvor=("ppnest" if izvor == "csv" else (e.get("cix_izvor") or ("corpus" if izvor == "corpus" and e.get("cix") else None))),
+                             cjelina=(e.get("cjelina") or None), pozicija=_pozicija(e.get("pozicija")),
+                             program1=(e.get("program1") or None), program2=(e.get("program2") or None),
+                             prolaza=(e.get("prolaza") if izvor == "csv" else None))       # GLODANJE iz CSV-a; iz CPW-a se računa
+        if ids is not None:
+            ids.append(el["id"])
         st["elementi"] += 1
         st["komada"] += int(e["kom"])
         if el["provjeri"]:
@@ -75,10 +86,7 @@ def uvezi_elemente(conn, nalog_id, elementi, tko, izvor, datoteka=None, vrsta_do
 
 def uvezi_cpw(conn, nalog_id, putanja, tko, izvor="cpw"):
     """CPW datoteka (kupac / PW / Corpus). izvor: 'kupac_ppw' | 'cpw' | 'corpus'."""
-    els = nalog_io.read_cpw(putanja)
-    for e in els:
-        e["naziv"] = e.get("napomena") or ""       # u CPW-u je 2. polje naziv elementa; PPNEST ga piše prazno
-        e["napomena"] = ""
+    els = nalog_io.read_cpw(putanja)               # 2. polje CPW-a je naziv elementa (read_cpw → 'naziv'); PPNEST ga piše prazno
     return uvezi_elemente(conn, nalog_id, els, tko, izvor, datoteka=putanja, vrsta_dok="cpw_ulaz" if izvor == "kupac_ppw" else "cpw_pw")
 
 

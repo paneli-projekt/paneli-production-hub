@@ -12,7 +12,7 @@ Odluke: [`docs/DECISIONS.md`](docs/DECISIONS.md) · parking ideja: [`docs/IDEJE_
 
 | Modul | Datoteka | Što |
 |---|---|---|
-| baza | `hub/schema.sql`, `hub/db.py` | SQLite shema v7 (04 §2 + 10 §4): šifrarnici, kupci, nalog, elementi, obračun, skladište, nabava, dnevnik; migracije starijih baza automatski |
+| baza | `hub/schema.sql`, `hub/db.py` | SQLite shema v8 (04 §2 + 10 §4): šifrarnici, kupci, nalog, elementi, obračun, skladište, nabava, dnevnik; migracije starijih baza automatski |
 | šifrarnici | `hub/sifrarnici/pantheon.py` | uvoz `ph_identi.csv` → `pantheon_ident`, `materijal` (IV*/RP*), `traka` (TR* + „ABS …“ pod OK/US) |
 | šifrarnici | `hub/sifrarnici/winstore.py` | uvoz Winstore XML inventara → `winstore_ploca` + povezivanje MaterialCode ↔ materijal (D-24) |
 | šifrarnici | `hub/sifrarnici/nazivi.py` | normalizacija naziva: vrsta, debljina (iz naziva i iz dimenzije `4100X640X8MM`, zadana 38 mm za radne ploče — D-52), riječi dekora, kodovi dekora (W908 ST2, K2665 AI, VSM-06), oznake traka |
@@ -34,7 +34,7 @@ Odluke: [`docs/DECISIONS.md`](docs/DECISIONS.md) · parking ideja: [`docs/IDEJE_
 | optimizacija | `hub/optimizacija/obracun.py` | kalkulator količina PW-metodom: korisni ostatak, m² za naplatu, metri trake (točno kao PW PDF) |
 | optimizacija | `hub/optimizacija/pila_optimizator.py` | giljotinski optimizator (uzdužno / poprečno / trake) + izbor po D-19 + CPO za pilu |
 | alati | `hub/alati/benchmark_optimizator.py` | Hub vs PanelWizard na svim testnim nalozima (11. 9.: +4,0 % m², 104 vs 102 ploče) |
-| alati | `hub/alati/provjera_exporta.py` | Hubov izvoz protiv PPNEST-ovog / PW-ovog na testnim nalozima (CSV 8/8, CPW 5/8 — razlike samo slovo M/A, D-61) |
+| alati | `hub/alati/provjera_exporta.py` | Hubov izvoz (stvarno napisane CPW/CSV datoteke) protiv PPNEST-ovog / PW-ovog na testnim nalozima (CSV 8/8, CPW 5/8 — razlike samo slovo M/A, D-61) |
 | alati | `hub/alati/cpo_crtaj.py`, `d09_tri_naloga.py`, `benchmark_nalozi.py` | slike shema iz CPO-a, D-09 dokument, benchmark naloga |
 
 ## Pokretanje
@@ -44,6 +44,7 @@ py -m venv venv && venv\Scripts\activate
 pip install -r requirements.txt
 set HUB_TEST_DATA=C:\Users\Administrator\Desktop\IGOR\CLAUDE_COWORK\Paneli_Production_Hub\05_NALOZI_ZA_TEST
 py -m pytest -q
+rem uvijek s HUB_TEST_DATA: 5 testova na stvarnim nalozima (CPO/CSV round-trip, šifrarnik, uvoz) bez toga se preskaču — a upravo su oni 15. 9. našli greške
 py -m hub.alati.benchmark_optimizator %HUB_TEST_DATA%
 ```
 
@@ -74,12 +75,16 @@ rem 6. prijedlozi spajanja malih naloga za nesting (D-54) — samo popis, vodite
 py -m hub.nalozi.spajanje --db hub.db --md ..\20_ANALIZA\prijedlozi_spajanja.md
 
 rem 7. izvoz naloga na nesting (CSV + CIX za bNest) — --suho samo pokaze sto bi nastalo
+rem    na stroj ide samo nalog u statusu potvrdjeno / skladiste / pila_nesting i bez stavki za potvrdu (D-65); za probu iz 'unos' dodati --forsiraj
 py -m hub.nalozi.export_nesting --db hub.db --nalog 9 --mapa C:\PPNESTING --suho
 py -m hub.nalozi.export_nesting --db hub.db --nalog 9 --mapa C:\PPNESTING
+py -m hub.nalozi.export_nesting --db hub.db --nalog 9 --mapa C:\PPNESTING --forsiraj
 
 rem 8. izvoz naloga za PanelWizard (CPW) i za pilu (CPO)
 py -m hub.nalozi.export_pw   --db hub.db --nalog 9 --mapa C:\PPNESTING
-py -m hub.nalozi.export_pila --db hub.db --nalog 9 --mapa C:\PILA
+py -m hub.nalozi.export_pila --db hub.db --nalog 9 --mapa C:\PILA            (isto pravilo statusa kao nesting; --forsiraj za probu)
+py -m hub.nalozi.optimiziraj --db hub.db --nalog 9 [--materijal 40 --nacin poprecno --dubina brzo]   (D-75: prijedlog slaganja; --potvrdi ID potvrđuje;
+                                                                               ponuda i pila koriste SAMO potvrđeno slaganje; --potvrdi-sve za probe)
 
 rem 9. provjera izvoza: Hub protiv PPNEST-ovih / PW-ovih datoteka na svim testnim nalozima
 py -m hub.alati.provjera_exporta --db hub.db --nalozi ..\05_NALOZI_ZA_TEST --md ..\20_ANALIZA\provjera_exporta.md --obrisi
@@ -89,7 +94,8 @@ set HUB_DB=hub.db
 py -m uvicorn hub.api.app:app --host 0.0.0.0 --port 8765
 ```
 
-Baza `hub.db` je jedna SQLite datoteka (u `.gitignore`); shema se primjenjuje automatski pri prvom otvaranju.
+Baza `hub.db` je jedna SQLite datoteka (u `.gitignore`); shema se primjenjuje automatski pri prvom otvaranju (migracija v8 briše brojač naloga
+koji su potrošile probe dok u bazi nema stvarnog naloga — D-47). Winstore XML je cijeli inventar: svaki uvoz zamjenjuje prethodni (D-64/D-65).
 Alias-tablica iz skilla krojna-ponuda je kopirana u `hub/sifrarnici/podaci/alias_krojna_ponuda.csv` (izvor ostaje skill).
 
 Stvarni nalozi kupaca (CPO, CSV, PDF) i `ph_identi.csv` **nisu** u repozitoriju — ostaju u `Paneli_Production_Hub\05_NALOZI_ZA_TEST` i `CLAUDE_COWORK\`.
@@ -101,6 +107,7 @@ Stvarni nalozi kupaca (CPO, CSV, PDF) i `ph_identi.csv` **nisu** u repozitoriju 
 - Nazivi prema pili i PanelWizardu bez dijakritika; imena CIX datoteka jedinstvena zauvijek (D-23); programi pile `HUB_xxxxx` (D-22).
 - Warehouse Huba je izvor istine za količine ploča/restlova/traka, Pantheon je financijska istina (D-02); Hub u Pantheon piše samo eSlog datoteke.
 - Prepoznavanje naziva je determinističko (bez LLM-a); što čovjek jednom potvrdi ulazi u alias-tablicu i više se ne pita (D-32).
+- Na stroj samo potvrđen nalog bez otvorenih potvrda; elementi se mijenjaju samo u unos / ponuda; brisanje nikad ne oslobađa ime CIX-a (D-65).
 
 ## Plan faze 2 (iz `docs/04 §4`)
 

@@ -21,19 +21,37 @@
     PUT  /api/nalog/element/{id}    DELETE /api/nalog/element/{id}?tko=
     POST /api/nalog/{id}/uvoz?izvor=           multipart datoteka CPW ili PPNEST CSV → materijali + elementi kroz šifrarnik
     POST /api/nalog/{id}/ponovi-prepoznavanje  nakon potvrda
+    POST /api/nalozi/uvoz-corpus               {mapa, kupac_id | kupac_kratki, projekt, suho, tko} cijeli Corpus paket → novi nalog vlastite proizvodnje (D-55)
+    POST /api/rezultat/nesting                 {put | mapa, suho, tko} bNest .mno → stvarna potrošnja po materijalu naloga, razdioba spojenog posla (D-38)
+    GET  /api/nalog/{id}/rezultati             naplaćeno (Hub, PW-metoda) vs potrošeno (bNest) po materijalu + sheme (PNG) za ekran
+    GET  /api/slika?put=                       PNG sheme rezanja (samo putanje zabilježene u dokumentima naloga)
+    GET  /api/nalog/{id}/obracun               stavke ponude iz obračuna (bez upisa) — ekran 3            POST …/obracun {pravila, tko} upiše radne stavke
+    GET  /api/nalog/{id}/ponude                verzije ponude;  POST /api/nalog/{id}/ponude {pravila, tko, potvrdi_opt} nova verzija iz obračuna (D-40)
+    GET  /api/nalog/{id}/optimizacija          potvrđeno slaganje + prijedlozi po materijalu (D-75)
+    POST /api/nalog/{id}/materijal/{nm}/optimizacija {nacin, dubina, tko}  novi prijedlog;  POST /api/optimizacija/{oid}/potvrdi {tko}
+    GET  /api/postavke/optimizacija            skrivene postavke (kerf, kerf_pile, nadmjera_trake, obracun_rezanja…, D-77); POST {kljuc: vrijednost}
+    GET  /api/ponuda/{vid}                     verzija sa stavkama;  POST /api/ponuda/{vid}/eslog {mapa, broj}  POST /api/ponuda/{vid}/poslana {na, mail_tekst}
+    POST /api/ponuda/{vid}/potvrdi             {ponuda_pantheon, datum, nacin, rok_obecan, prioritet, mapa, tko} dijalog 3b → nalog potvrđen + eSlog
+    POST /api/ponuda/{vid}/posalji             {na, tekst, cc, mapa, suho, tko} ponuda kupcu mailom s PDF-om (D-41); GET /api/mail/postavke
+    POST /api/nalog/{id}/izdatnica             {mapa, tko} vlastita proizvodnja: korekcija po stvarnom stanju (.mno) → verzija izdatnica (D-56)
     GET  /api/nalog/{id}/elementi-export       element-zapis za exporte (korak 3)
     GET  /api/spajanje?prag=1&status=          prijedlozi spajanja malih naloga u jedan nesting posao (D-54)
+    POST /api/spajanje/izvezi                  {nm_ids[], mapa, stil, suho, forsiraj, tko} korak B: jedan CSV+CIX paket iz više naloga (SPOJ_…)
+    GET  /api/spajanje/poslovi                 spojeni poslovi s nalozima i je li se .mno vratio
     POST /api/nalog/{id}/izvoz/nesting         {mapa, stil, suho, tko} CSV + CIX za bNest po materijalu (korak 3, D-23/D-24)
+    POST /api/nalog/{id}/izvoz/pw              {mapa, zaglavlje_jednom, samo_pila, suho, tko} CPW za PanelWizard (D-11)
+    POST /api/nalog/{id}/izvoz/pila            {mapa, suho, sve, tko} optimizacija + CPO za pilu (D-19/D-21/D-22)
 """
 import os
 import re
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 from .. import db
-from ..nalozi import nalozi as N, kupci as K, uvoz_datoteka as U, spajanje as SP, export_nesting as EX
+from ..nalozi import nalozi as N, kupci as K, uvoz_datoteka as U, spajanje as SP, export_nesting as EX, export_pw as EW, export_pila as EP, uvoz_corpus as UC, rezultat_nesting as RN
+from ..nalozi import obracun as OC, ponuda as PO, optimiziraj as OP
 
 router = APIRouter()
 _ctx = {}   # puni app.py: {"veza": callable, "brava": Lock}
@@ -47,11 +65,29 @@ def _brava():
     return _ctx["brava"]
 
 
+def _rollback():
+    """Neuspjeli zahtjev ne smije ostaviti otvorenu transakciju na dijeljenoj vezi — sljedeći tuđi commit bi je upisao."""
+    try:
+        c = _c()
+        if c.in_transaction:
+            c.rollback()
+    except Exception:
+        pass
+
+
 def _greska(fn, *a, **kw):
+    """Pozovi funkciju modula; poslovna greška → 400, sve ostalo → 500, u oba slučaja s rollbackom."""
     try:
         return fn(*a, **kw)
-    except N.NalogGreska as e:
+    except (N.NalogGreska, EX.ExportGreska, SP.SpajanjeGreska, OC.ObracunGreska, PO.PonudaGreska, OP.OptimizacijaGreska, ValueError) as e:
+        _rollback()
         raise HTTPException(400, str(e))
+    except HTTPException:
+        _rollback()
+        raise
+    except Exception:
+        _rollback()
+        raise
 
 
 # ---------------------------------------------------------------- kupci
@@ -114,11 +150,8 @@ def kupac_novi(p: KupacNovi):
         if slicni and not p.svejedno:
             raise HTTPException(409, dict(poruka="postoji sličan kupac — izaberi postojećeg ili pošalji svejedno=true",
                                           slicni=[dict(id=k["id"], naziv=k["naziv"], mjesto=k["mjesto"], telefon=k["telefon"], email=k["email"], razlog=r) for k, r in slicni]))
-        try:
-            return K.novi_hub_kupac(_c(), p.tko, p.ime, mjesto=p.mjesto, telefon=p.telefon, email=p.email, adresa=p.adresa, posta=p.posta,
-                                    oib=p.oib, napomena=p.napomena, vrsta=p.vrsta)
-        except ValueError as e:
-            raise HTTPException(400, str(e))
+        return _greska(K.novi_hub_kupac, _c(), p.tko, p.ime, mjesto=p.mjesto, telefon=p.telefon, email=p.email, adresa=p.adresa, posta=p.posta,
+                       oib=p.oib, napomena=p.napomena, vrsta=p.vrsta)
 
 
 @router.get("/api/kupci/{kupac_id}")
@@ -137,10 +170,7 @@ def kupac_uredi(kupac_id: int, p: KupacUredi):
         if not K.kupac(_c(), kupac_id):
             raise HTTPException(404, "nema kupca %d" % kupac_id)
         polja = {k: v for k, v in p.model_dump().items() if k != "tko" and v is not None}
-        try:
-            return K.uredi_kupca(_c(), kupac_id, p.tko, **polja)
-        except ValueError as e:
-            raise HTTPException(400, str(e))
+        return _greska(K.uredi_kupca, _c(), kupac_id, p.tko, **polja)
 
 
 # ---------------------------------------------------------------- nalozi
@@ -235,17 +265,15 @@ class IzvozNesting(BaseModel):
     stil: str = "bsolid"
     suho: bool = False
     sve: bool = False
+    forsiraj: bool = False                 # izvoz i iz statusa unos / ponuda (samo za probe)
     tko: str = "web"
 
 
 @router.post("/api/nalog/{nalog_id}/izvoz/nesting")
 def nalog_izvoz_nesting(nalog_id: int, p: IzvozNesting):
     """CSV + CIX za bNest, po materijalu. `suho=true` samo izračuna paket i ne dira ni disk ni bazu."""
-    with _ctx["brava"]:
-        try:
-            return EX.izvezi(_c(), nalog_id, p.mapa, p.tko, p.stil, samo_nesting=not p.sve, suho=p.suho)
-        except EX.ExportGreska as e:
-            raise HTTPException(400, str(e))
+    with _brava():
+        return _greska(EX.izvezi, _c(), nalog_id, p.mapa, p.tko, p.stil, samo_nesting=not p.sve, suho=p.suho, forsiraj=p.forsiraj)
 
 
 
@@ -260,17 +288,15 @@ class IzvozPW(BaseModel):
 @router.post("/api/nalog/{nalog_id}/izvoz/pw")
 def nalog_izvoz_pw(nalog_id: int, p: IzvozPW):
     """CPW za PanelWizard, po materijalu (paralelni rad, D-11). Zadano izvozi sve materijale naloga."""
-    with _ctx["brava"]:
-        try:
-            return EW.izvezi(_c(), nalog_id, p.mapa, p.tko, header_once=p.zaglavlje_jednom, samo_pila=p.samo_pila, suho=p.suho)
-        except EX.ExportGreska as e:
-            raise HTTPException(400, str(e))
+    with _brava():
+        return _greska(EW.izvezi, _c(), nalog_id, p.mapa, p.tko, header_once=p.zaglavlje_jednom, samo_pila=p.samo_pila, suho=p.suho)
 
 
 class IzvozPila(BaseModel):
     mapa: str
     suho: bool = False
     sve: bool = False
+    forsiraj: bool = False
     tko: str = "web"
 
 
@@ -278,11 +304,8 @@ class IzvozPila(BaseModel):
 def nalog_izvoz_pila(nalog_id: int, p: IzvozPila):
     """Optimizacija + CPO za pilu, po materijalu (D-19 izbor načina, D-21 kerf, D-22 broj programa).
     `suho=true` složi sheme i vrati brojke bez pisanja — to ekran pokazuje prije slanja na pilu."""
-    with _ctx["brava"]:
-        try:
-            return EP.izvezi(_c(), nalog_id, p.mapa, p.tko, samo_pila=not p.sve, suho=p.suho)
-        except EX.ExportGreska as e:
-            raise HTTPException(400, str(e))
+    with _brava():
+        return _greska(EP.izvezi, _c(), nalog_id, p.mapa, p.tko, samo_pila=not p.sve, suho=p.suho, forsiraj=p.forsiraj)
 
 @router.get("/api/spajanje")
 def spajanje_prijedlozi(prag: float = 1.0, status: Optional[str] = None):
@@ -427,6 +450,284 @@ def element_obrisi(eid: int, tko: str = "web"):
     with _brava():
         _greska(N.obrisi_element, _c(), eid, tko)
         return dict(ok=True)
+
+
+# ---------------------------------------------------------------- uvoz Corpus paketa (D-29, D-55)
+class UvozCorpus(BaseModel):
+    mapa: str                              # mapa izvoza iz Corpusa na disku poslužitelja / mrežnom disku (…\NESTING\<PROJEKT>)
+    kupac_id: Optional[int] = None
+    kupac_kratki: Optional[str] = None
+    projekt: Optional[str] = None
+    suho: bool = False                     # samo provjeri paket (greške, upozorenja, brojke), ne otvaraj nalog
+    tko: str = "web"
+
+
+@router.post("/api/nalozi/uvoz-corpus")
+def nalozi_uvoz_corpus(p: UvozCorpus):
+    """Corpusov paket (CPW po materijalu + CSV + CIX, i podmapa HORIZONTALNO_BUSENJE) → novi nalog `vlastita_proizvodnja`.
+    Paket s greškom (element bez CIX-a, krive mjere u CIX-u, zauzeto ime) vraća 400 i ne otvara nalog."""
+    with _brava():
+        c = _c()
+        nid, izv = _greska(UC.uvezi_paket, c, p.mapa, p.tko, kupac_id=p.kupac_id, kupac_kratki=p.kupac_kratki, projekt=p.projekt, suho=p.suho)
+        if nid:
+            izv["za_potvrdu"] = N.za_potvrdu(c, nid)
+            izv["sazetak"] = N.pregled(c, nid)["sazetak"]
+        return izv
+
+
+class SpajanjeIzvoz(BaseModel):
+    nm_ids: List[int]                      # nalog_materijal.id iz prijedloga (stavke[].nm_id)
+    mapa: str
+    stil: str = "bsolid"
+    suho: bool = False
+    forsiraj: bool = False
+    tko: str = "web"
+
+
+@router.post("/api/spajanje/izvezi")
+def spajanje_izvezi(p: SpajanjeIzvoz):
+    """Voditelj je odabrao naloge (isti materijal) → jedan nesting posao `SPOJ_<MATERIJAL>_<zig>` (D-54/B). Obračun naloga se ne mijenja."""
+    with _brava():
+        return _greska(SP.izvezi_spojeno, _c(), p.nm_ids, p.mapa, p.tko, p.stil, p.suho, p.forsiraj)
+
+
+@router.get("/api/spajanje/poslovi")
+def spajanje_poslovi(limit: int = 100):
+    with _ctx["brava"]:
+        return SP.poslovi(_c(), limit)
+
+
+# ---------------------------------------------------------------- obračun i ponuda (korak 4; D-18, D-20, D-40, D-56)
+class ObracunP(BaseModel):
+    pravila: bool = True                   # pravilo načete ploče (1/3–2/3)
+    tko: str = "web"
+
+
+@router.get("/api/nalog/{nalog_id}/obracun")
+def nalog_obracun(nalog_id: int, pravila: bool = True):
+    """Stavke ponude izračunate sada (ne upisuje) — ekran 3 obračun."""
+    with _ctx["brava"]:
+        return _greska(OC.izracunaj, _c(), nalog_id, pravila)
+
+
+@router.post("/api/nalog/{nalog_id}/obracun")
+def nalog_obracun_upisi(nalog_id: int, p: ObracunP):
+    with _brava():
+        return _greska(OC.upisi, _c(), nalog_id, p.tko, p.pravila)
+
+
+@router.get("/api/nalog/{nalog_id}/ponude")
+def nalog_ponude(nalog_id: int):
+    with _ctx["brava"]:
+        c = _c()
+        _greska(N.nalog, c, nalog_id)
+        return PO.verzije(c, nalog_id)
+
+
+class PonudaNovaP(ObracunP):
+    potvrdi_opt: Optional[bool] = None     # True: sam potvrdi Hubov prijedlog slaganja (probe, D-75)
+
+
+@router.post("/api/nalog/{nalog_id}/ponude")
+def nalog_nova_ponuda(nalog_id: int, p: PonudaNovaP):
+    """Nova verzija ponude iz obračuna; nalog iz 'unos' prelazi u 'ponuda'. Traži potvrđeno slaganje svakog materijala (D-75)."""
+    with _brava():
+        return _greska(PO.nova_verzija, _c(), nalog_id, p.tko, p.pravila, potvrdi_opt=p.potvrdi_opt)
+
+
+# ---------------------------------------------------------------- optimizacija s potvrdom (D-75) i postavke (D-77)
+class OptimizacijaP(BaseModel):
+    nacin: str = "auto"                    # auto | uzduzno | poprecno | trake
+    dubina: str = "najbolje"               # brzo | najbolje
+    tko: str = "web"
+
+
+class TkoP(BaseModel):
+    tko: str = "web"
+
+
+@router.get("/api/nalog/{nalog_id}/optimizacija")
+def nalog_optimizacija(nalog_id: int):
+    with _ctx["brava"]:
+        c = _c()
+        _greska(N.nalog, c, nalog_id)
+        return _greska(OP.pregled, c, nalog_id)
+
+
+@router.post("/api/nalog/{nalog_id}/materijal/{nm_id}/optimizacija")
+def nalog_optimizacija_prijedlog(nalog_id: int, nm_id: int, p: OptimizacijaP):
+    """Novi prijedlog slaganja materijala (način × dubina); ekran ga pokaže uz sheme i razliku prema automatskom."""
+    with _brava():
+        c = _c()
+        m = _greska(N.materijal_naloga, c, nm_id)
+        if not m or m["nalog_id"] != nalog_id:
+            raise HTTPException(404, "materijal %s nije u nalogu %s" % (nm_id, nalog_id))
+        return _greska(OP.predlozi, c, nm_id, p.nacin, p.dubina, p.tko)
+
+
+@router.post("/api/optimizacija/{oid}/potvrdi")
+def optimizacija_potvrdi(oid: int, p: TkoP):
+    """Prijedlog → potvrđeno slaganje (jedino za ponudu, pilu i nabavu). `ponuda_poslana` = treba nova verzija ponude."""
+    with _brava():
+        return _greska(OP.potvrdi, _c(), oid, p.tko)
+
+
+POSTAVKE_OPT = ("kerf", "kerf_pile", "nadmjera_trake", "obracun_rezanja", "ident_rezanje_rez", "ident_rezanje_m")
+
+
+def _postavke_opt(c):
+    return [dict(r) for r in c.execute("SELECT kljuc, vrijednost, opis FROM postavke WHERE kljuc IN (%s) ORDER BY kljuc" % ",".join("?" * len(POSTAVKE_OPT)), POSTAVKE_OPT)]
+
+
+@router.get("/api/postavke/optimizacija")
+def postavke_optimizacija():
+    with _ctx["brava"]:
+        return _postavke_opt(_c())
+
+
+@router.post("/api/postavke/optimizacija")
+def postavke_optimizacija_upisi(p: dict):
+    """{kljuc: vrijednost, …} — samo ključevi iz POSTAVKE_OPT; brojčane se provjere."""
+    with _brava():
+        c = _c()
+        tko = p.pop("tko", "web")
+        for k, v in p.items():
+            if k not in POSTAVKE_OPT:
+                raise HTTPException(400, "nepoznata postavka %s" % k)
+            if k in ("kerf", "kerf_pile", "nadmjera_trake"):
+                try:
+                    float(str(v).replace(",", "."))
+                except ValueError:
+                    raise HTTPException(400, "%s mora biti broj" % k)
+                v = str(v).replace(",", ".")
+            if k == "obracun_rezanja" and v not in ("m2", "rezova", "m_reza"):
+                raise HTTPException(400, "obracun_rezanja: m2 | rezova | m_reza")
+            c.execute("UPDATE postavke SET vrijednost = ? WHERE kljuc = ?", (str(v), k))
+            db.dnevnik(c, tko, "postavke", k, "promjena", str(v))
+        c.commit()
+        return _postavke_opt(c)
+
+
+@router.get("/api/ponuda/{vid}")
+def ponuda_verzija(vid: int):
+    with _ctx["brava"]:
+        return _greska(PO.verzija, _c(), vid)
+
+
+class EslogP(BaseModel):
+    mapa: Optional[str] = None
+    broj: Optional[str] = None
+    tko: str = "web"
+
+
+@router.post("/api/ponuda/{vid}/eslog")
+def ponuda_eslog(vid: int, p: EslogP):
+    with _brava():
+        return dict(eslog=_greska(PO.napisi_eslog, _c(), vid, p.mapa, p.tko, p.broj))
+
+
+class PoslanaP(BaseModel):
+    na: Optional[str] = None
+    mail_tekst: Optional[str] = None
+    tko: str = "web"
+
+
+class PosaljiP(BaseModel):
+    na: Optional[str] = None               # zadano e-mail kupca iz Huba
+    tekst: Optional[str] = None
+    cc: Optional[str] = None
+    mapa: Optional[str] = None
+    suho: bool = False                     # sastavi PDF i poruku, ne šalji
+    tko: str = "web"
+
+
+@router.post("/api/ponuda/{vid}/posalji")
+def ponuda_posalji(vid: int, p: PosaljiP):
+    """Ponuda kupcu mailom s PDF-om (D-41). Bez SMTP lozinke → 400 s uputom; ured može poslati ručno i označiti /poslana."""
+    from ..nalozi import mail as M
+    with _brava():
+        try:
+            return _greska(PO.posalji, _c(), vid, p.tko, p.na, p.tekst, p.cc, p.mapa, p.suho)
+        except M.MailGreska as e:
+            _rollback()
+            raise HTTPException(400, str(e))
+
+
+@router.get("/api/mail/postavke")
+def mail_postavke():
+    from ..nalozi import mail as M
+    with _ctx["brava"]:
+        p = M.postavke_smtp(_c())
+        p.pop("lozinka", None)
+        return p
+
+
+@router.post("/api/ponuda/{vid}/poslana")
+def ponuda_poslana(vid: int, p: PoslanaP):
+    with _brava():
+        return _greska(PO.oznaci_poslanu, _c(), vid, p.tko, p.na, p.mail_tekst)
+
+
+class PotvrdaP(BaseModel):
+    ponuda_pantheon: Optional[str] = None
+    datum: Optional[str] = None
+    nacin: Optional[str] = None            # mail | telefon | osobno
+    rok_obecan: Optional[str] = None
+    prioritet: Optional[str] = None
+    mapa: Optional[str] = None
+    tko: str = "web"
+
+
+@router.post("/api/ponuda/{vid}/potvrdi")
+def ponuda_potvrdi(vid: int, p: PotvrdaP):
+    """Dijalog 3b „Kupac potvrdio“: verzija potvrđena, nalog → potvrdjeno, eSlog XML za Pantheon."""
+    with _brava():
+        return _greska(PO.potvrdi, _c(), vid, p.tko, p.ponuda_pantheon, p.mapa, datum=p.datum, nacin=p.nacin, rok_obecan=p.rok_obecan, prioritet=p.prioritet)
+
+
+@router.post("/api/nalog/{nalog_id}/izdatnica")
+def nalog_izdatnica(nalog_id: int, p: EslogP):
+    with _brava():
+        return _greska(PO.korekcija_po_stvarnom, _c(), nalog_id, p.tko, p.mapa)
+
+
+# ---------------------------------------------------------------- rezultat nestinga (.mno) i sheme (D-38, D-34)
+class RezultatNesting(BaseModel):
+    put: Optional[str] = None              # jedna .mno datoteka
+    mapa: Optional[str] = None             # ili mapa bNest projekata — svi .mno ispod nje, već uvezeni se preskaču
+    suho: bool = False
+    tko: str = "web"
+
+
+@router.post("/api/rezultat/nesting")
+def rezultat_nesting(p: RezultatNesting):
+    """bNest rezultat → `optimizacija` (engine bNest) za svaki materijal naloga čiji su dijelovi u poslu; spojeni posao se razdijeli po kvadraturi."""
+    if not (p.put or p.mapa):
+        raise HTTPException(400, "treba put (.mno) ili mapa")
+    with _brava():
+        if p.put:
+            return _greska(RN.upisi, _c(), p.put, p.tko, p.suho)
+        return _greska(RN.upisi_mapu, _c(), p.mapa, p.tko, p.suho)
+
+
+@router.get("/api/nalog/{nalog_id}/rezultati")
+def nalog_rezultati(nalog_id: int):
+    """Po materijalu: zadnji Hubov izvoz na pilu (ploče, naplata, sheme PNG) i zadnji bNest rezultat (stvarno potrošeno) — D-38."""
+    with _ctx["brava"]:
+        c = _c()
+        _greska(N.nalog, c, nalog_id)
+        return RN.usporedba(c, nalog_id)
+
+
+@router.get("/api/slika")
+def slika(put: str):
+    """PNG sheme — vraća se samo datoteka koja je zabilježena kao dokument (png) nekog naloga."""
+    from fastapi.responses import FileResponse
+    with _ctx["brava"]:
+        r = _c().execute("SELECT 1 FROM dokument WHERE vrsta = 'png' AND putanja = ?", (os.path.abspath(put),)).fetchone()
+    if not r or not os.path.isfile(put):
+        raise HTTPException(404, "nema takve slike")
+    return FileResponse(put, media_type="image/png")
 
 
 # ---------------------------------------------------------------- uvoz datoteke

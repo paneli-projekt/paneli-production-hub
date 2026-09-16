@@ -51,11 +51,12 @@ def _f(x):
 
 
 def uvezi_winstore(conn, putanja, tko="uvoz", povezi=True):
-    """Zamijeni prethodni izvoz istog imena, upiši ploče, poveži s materijalima. Vraća statistiku i popis nepovezanih kodova."""
+    """Novi XML je CIJELI inventar u tom trenutku (Winstore je vlasnik broja punih ploča, D-64): zamijeni sve prethodno,
+    upiši ploče, poveži s materijalima. Vraća statistiku i popis nepovezanih kodova. Veze kod ↔ ident na materijalu ostaju."""
     stavke = ucitaj_xml(putanja)
     izvoz = os.path.basename(putanja)
     cur = conn.cursor()
-    cur.execute("DELETE FROM winstore_ploca WHERE izvoz = ?", (izvoz,))
+    cur.execute("DELETE FROM winstore_ploca")          # ne samo isti naziv datoteke — dnevni izvozi imaju različita imena (12092026.XML…)
     st = dict(stavke=len(stavke), kodova=len({s["materijal_kod"] for s in stavke}), povezano=0, vec_povezano=0, nepovezano=[], dodatni=[], po_razini={},
               ambalaza=0, rucno=0, debljina_iz_winstorea=[])
     ambalaza = {s["materijal_kod"] for s in stavke if je_ambalaza(s["opis"], s["materijal_kod"])}

@@ -14,7 +14,7 @@ import os
 import sys
 
 from .. import db
-from . import nalozi as N, uvoz_datoteka as U
+from . import nalozi as N, uvoz_datoteka as U, uvoz_corpus as UC
 
 
 def mape_naloga(koren):
@@ -25,9 +25,11 @@ def mape_naloga(koren):
         pw = sorted({os.path.normpath(p) for p in glob.glob(os.path.join(d, "04_export_nesting", "**", "PANEL WIZARD", "*.[cC][pP][wW]"), recursive=True)})
         csvs = sorted({os.path.normpath(p) for p in glob.glob(os.path.join(d, "04_export_nesting", "**", "NESTING", "*.[cC][sS][vV]"), recursive=True)})
         kupac = sorted({os.path.normpath(p) for p in glob.glob(os.path.join(d, "01_ulaz_kupca", "*.[cC][pP][wW]"))})
-        if not (pw or csvs or kupac):
+        corpus = os.path.join(d, "01_ulaz_corpus")     # Corpus paket (D-55): cijela mapa izvoza, uvozi se kao jedan nalog
+        corpus = corpus if glob.glob(os.path.join(corpus, "**", "*.[cC][pP][wW]"), recursive=True) else None
+        if not (pw or csvs or kupac or corpus):
             continue                                   # prazna mapa ili _PREDLOZAK_NALOGA — nije nalog
-        out.append(dict(mapa=os.path.basename(d), pw=pw, csv=csvs, kupac=kupac))
+        out.append(dict(mapa=os.path.basename(d), pw=pw, csv=csvs, kupac=kupac, corpus=corpus))
     return out
 
 
@@ -51,6 +53,15 @@ def _uvezi(conn, naziv, datoteke, izvor, tko="PROVJERA"):
     return n["id"], uk
 
 
+def _zapis(conn, nid, uk, corpus=None):
+    p = N.pregled(conn, nid)
+    return dict(nalog_id=nid, naziv=p["naziv"], uvoz=uk, sazetak=p["sazetak"],
+                materijali=[dict(ulaz=x["naziv_ulaz"], deb=x["debljina_ulaz"], ident=x["ident"], naziv=x["naziv"], provjeri=x["provjeri"],
+                                 elemenata=x["elemenata"], komada=x["komada"], m2=x["m2"], put=x.get("put")) for x in p["materijali"]],
+                za_potvrdu=p["za_potvrdu"],
+                corpus=dict(nesting=corpus["nesting"], pila=corpus["pila"], cix=corpus["cix"], upozorenja=corpus["upozorenja"]) if corpus else None)
+
+
 def provjeri(conn, koren):
     rez = []
     _BROJAC[0] = max([0] + [int(r[0].split("-")[1]) for r in conn.execute("SELECT broj FROM nalog WHERE broj LIKE 'PROV-%'")])
@@ -61,11 +72,18 @@ def provjeri(conn, koren):
                 r[kljuc] = None
                 continue
             nid, uk = _uvezi(conn, m["mapa"].lstrip("_"), dat, izvor)
-            p = N.pregled(conn, nid)
-            r[kljuc] = dict(nalog_id=nid, naziv=p["naziv"], uvoz=uk, sazetak=p["sazetak"],
-                            materijali=[dict(ulaz=x["naziv_ulaz"], deb=x["debljina_ulaz"], ident=x["ident"], naziv=x["naziv"], provjeri=x["provjeri"],
-                                             elemenata=x["elemenata"], komada=x["komada"], m2=x["m2"]) for x in p["materijali"]],
-                            za_potvrdu=p["za_potvrdu"])
+            r[kljuc] = _zapis(conn, nid, uk)
+        r["corpus"] = None
+        if m.get("corpus"):
+            try:
+                _BROJAC[0] += 1
+                dijelovi = m["mapa"].lstrip("_").split("_", 1)
+                nid, izv = UC.uvezi_paket(conn, m["corpus"], "PROVJERA", kupac_kratki=dijelovi[0], projekt=dijelovi[1] if len(dijelovi) > 1 else None,
+                                          izvor="provjera", broj="PROV-%03d" % _BROJAC[0], redni=_BROJAC[0])
+                r["corpus"] = _zapis(conn, nid, dict(izv["uvoz"], preskocene_starije=[]), corpus=izv)
+            except UC.CorpusGreska as e:
+                r["corpus"] = dict(greska=str(e), naziv=m["mapa"], uvoz=dict(za_potvrdu_rub=0, preskocene_starije=[]),
+                                   sazetak=dict(materijala=0, elemenata=0, komada=0, m2=0, za_potvrdu=0), materijali=[], za_potvrdu=[])
         if r["cpw"] and r["csv"]:
             a, b = r["cpw"]["sazetak"], r["csv"]["sazetak"]
             r["slaze_se"] = (a["elemenata"], a["komada"], round(a["m2"], 2)) == (b["elemenata"], b["komada"], round(b["m2"], 2)) and \
@@ -80,7 +98,7 @@ def sazetak(rez):
     s = dict(naloga=len(rez), slaze_se=sum(1 for r in rez if r["slaze_se"]), usporedivo=sum(1 for r in rez if r["slaze_se"] is not None),
              materijala=0, materijala_sigurno=0, elemenata=0, komada=0, rubova_za_potvrdu=0, stavki_za_potvrdu=0)
     for r in rez:
-        for k in ("cpw", "csv", "kupac"):
+        for k in ("cpw", "csv", "kupac", "corpus"):
             if not r[k]:
                 continue
             s["materijala"] += len(r[k]["materijali"])
@@ -96,13 +114,19 @@ def ispis(rez, s, out=sys.stdout):
     w = out.write
     for r in rez:
         w("== %s  (CPW <-> CSV %s)\n" % (r["mapa"], {True: "SLAŽE SE", False: "RAZLIKA", None: "—"}[r["slaze_se"]]))
-        for k in ("cpw", "csv", "kupac"):
+        for k in ("cpw", "csv", "kupac", "corpus"):
             x = r[k]
             if not x:
                 continue
             sz = x["sazetak"]
-            w("   %-6s %-24s %2d mat, %3d el, %4d kom, %7.2f m2, za potvrdu %d%s\n" % (k, x["naziv"], sz["materijala"], sz["elemenata"], sz["komada"], sz["m2"], sz["za_potvrdu"],
-                                                                              ("; starije verzije preskočene: " + ", ".join(x["uvoz"]["preskocene_starije"])) if x["uvoz"].get("preskocene_starije") else ""))
+            if x.get("greska"):
+                w("   %-6s GRESKA: %s\n" % (k, x["greska"]))
+                continue
+            w("   %-6s %-24s %2d mat, %3d el, %4d kom, %7.2f m2, za potvrdu %d%s%s\n" % (k, x["naziv"], sz["materijala"], sz["elemenata"], sz["komada"], sz["m2"], sz["za_potvrdu"],
+                                                                              ("; starije verzije preskočene: " + ", ".join(x["uvoz"]["preskocene_starije"])) if x["uvoz"].get("preskocene_starije") else "",
+                                                                              ("; nesting %d el, pila %d el, CIX %d" % (x["corpus"]["nesting"], x["corpus"]["pila"], x["corpus"]["cix"])) if x.get("corpus") else ""))
+            for u in (x.get("corpus") or {}).get("upozorenja", []):
+                w("          PAZI: %s\n" % u)
             for m in x["materijali"]:
                 w("          %-26s %-9s %-42s %s\n" % ((m["ulaz"] or "")[:26], m["ident"] or "—", (m["naziv"] or "")[:42], "ZA POTVRDU" if m["provjeri"] or not m["ident"] else ""))
             for z in x["za_potvrdu"]:
@@ -115,7 +139,7 @@ def markdown(rez, s):
     L = ["# Provjera koraka 2 — uvoz testnih naloga kroz šifrarnik", "",
          "| Nalog | Izvor | Materijala | Elemenata | Komada | m² | Za potvrdu | CPW ↔ CSV |", "|---|---|---|---|---|---|---|---|"]
     for r in rez:
-        for k in ("cpw", "csv", "kupac"):
+        for k in ("cpw", "csv", "kupac", "corpus"):
             x = r[k]
             if not x:
                 continue
@@ -134,7 +158,7 @@ def markdown(rez, s):
                 L.append("| %s (%s) | %s | %s | %s | %d | %d | %.2f |" % (r["mapa"], k, m["ulaz"], m["ident"] or "za potvrdu", m["naziv"] or "—", m["elemenata"], m["komada"], m["m2"]))
     L += ["", "## Stavke za potvrdu", "", "| Nalog | Vrsta | Tekst | Klasa | Kandidati |", "|---|---|---|---|---|"]
     for r in rez:
-        for k in ("cpw", "csv", "kupac"):
+        for k in ("cpw", "csv", "kupac", "corpus"):
             x = r[k]
             if not x:
                 continue
@@ -144,14 +168,10 @@ def markdown(rez, s):
 
 
 def obrisi_provjere(conn):
-    ids = [r[0] for r in conn.execute("SELECT id FROM nalog WHERE izvor = 'provjera'")]
+    """Obriši sve probne naloge (izvor 'provjera') sa svime što na njima visi — i nakon izvoza (cix_registar, optimizacija)."""
+    ids = [r[0] for r in conn.execute("SELECT id FROM nalog WHERE izvor = 'provjera'").fetchall()]
     for nid in ids:
-        conn.execute("DELETE FROM element WHERE nalog_materijal_id IN (SELECT id FROM nalog_materijal WHERE nalog_id = ?)", (nid,))
-        conn.execute("DELETE FROM nalog_materijal WHERE nalog_id = ?", (nid,))
-        conn.execute("DELETE FROM dogadjaj WHERE nalog_id = ?", (nid,))
-        conn.execute("DELETE FROM dokument WHERE nalog_id = ?", (nid,))
-        conn.execute("DELETE FROM nalog WHERE id = ?", (nid,))
-    conn.commit()
+        N.obrisi_nalog(conn, nid, "PROVJERA")
     return len(ids)
 
 

@@ -65,8 +65,9 @@ koja se rješava u koraku 4.
 py -m hub.alati.provjera_exporta --db hub.db --nalozi ..\05_NALOZI_ZA_TEST --md ..\20_ANALIZA\provjera_exporta.md --obrisi
 ```
 
-Za svaki testni nalog uveze se PPNEST-ov izvoz, pa se iz Huba izveze natrag i usporedi. Uspoređuje se ono što stroj i
-obračun stvarno troše — **debljina, mjere, komadi i maska rubova po elementu** — a ne tekst naziva (Hub namjerno piše
+Za svaki testni nalog uveze se PPNEST-ov izvoz, pa se iz Huba napišu CPW/CSV datoteke natrag (istim funkcijama kao izvoz,
+u privremenu mapu — od 15. 9. popodne stvarno se pišu i čitaju datoteke, do tada se uspoređivao samo zapis u bazi) i usporede.
+Uspoređuje se ono što stroj i obračun stvarno troše — **debljina, mjere, komadi i maska rubova po elementu** — a ne tekst naziva (Hub namjerno piše
 svoj kratki naziv materijala i pravi naziv trake iz Pantheona).
 
 **Rezultat: CSV 8 / 8 naloga isto, CPW 5 / 8.** Preostale tri razlike su sve iste vrste i objašnjene su u §5; ni u
@@ -126,6 +127,14 @@ je miče; dvoklik u sredinu stavlja je na sva četiri ruba, sljedeći dvoklik br
    Veza je potvrđena na stvarnoj ponudi 26-010-002823, dakle to je traka koja je i naplaćena.
 
 Obje razlike mijenjaju samo ono što piše, ne i što se reže.
+
+## 6a. Dopuna 15. 9. popodne (pregled koda, dokument 17 / D-65)
+
+- API rute `POST …/izvoz/pw` i `…/izvoz/pila` vraćale su 500 (moduli nisu bili uvezeni u `nalozi_api.py`) — popravljeno, pokriveno testom.
+- Na stroj (nesting, pila) samo iz statusa potvrđeno / skladište / pila-nesting i bez stavki za potvrdu; `--forsiraj` za probe, `--suho` uvijek.
+- Naziv elementa (2. polje CPW-a) sad se i izvozi; Corpusovi stupci i `GLODANJE` vraćaju se u CSV; `cpo_rw` čuva Corpusovu oznaku u ORD2.
+- Neuspjeli izvoz radi rollback (brojač programa i dokumenti ne ostaju u otvorenoj transakciji).
+- Element na punu mjeru ploče (kupčev PPW HUMER: 2800 × 320 na ploči 2800) rušio je izvoz; Igor: reže se **bez obreza ruba** — Hub takav materijal slaže s obrezom 0 (INV1 trim 0) uz upozorenje; JELA TAVERNA iz kupčevog PPW-a tako daje 6 ploča kao PW. Element veći od same ploče daje poruku s popisom.
 
 ## 7. Što ostaje u koraku 3
 
