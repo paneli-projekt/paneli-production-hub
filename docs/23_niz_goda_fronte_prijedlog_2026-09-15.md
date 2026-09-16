@@ -64,3 +64,21 @@ Kako oznaka ulazi u Hub, tri puta:
 
 Ugradnja nakon odgovora: polja `niz` / `niz_rb` na elementu (shema v10), prepoznavanje `skica N` i sufiksa `#A1`, majka pri izvozu na pilu + skica niza,
 etikete, obračun — otprilike jedan korak kralježnice (kao 3c).
+
+## 5. Dopuna 16. 9. 2026. — Igor prihvatio numeraciju u Corpusu; oblik oznake `FR1_A1`
+
+Igor: „prihvaćamo numeraciju u Corpusu, ali oznaka mora biti spojena s nazivom fronte — ako se dogodi razmak, bNest ne čita program.“
+Zato je oblik sufiksa (umjesto ranijeg ` #A1`):
+
+| Slučaj | Oznaka | Primjer |
+|---|---|---|
+| okomiti niz (fronte jedna iznad druge, brojevi odozgo) | `_<slovo><broj>` | `FR1_A1`, `FR2_A2` |
+| vodoravni niz (slijeva nadesno gledano s lica) | `_<slovo><broj>H` | `FR11_E1H`, `FR12_E2H` |
+| mreža (redak-stupac) | `_<slovo><red>-<stupac>` | `FR20_C1-1`, `FR21_C2-1`, `FR22_C1-2` |
+
+Pravila: bez razmaka; slovo niza jedinstveno u projektu; brojevi 1, 2, 3 … bez rupa i bez vodećih nula; velika i mala slova svejedno;
+dopušteni znakovi samo slova, brojke, `_` i `-` (sigurno za bNest, CIX, CSV, CPO i etiketu). Sufiks je zadnji dio naziva — Hub ga čita
+uzorkom `_[A-Z][0-9]+(H|-[0-9]+)?$`, ostatak naziva ostaje naziv fronte. Vodoravni niz nije iznimka nego smjer zapisan uz niz; majka mu je
+široka (Σ širina + kerf), god ostaje okomit, pa vrijedi granica Σ ≤ 2050 mm (2070 bez obreza) — inače Hub predlaže podjelu u dvije majke uz upozorenje.
+Grafički primjeri: artefakti „Niz goda u Corpusu“ i „Oznake niza u Corpusu — primjeri“ (PDF za ispis poslan 16. 9.).
+Ostaje za potvrdu: rezerva uz kerf (2049 → 2050), CNC fronti iz niza (Rover na izrezanoj fronti ili majka na nesting), etiketa (`A2/3` ili i skica).

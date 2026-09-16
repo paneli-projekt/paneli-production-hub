@@ -85,6 +85,7 @@ py -m hub.nalozi.export_pw   --db hub.db --nalog 9 --mapa C:\PPNESTING
 py -m hub.nalozi.export_pila --db hub.db --nalog 9 --mapa C:\PILA            (isto pravilo statusa kao nesting; --forsiraj za probu)
 py -m hub.nalozi.optimiziraj --db hub.db --nalog 9 [--materijal 40 --nacin poprecno --dubina brzo]   (D-75: prijedlog slaganja; --potvrdi ID potvrđuje;
                                                                                ponuda i pila koriste SAMO potvrđeno slaganje; --potvrdi-sve za probe)
+py -m hub.ispis.krojni --db hub.db --nalog 9 [--materijal 40] [--mapa C:\ISPISI]      (D-76: krojni nacrt PDF iz potvrđenog slaganja; bez potvrde = PRIJEDLOG)
 
 rem 9. provjera izvoza: Hub protiv PPNEST-ovih / PW-ovih datoteka na svim testnim nalozima
 py -m hub.alati.provjera_exporta --db hub.db --nalozi ..\05_NALOZI_ZA_TEST --md ..\20_ANALIZA\provjera_exporta.md --obrisi

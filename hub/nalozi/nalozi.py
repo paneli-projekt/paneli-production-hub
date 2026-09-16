@@ -388,7 +388,8 @@ def element(conn, eid):
     if not r:
         raise NalogGreska("nema elementa %s" % eid)
     d = dict(r)
-    d["napomena_etiketa"] = (d["napomena"] or "")[:NAPOMENA_ETIKETA]
+    # na etiketu ide napomena; kad je nema, naziv elementa (kupčev PPW piše napomenu u 2. polje CPW-a = naziv; Corpus id na etiketi, D-55) — Igor, 16. 9.
+    d["napomena_etiketa"] = ((d["napomena"] or "").strip() or (d["naziv"] or "").strip())[:NAPOMENA_ETIKETA]
     d["m2"] = round(d["L"] * d["W"] * d["kom"] / 1e6, 4)
     return d
 

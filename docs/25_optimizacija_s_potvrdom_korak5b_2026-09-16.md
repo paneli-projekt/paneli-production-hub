@@ -41,8 +41,39 @@ Postavke su globalne; ponuda nosi snimku brojki (D-69/3), pa promjena ne mijenja
 potvrdom (`tests/conftest.py`), pravilo se testira u `tests/test_optimizacija_potvrda.py` (prijedlog → potvrda → ista brojka u ponudi i CPO-u, zamjena
 uz poslanu ponudu, zastarijevanje, načini × dubine, postavke D-77, API). **114 testova prolazi** sa stvarnim podacima.
 
-## 4. Što ostaje u koraku 5b
+## 4. Krojni nacrt PDF (drugi dio, isti dan — D-76 / D-77)
 
-Krojni nacrt PDF po materijalu u PW rasporedu (listovi s komadima, mjerama, oznakama i kant trokutićima, ostatak, legenda kantova, barkod programa;
-statistika s identima materijala i traka + skladišna mjesta iz Winstorea / Regal trake, kantiranje po dekorima) — D-76 / D-77; zatim radni nalog,
-pick-lista, izdatnica na istom modulu.
+    py -m hub.ispis.krojni --db hub.db --nalog 12 [--materijal 40] [--oid 17] [--mapa C:\ISPISI]
+    GET  /api/nalog/{id}/ispis/krojni.pdf?materijal=40      (PDF u odgovoru; bez `materijal` svi materijali naloga koji se slažu na ploču)
+    POST /api/nalog/{id}/ispis/krojni.pdf {materijal, mapa, tko}   (napravi i zabilježi kao dokument `pdf_krojni`)
+
+`hub/ispis/krojni.py` (reportlab) iz **potvrđenog slaganja** (D-75) radi ono što operater danas čita s PW-ovog ispisa, ali kao Hubov dokument —
+po Igorovim uputama 16. 9.: naslov sličan PW-u, ne isti, s logom Paneli_ Production Hub; **crno-bijelo i štedljivo** (bez ispuna i boja);
+**oznake kantiranja kao u PW** (puni trokutić na rubu komada, vrh prema van; kad materijal ima više traka uz trokutić stoji broj kanta,
+legenda „Kant 1. = TR001254 ABS 1/22 JELA CLAY · R2-04-B“); **ploča uspravno** — duža stranica 2800 je okomita na A4.
+
+- **List po ploči:** zaglavlje (logo, naziv, program `HUB_00012` s barkodom Code 39, List x / y), blok nalog · materijal (ident + naziv + Winstore kod
+  + stanje na skladištu) · ploča (mjere, debljina, god, obrez) · slaganje (način, kerf pile / obračuna) · **tko je potvrdio i kad**; redak lista
+  (smjer, komada, rezova, iskorištenje, m² dijelova, korisni ostatak); crtež s brojem elementa, napomenom / nazivom, mjerama u komadu, trokutićima
+  kantiranja, rezovima (točkasto) i natpisom OSTATAK; legenda kantova; podnožje s datumom ispisa.
+- **Statistika:** tablica elemenata (naziv, mjere, kom, god, oznake `2DA 2KA` kao PW, **kant po rubu L·O·D·G**, napomena), ploče i površina
+  (ident, Winstore, potrošene ploče, m² ploča / dijelova / **za naplatu** s kriterijem ostatka, korisni ostaci), **kantiranje po traci** (Kant n.,
+  ident, naziv, točni metri, metri za ponudu s nadmjerom iz postavke, **pretinac iz Regal trake, metri na roli**).
+- Bez potvrđenog slaganja nacrt se napravi iz Hubovog prijedloga s crvenom oznakom **PRIJEDLOG — nije za pilu**; `--oid` ispisuje konkretan prijedlog
+  (alternativu) radi usporedbe prije potvrde.
+- **Regal traka:** `hub/skladiste/trake.py` čita `GET /api/stanje` (postavka `regal_traka_url`, zadano `http://192.168.5.201:8080`) — `lok` → pretinac,
+  `q` → metri; keš 60 s; kad nije dostupna, polje ostaje prazno i ništa ne staje (D-63/D-64: Hub samo čita).
+- Winstore nema mjesto na regalu u izvozu, pa za ploče piše kod i stanje u komadima.
+
+**Igorove dorade izgleda (16. 9. popodne, ugrađene):** puni trokutić = ABS, prazni = melamin; mjere komada uz desni (okomita, zaokrenuto) i donji rub,
+veći font, odmaknute od trokutića; ploča zrcalno po visini — prve trake gore, ostatak dolje kao u PW; zaglavlje bez kerfa obračuna (samo kerf pile),
+`God` kao zaseban redak **DA / NE** podebljano; statistika s kolonama **Melamin** i **ABS** kao PW (`1DP`, `2DA 2KA`) uz kant po rubu; PLOČE /
+POVRŠINA SVIH PLOČA / POVRŠINA ZA NAPLATU kao tri uočljive kućice; kantiranje po traci samo **Količina m** (metri s nadmjerom), bez „točno m“.
+
+Probni PDF-ovi: `docs/sheme_proba/krojni_proba_JELA.pdf` (HUMER JELA TAVERNA, 6 listova + 2 stranice statistike — usporedivo s
+`05_NALOZI_ZA_TEST\_HUMER_OMIS\02_panelwizard\JELA TAVERNA 19MM.pdf`) i `krojni_proba.pdf` (BOGDANIC BIJELI NK 18, dvije trake → Kant 1. / Kant 2.).
+Testovi: `tests/test_ispis_krojni.py` (podaci, lažna Regal traka, PRIJEDLOG, dokument, API). **116 testova prolazi.**
+
+## 5. Što ostaje u koraku 5b
+
+Radni nalog / popis elemenata, pick-lista traka (D-63), izdatnica i narudžbenica na istom modulu `hub/ispis/`; ekran s gumbom „Ispis“ dolazi s web ekranima.

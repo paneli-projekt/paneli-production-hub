@@ -30,6 +30,7 @@
     GET  /api/nalog/{id}/optimizacija          potvrđeno slaganje + prijedlozi po materijalu (D-75)
     POST /api/nalog/{id}/materijal/{nm}/optimizacija {nacin, dubina, tko}  novi prijedlog;  POST /api/optimizacija/{oid}/potvrdi {tko}
     GET  /api/postavke/optimizacija            skrivene postavke (kerf, kerf_pile, nadmjera_trake, obracun_rezanja…, D-77); POST {kljuc: vrijednost}
+    GET  /api/nalog/{id}/ispis/krojni.pdf      krojni nacrt PDF iz potvrđenog slaganja (D-76); ?materijal=nm (jedan) ?oid= (prijedlog) ?mapa= ; POST … {materijal, mapa, tko} napravi i zabilježi
     GET  /api/ponuda/{vid}                     verzija sa stavkama;  POST /api/ponuda/{vid}/eslog {mapa, broj}  POST /api/ponuda/{vid}/poslana {na, mail_tekst}
     POST /api/ponuda/{vid}/potvrdi             {ponuda_pantheon, datum, nacin, rok_obecan, prioritet, mapa, tko} dijalog 3b → nalog potvrđen + eSlog
     POST /api/ponuda/{vid}/posalji             {na, tekst, cc, mapa, suho, tko} ponuda kupcu mailom s PDF-om (D-41); GET /api/mail/postavke
@@ -717,6 +718,42 @@ def nalog_rezultati(nalog_id: int):
         c = _c()
         _greska(N.nalog, c, nalog_id)
         return RN.usporedba(c, nalog_id)
+
+
+class IspisP(BaseModel):
+    materijal: Optional[int] = None
+    oid: Optional[int] = None
+    mapa: Optional[str] = None
+    tko: str = "web"
+
+
+@router.get("/api/nalog/{nalog_id}/ispis/krojni.pdf")
+def nalog_ispis_krojni(nalog_id: int, materijal: Optional[int] = None, oid: Optional[int] = None, mapa: Optional[str] = None):
+    """Krojni nacrt (PDF) — svi materijali naloga koji se slažu na ploču ili jedan (`materijal`); iz potvrđenog slaganja, bez potvrde s oznakom PRIJEDLOG.
+    Datoteka se napiše u mapu ispisa i vrati; ne bilježi se kao dokument (za to POST)."""
+    from fastapi.responses import FileResponse
+    from ..ispis import krojni as KR
+    with _brava():
+        c = _c()
+        _greska(N.nalog, c, nalog_id)
+        try:
+            r = KR.napravi(c, nalog_id, mapa, materijal, oid, "web", zabiljezi=False)
+        except (KR.IspisGreska, OP.OptimizacijaGreska) as e:
+            raise HTTPException(400, str(e))
+        return FileResponse(r["put"], media_type="application/pdf", filename=os.path.basename(r["put"]))
+
+
+@router.post("/api/nalog/{nalog_id}/ispis/krojni.pdf")
+def nalog_ispis_krojni_zabiljezi(nalog_id: int, p: IspisP):
+    from ..ispis import krojni as KR
+    with _brava():
+        c = _c()
+        _greska(N.nalog, c, nalog_id)
+        try:
+            return KR.napravi(c, nalog_id, p.mapa, p.materijal, p.oid, p.tko)
+        except (KR.IspisGreska, OP.OptimizacijaGreska) as e:
+            _rollback()
+            raise HTTPException(400, str(e))
 
 
 @router.get("/api/slika")

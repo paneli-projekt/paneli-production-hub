@@ -202,7 +202,7 @@ def test_uvoz_cpw(baza):
     # export zapis
     ex = N.elementi_za_export(baza, n["id"])
     assert len(ex) == 6 and ex[0]["sifra_mat"] == "W908ST2-18" and ex[0]["mat"] == "IV BIJELI NK 18" and ex[0]["traka"]["L"] == "ABS 1/22 CRNI NK" and ex[0]["tip"]["L"] == "A"
-    assert ex[1]["tip"] == {"L": "M", "O": "", "D": "M", "G": ""} and ex[1]["napomena"] == ""
+    assert ex[1]["tip"] == {"L": "M", "O": "", "D": "M", "G": ""} and ex[1]["napomena"] == "bok"          # bez napomene → naziv elementa ide na etiketu (16. 9.)
 
 
 def test_uvoz_ppnest_csv(baza):
