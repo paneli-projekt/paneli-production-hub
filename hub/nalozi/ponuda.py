@@ -194,9 +194,10 @@ def posalji(conn, verzija_id, tko="web", na=None, tekst=None, cc=None, mapa=None
     if not na:
         raise PonudaGreska("kupac %s nema e-mail u Hubu — upisati na kartici kupca (D-50)" % (n.get("kupac_naziv") or "?"))
     mapa = mapa or postavka(conn, "mapa_ponude") or os.path.join(os.path.dirname(os.path.abspath(db.putanja_baze())), "ponude")
-    dok = PP.napravi(conn, verzija_id, mapa)
-    tekst = tekst or ("Poštovani,\n\nu prilogu je ponuda %s (nalog %s), ukupno %.2f EUR s PDV-om.\n\nMolimo potvrdu odgovorom na ovaj mail ili telefonom.\n\n%s\n%s"
-                      % (dok["naslov"], n["naziv"], dok["ukupno"], PP.TVRTKA["naziv"], PP.TVRTKA["mail"]))
+    dok = PP.napravi(conn, verzija_id, mapa, tko=tko)
+    from .. import korisnici as KO
+    tekst = tekst or ("Poštovani,\n\nu prilogu je ponuda %s (nalog %s), ukupno %.2f EUR s PDV-om.\n\nMolimo potvrdu odgovorom na ovaj mail ili telefonom.\n\nLijep pozdrav,\n%s"
+                      % (dok["naslov"], n["naziv"], dok["ukupno"], KO.potpis(conn, tko)))      # D-88: potpis osobe koja šalje
     r = M.posalji(conn, na, "%s — %s" % (dok["naslov"], PP.TVRTKA["naziv"]), tekst, html=PP.html(conn, verzija_id),
                   prilozi=[dok["pdf"] or dok["html"]], cc=cc, tko=tko, nalog_id=v["nalog_id"], suho=suho)
     conn.execute("UPDATE ponuda_verzija SET pdf_putanja = ? WHERE id = ?", (dok["pdf"] or dok["html"], verzija_id))

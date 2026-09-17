@@ -50,9 +50,11 @@ def upisi_postavke(conn, **kv):
     return postavke_smtp(conn)
 
 
-def poruka(p, na, predmet, tekst, html=None, prilozi=(), cc=None):
+def poruka(p, na, predmet, tekst, html=None, prilozi=(), cc=None, odgovor_na=None):
     msg = EmailMessage()
     msg["From"] = formataddr((p["mail_od_naziv"] or "", p["mail_od"]))
+    if odgovor_na:                                   # D-88: odgovor kupca ide osobi koja je poslala
+        msg["Reply-To"] = odgovor_na
     msg["To"] = na if isinstance(na, str) else ", ".join(na)
     kopija = [x for x in ((cc or "") + "," + (p.get("mail_kopija") or "")).split(",") if x.strip()]
     if kopija:
@@ -73,13 +75,17 @@ def poruka(p, na, predmet, tekst, html=None, prilozi=(), cc=None):
 
 
 def posalji(conn, na, predmet, tekst, html=None, prilozi=(), cc=None, tko="web", nalog_id=None, suho=False):
-    """Pošalji poruku preko SMTP SSL. Vraća dict(poslano, na, cc, predmet, prilozi, message_id). suho: sastavi poruku, ne šalji."""
+    """Pošalji poruku preko SMTP SSL. Vraća dict(poslano, na, cc, predmet, prilozi, message_id). suho: sastavi poruku, ne šalji.
+    Reply-To = e-mail prijavljenog korisnika (`tko`) kad ga ima (D-88)."""
+    from .. import korisnici as KO
     p = postavke_smtp(conn)
+    k = KO.korisnik(conn, tko)
+    odgovor_na = formataddr((k.get("ime") or "", k["email"])) if k and k.get("email") else None
     if not na:
         raise MailGreska("nema adrese primatelja")
     if not p["spreman"] and not suho:
         raise MailGreska("SMTP lozinka nije postavljena — upisati je u %s (ili HUB_SMTP_LOZINKA); do tada ponudu poslati ručno" % p["lozinka_datoteka"])
-    msg = poruka(p, na, predmet, tekst, html, prilozi, cc)
+    msg = poruka(p, na, predmet, tekst, html, prilozi, cc, odgovor_na)
     if not suho:
         try:
             with smtplib.SMTP_SSL(p["smtp_host"], p["smtp_port"], context=ssl.create_default_context(), timeout=30) as s:
@@ -90,7 +96,7 @@ def posalji(conn, na, predmet, tekst, html=None, prilozi=(), cc=None, tko="web",
     if nalog_id:
         dnevnik(conn, tko, "nalog", nalog_id, "mail", "%s%s: %s" % ("[suho] " if suho else "", msg["To"], predmet))
         conn.commit()
-    return dict(poslano=not suho, na=msg["To"], cc=msg.get("Cc"), predmet=predmet, prilozi=[os.path.basename(x) for x in prilozi], message_id=msg["Message-ID"], kada=sada())
+    return dict(poslano=not suho, na=msg["To"], cc=msg.get("Cc"), odgovor_na=msg.get("Reply-To"), predmet=predmet, prilozi=[os.path.basename(x) for x in prilozi], message_id=msg["Message-ID"], kada=sada())
 
 
 def main(argv=None):

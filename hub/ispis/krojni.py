@@ -16,7 +16,7 @@ import sys
 
 from .. import db
 from ..db import sada, dnevnik, postavka
-from ..nalozi import nalozi as N, optimiziraj as OP, sheme as SH
+from ..nalozi import nalozi as N, optimiziraj as OP, sheme as SH, grupe as G
 from ..optimizacija import obracun as OB, pila_optimizator as OPT
 from ..skladiste import trake as RT
 
@@ -84,24 +84,33 @@ def podaci(conn, nm_id, oid=None):
     d = dict(inv=[dict(L=float(ploca[0]), W=float(ploca[1]), trim=[float(trim)] * 4)], ctl2=[kerf],
              pat=[dict(no=i + 1, dir=s["dir"], qty=1, cuts=OPT.sheme_u_cuts(s)) for i, s in enumerate(sheets)])
     geo = SH.geometrija(d)
-    # elementi s trakama (ident + naziv po rubu)
+    # trake: metri po KONAČNOJ mjeri pravih elemenata (i članova majki — majka se reže, komadi se kantiraju; korak 6)
     trake = {}
+
+    def _traka(el, i, strana):
+        tid = el["rub%d_traka_id" % i]
+        if tid and tid not in trake:
+            vrsta = "MEL" if N.tip_ruba(el["rub%d_klasa" % i], el["rub%d_kod" % i]) == "M" else "ABS"
+            n_vrste = sum(1 for t in trake.values() if t["vrsta"] == vrsta) + 1
+            trake[tid] = dict(id=tid, ident=el["rub%d_traka" % i], naziv=el["rub%d_naziv" % i], klasa=el["rub%d_klasa" % i],
+                              vrsta=vrsta, broj=n_vrste, oznaka="%s %d" % (vrsta, n_vrste), rb=len(trake) + 1,
+                              metri=0.0, metri_tocno=0.0, pretinac=None, preostalo=None)
+        return tid
+    for el in N.elementi_konacni(conn, nm_id):
+        for i, strana in enumerate(("L", "O", "D", "G"), 1):
+            tid = _traka(el, i, strana)
+            if tid:
+                ln = float(el["L"]) if strana in ("L", "D") else float(el["W"])
+                trake[tid]["metri_tocno"] += ln * int(el["kom"]) / 1000.0
+    # elementi koji se REŽU (mjera za rezanje, element-majke umjesto članova) s oznakama kantiranja na tom komadu
     elementi = []
     for k, e in enumerate(els):
         el = N.element(conn, e["element_id"])
         rub = {}
         for i, strana in enumerate(("L", "O", "D", "G"), 1):
-            tid = el["rub%d_traka_id" % i]
+            tid = _traka(el, i, strana)
             if tid:
-                if tid not in trake:
-                    vrsta = "MEL" if (e.get("tip", {}).get(strana) or "A") == "M" else "ABS"
-                    n_vrste = sum(1 for t in trake.values() if t["vrsta"] == vrsta) + 1
-                    trake[tid] = dict(id=tid, ident=el["rub%d_traka" % i], naziv=el["rub%d_naziv" % i], klasa=el["rub%d_klasa" % i],
-                                      vrsta=vrsta, broj=n_vrste, oznaka="%s %d" % (vrsta, n_vrste), rb=len(trake) + 1,
-                                      metri=0.0, metri_tocno=0.0, pretinac=None, preostalo=None)
                 rub[strana] = tid
-                ln = float(el["L"]) if strana in ("L", "D") else float(el["W"])
-                trake[tid]["metri_tocno"] += ln * int(el["kom"]) / 1000.0
             elif el["rub%d_kod" % i]:
                 rub[strana] = "?"                                   # rub naručen, traka nije potvrđena
         po_traci = {}
@@ -110,8 +119,15 @@ def podaci(conn, nm_id, oid=None):
                 k2 = ("D" if strana in ("L", "D") else "K") + ("P" if trake[tid]["vrsta"] == "MEL" else "A")
                 po_traci.setdefault(tid, {})[k2] = po_traci.setdefault(tid, {}).get(k2, 0) + 1
         oznake_po_traci = {tid: " ".join("%d%s" % (br[k2], k2) for k2 in ("DA", "KA", "DP", "KP") if k2 in br) for tid, br in po_traci.items()}
+        nap = (el["napomena"] or "")[:60]
+        if e.get("rez_razlog") == "suziti":
+            nap = ("%s · konačna %s × %s" % (el["napomena_rez"], _mm(e["L_kon"]), _mm(e["W_kon"])) + ((" · " + nap) if nap else ""))[:80]
+        elif e.get("rez_razlog") == "sloj":
+            nap = ("%s · sirova mjera sloja" % el["napomena_rez"] + ((" · " + nap) if nap else ""))[:80]
+        elif e.get("vrsta") == "majka":
+            nap = ("%s · reže se po skici majke" % el["napomena_rez"])[:80]
         elementi.append(dict(idx=k + 1, id=e["element_id"], naziv=e.get("naziv") or "", L=float(e["L"]), W=float(e["W"]), kom=int(e["kom"]),
-                             god=int(e.get("god", 0)), napomena=(el["napomena"] or "")[:60], napomena_etiketa=e.get("napomena") or "",
+                             god=int(e.get("god", 0)), napomena=nap, napomena_etiketa=e.get("napomena") or "", vrsta=e.get("vrsta") or "element",
                              rub=rub, tip=dict(e.get("tip", {})), oznake_mel=_oznake_kanta(e.get("tip", {}), e.get("traka", {}))[0],
                              oznake_abs=_oznake_kanta(e.get("tip", {}), e.get("traka", {}))[1], oznake_po_traci=oznake_po_traci))
     for t in trake.values():
@@ -142,7 +158,8 @@ def podaci(conn, nm_id, oid=None):
     if red and red.get("potvrdio_id"):
         r = conn.execute("SELECT oznaka, ime FROM korisnik WHERE id = ?", (red["potvrdio_id"],)).fetchone()
         potvrdio = (r["ime"] or r["oznaka"]) if r else None
-    return dict(nalog=dict(id=n["id"], naziv=n["naziv"], broj=n["broj"], kupac=n["kupac_naziv"] or "", status=n["status"]),
+    majke = [mk for mk in G.pregled(conn, n["id"]) if mk["nalog_materijal_id"] == nm_id]      # korak 6: skice majki i sklopova ovog materijala
+    return dict(nalog=dict(id=n["id"], naziv=n["naziv"], broj=n["broj"], kupac=n["kupac_naziv"] or "", status=n["status"]), majke=majke,
                 materijal=dict(nm_id=nm_id, ident=m["ident"], naziv=m["naziv"] or m["naziv_kratki"] or m["naziv_ulaz"], kratki=m["naziv_kratki"] or m["naziv_ulaz"],
                                winstore_kod=m["winstore_kod"], debljina=m["debljina"] or m["debljina_ulaz"], stanje_kom=stanje, put=m["put"]),
                 ploca=dict(L=L, W=W, trim=trim, kerf_pile=kerf, kerf_obracun=kerf_obracun, god=bool(god)),
@@ -553,6 +570,85 @@ class _Nacrt:
             c.setFillColor(colors.HexColor("#b00020"))
             c.drawString(self.M, y, "PRIJEDLOG — slaganje nije potvrđeno (D-75); nacrt nije za pilu dok ga netko ne potvrdi.")
             c.setFillColor(colors.black)
+        self.podnozje(self.ukupno)
+        c.showPage()
+        if d.get("majke"):
+            self.majke()
+
+    def _skica(self, x0, y_vrh, sir_max, vis_max, L, W, clanovi, kerf=None):
+        """Majka L × W (L vodoravno) s članovima; vraća visinu crteža. Crno-bijelo, mjere uz rubove."""
+        c, mm = self.c, self.mm
+        from reportlab.lib import colors
+        sk = min(sir_max / max(L, 1), vis_max / max(W, 1))
+        w, h = L * sk, W * sk
+        y0 = y_vrh - h
+        c.setLineWidth(0.8)
+        c.rect(x0, y0, w, h, stroke=1, fill=0)
+        c.setLineWidth(0.3)
+        for m in clanovi:
+            c.rect(x0 + m["x"] * sk, y0 + m["y"] * sk, m["L"] * sk, m["W"] * sk, stroke=1, fill=0)
+            c.setFont(self.fb, 7 if min(m["L"], m["W"]) * sk > 6 * mm else 5)
+            c.drawCentredString(x0 + (m["x"] + m["L"] / 2) * sk, y0 + (m["y"] + m["W"] / 2) * sk - 1 * mm, str(m["poz"]))
+            c.setFont(self.f, 5.5)
+            if min(m["L"], m["W"]) * sk > 9 * mm:
+                c.drawCentredString(x0 + (m["x"] + m["L"] / 2) * sk, y0 + (m["y"] + m["W"] / 2) * sk - 3.5 * mm, "%s × %s" % (_mm(m["L"]), _mm(m["W"])))
+        c.setFont(self.f, 7)
+        c.drawCentredString(x0 + w / 2, y0 - 3.2 * mm, "%s mm" % _mm(L))
+        c.saveState()
+        c.translate(x0 + w + 3 * mm, y0 + h / 2)
+        c.rotate(90)
+        c.drawCentredString(0, 0, "%s mm" % _mm(W))
+        c.restoreState()
+        return h + 5 * mm
+
+    def majke(self):
+        """Stranica 'Majke i sklopovi' (korak 6): za svaki niz goda, majku malih komada i sklop lijepljenja — skica s rezovima i članovi."""
+        c, mm, d = self.c, self.mm, self.d
+        from reportlab.lib import colors
+        y = self.zaglavlje("Majke i sklopovi · %s" % d["materijal"]["kratki"], "Majke")
+        c.setFont(self.f, 7.5)
+        c.drawString(self.M, y - 4 * mm, "Veći komad se reže po ovoj skici (kerf pile između komada); trake i CNC obrada su po komadima, etiketa komada nosi oznaku (A2/3, IZ M1, LA1/2).")
+        y -= 9 * mm
+        for mk in d["majke"]:
+            sk = mk["skica"]
+            if mk["vrsta"] == "niz":
+                ploce = [dict(L=sk["L"], W=sk["W"], clanovi=sk["clanovi"], naslov="NIZ GODA %s — %d fronti, smjer %s, kerf %s mm, majka %s × %s × %d kom"
+                              % (mk["oznaka"], mk["clanova"], {"V": "okomito", "H": "vodoravno", "G": "mreža"}.get(mk["smjer"], mk["smjer"]), _mm(sk["kerf"]), _mm(sk["L"]), _mm(sk["W"]), mk["komada"] // max(mk["clanova"], 1)))]
+            elif mk["vrsta"] == "mali":
+                ploce = [dict(L=mj["L"], W=mj["W"], clanovi=mj["clanovi"], naslov="MAJKA %s — %d × komad %s × %s, %d majk%s, kerf %s mm; kant na majci: %s"
+                              % (mk["oznaka"], mj["komada"], _mm(sk["komad"]["L"]), _mm(sk["komad"]["W"]), mj["majki"], "a" if mj["majki"] == 1 else "e", _mm(sk["kerf"]),
+                                 " / ".join(k for k in sk["rub_kratki"] if k) or "—")) for mj in sk["majke"]]
+            else:
+                ploce = [dict(L=mk["L"], W=mk["W"], clanovi=[dict(poz="sloj %d" % s_["sloj"], x=0, y=0, L=s_["L"], W=s_["W"]) for s_ in sk["slojevi"][:1]],
+                              naslov="SKLOP LIJEPLJENJA %s — %d slojeva, konačna %s × %s, %s mm; slojevi se režu na sirovu mjeru (+10), kant na sklopu"
+                              % (mk["oznaka"], mk["clanova"], _mm(mk["L"]), _mm(mk["W"]), _mm(mk["debljina"] or 0)))]
+            for p in ploce:
+                vis = min(60 * mm, (self.PW - 2 * self.M - 10 * mm) * p["W"] / max(p["L"], 1)) + 14 * mm
+                if y - vis - 6 * mm < self.M + 12 * mm:
+                    self.podnozje(self.ukupno)
+                    c.showPage()
+                    y = self.zaglavlje("Majke i sklopovi · %s" % d["materijal"]["kratki"], "Majke (nastavak)") - 4 * mm
+                c.setFont(self.fb, 8.5)
+                c.drawString(self.M, y - 3 * mm, p["naslov"][:120])
+                if mk["provjeri"] and mk["napomena"]:
+                    c.setFont(self.f, 7)
+                    c.setFillColor(colors.HexColor("#b00020"))
+                    c.drawString(self.M, y - 6.5 * mm, "PROVJERI: " + mk["napomena"][:130])
+                    c.setFillColor(colors.black)
+                    y -= 3.5 * mm
+                h = self._skica(self.M + 2 * mm, y - 6 * mm, self.PW - 2 * self.M - 10 * mm, 60 * mm, p["L"], p["W"], p["clanovi"])
+                y -= h + 9 * mm
+                # članovi
+                c.setFont(self.f, 7)
+                for cl in mk["clanovi"]:
+                    if y < self.M + 12 * mm:
+                        self.podnozje(self.ukupno)
+                        c.showPage()
+                        y = self.zaglavlje("Majke i sklopovi · %s" % d["materijal"]["kratki"], "Majke (nastavak)") - 4 * mm
+                    c.drawString(self.M + 4 * mm, y, "%-8s %-30s %s × %s × %d%s   etiketa: %s" % (cl["majka_poz"] or "", (cl["naziv"] or "")[:30], _mm(cl["L"]), _mm(cl["W"]), cl["kom"],
+                                                                                                  ("   reže se %s × %s" % (_mm(cl["rez_L"]), _mm(cl["rez_W"]))) if cl["rez_L"] else "", cl["napomena_rez"] or ""))
+                    y -= 3.6 * mm
+                y -= 4 * mm
         self.podnozje(self.ukupno)
         c.showPage()
 

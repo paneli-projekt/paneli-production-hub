@@ -48,8 +48,8 @@ def test_obracun_stavke(baza_o):
     # 1 ploča 2800×2070: PW-metoda daje korisni ostatak, pravilo načete ploče → cijela / +0,25 / min 1/3 — količina je iz PW m² + pravilo
     assert po["IV000090"]["jm"] == "M2" and 1.93 <= po["IV000090"]["kolicina"] <= 5.8 and "PW-metoda" in po["IV000090"]["pravilo"]
     assert po["US000002"]["kolicina"] == po["IV000090"]["kolicina"]
-    # traka: (800×2 + 400) mm × 1,10 = 2,20 m → 3 m naviše; kantiranje = točno 2,20 m (D-20)
-    assert po["TR000168"]["kolicina"] == 3 and po["US000011"]["kolicina"] == 2.2
+    # traka: (800×2 + 400) mm × 1,10 = 2,20 m → 3 m naviše; kantiranje = isti metri kao traka (D-90, Igor 17. 9.)
+    assert po["TR000168"]["kolicina"] == 3 and po["US000011"]["kolicina"] == 3 and po["TR000168"]["pravilo"] == ""
     assert po["US000016"]["kolicina"] == 0.4 and "NUT" in po["US000016"]["pravilo"]
     assert po["OK000218"]["kolicina"] == 8 and any("SARKA" in u for u in r["upozorenja"])
     # cijene iz šifrarnika, rabat: materijal / usluge s naloga (zadano 15 / 20)

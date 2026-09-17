@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Prijedlozi spajanja malih naloga u jedan nesting posao (D-54).
+r"""Prijedlozi spajanja malih naloga u jedan nesting posao (D-54).
 
 Više naloga koji čekaju proizvodnju često traže isti materijal, svaki u količini manjoj od jedne ploče — pa svaki
 zasebno ide na pilu. Ako se ti dijelovi režu zajedno, stane ih se više na istu ploču i posao ide na nesting, koji je

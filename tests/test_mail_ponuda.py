@@ -31,6 +31,7 @@ class LazniSMTP:
 
 def test_postavke_i_lozinka(baza_o, tmp_path, monkeypatch):
     monkeypatch.delenv("HUB_SMTP_LOZINKA", raising=False)
+    monkeypatch.setenv("HUB_DB", str(tmp_path / "hub.db"))        # lozinka se traži uz bazu — ne uz smtp_lozinka.txt u radnoj mapi (30_NOVI_PROGRAM)
     p = M.postavke_smtp(baza_o)
     assert (p["smtp_host"], p["smtp_port"], p["smtp_user"], p["mail_od"]) == ("mail.paneliprojekt.hr", 465, "prodaja@paneliprojekt.hr", "prodaja@paneliprojekt.hr")
     assert not p["spreman"] and p["lozinka_datoteka"].endswith("smtp_lozinka.txt")

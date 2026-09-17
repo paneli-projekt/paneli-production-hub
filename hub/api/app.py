@@ -2,8 +2,8 @@
 """HTTP API Huba (FastAPI): korak 1 šifrarnik materijala i traka (ovdje), korak 2 kupci / nalozi / elementi (hub/api/nalozi_api.py).
 
     set HUB_DB=C:\\hub\\hub.db
-    py -m uvicorn hub.api.app:app --host 0.0.0.0 --port 8765
-    → http://192.168.5.201:8765/docs  (automatska dokumentacija i isprobavanje)
+    py -m uvicorn hub.api.app:app --host 0.0.0.0 --port 8766
+    → http://192.168.5.201:8766/docs  (automatska dokumentacija i isprobavanje)
 
 Krajnje točke:
     GET  /api/zdravlje                          stanje baze (broj materijala, traka, aliasa, zadnji uvozi)
@@ -15,6 +15,7 @@ Krajnje točke:
     POST /api/sifrarnik/alias        {alias, ident, tko, izvor}                      potvrda: tekst → materijal (D-32)
     POST /api/sifrarnik/alias-traka  {oznaka, traka, materijal?, klasa?, tko, izvor} potvrda: oznaka → traka (+ zadana traka materijala)
     + krajnje točke koraka 2 (kupci, nalozi, materijali naloga, elementi, statusi, uvoz datoteka) — vidi nalozi_api.py
+    + prijava korisnika (POST /api/prijava, /api/odjava, GET /api/ja, /api/korisnici) — vidi korisnici_api.py (D-88)
 Jedna dijeljena SQLite veza uz bravu (keš prepoznavanja živi uz vezu); Hub nikad ne piše u Pantheon (D-02).
 """
 import os
@@ -52,6 +53,24 @@ def _red(r):
 from . import nalozi_api                      # korak 2: kupci, nalozi, elementi
 nalozi_api._ctx.update(veza=veza, brava=_brava)
 app.include_router(nalozi_api.router)
+from . import skladiste_api                   # Warehouse (D-64): skladište i nabava
+skladiste_api._ctx.update(veza=veza, brava=_brava)
+app.include_router(skladiste_api.router)
+from . import korisnici_api                   # prijava s lozinkom, sesije, potpis (D-88)
+korisnici_api._ctx.update(veza=veza, brava=_brava)
+app.include_router(korisnici_api.router)
+app.middleware("http")(korisnici_api.provjera_prijave)
+
+# ---------------------------------------------------------------- web ekrani (hub/web: index.html + app.js + ekrani.js, bez builda)
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+_WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "web")
+app.mount("/static", StaticFiles(directory=_WEB), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def web_index():
+    return FileResponse(os.path.join(_WEB, "index.html"))
 
 
 # ---------------------------------------------------------------- zdravlje

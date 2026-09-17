@@ -38,10 +38,12 @@ def _orijentiraj(W, L, god, dir_, dulja_uz_traku):
     a, b = (max(W, L), min(W, L))
     return (b, a) if dulja_uz_traku else (a, b)
 
-def slozi(dijelovi, ploca=(2800, 2070), trim=10, kerf=16.0, god=True, nacin='uzduzno', sort='w', dulja_uz_traku=True):
-    """dijelovi: lista (idx, W, L, kom). Vraća listu ploča: dict(dir, strips=[dict(w, used_l, blocks=[dict(l, used_w, subs=[dict(w3, parts=[(l4, idx)])])])])."""
+def slozi(dijelovi, ploca=(2800, 2070), trim=10, kerf=16.0, god=True, nacin='uzduzno', sort='w', dulja_uz_traku=True, ogr=None):
+    """dijelovi: lista (idx, W, L, kom). Vraća listu ploča: dict(dir, strips=[dict(w, used_l, blocks=[dict(l, used_w, subs=[dict(w3, parts=[(l4, idx)])])])]).
+    ogr (D-91): ograničenja pile — dict(max_razina, max_sirina, min_komad_4); vidi dopusteno()."""
     dir_ = 'S' if nacin == 'poprecno' else 'L'
     LIM_W, LIM_L = _os_ploce(ploca, trim, dir_)
+    mr, ms, min4 = _ogr(ogr)
     pieces = []
     for idx, W, L, kom in dijelovi:
         w, l = _orijentiraj(W, L, god, dir_, dulja_uz_traku)
@@ -61,17 +63,17 @@ def slozi(dijelovi, ploca=(2800, 2070), trim=10, kerf=16.0, god=True, nacin='uzd
     samo_trake = nacin == 'trake'
 
     def try_place(sheet, w, l, idx):
-        # 1) pod-traka u postojećem bloku (razina 3/4) — ne u načinu 'trake'
-        if not samo_trake:
+        # 1) pod-traka u postojećem bloku (razina 3/4) — ne u načinu 'trake'; uz ogr samo do dopuštene razine / broja širina
+        if not samo_trake and mr >= 3:
             for st in sheet['strips']:
                 for b in st['blocks']:
-                    if l <= b['l'] and b['used_w'] + kerf + w <= st['w']:
+                    if l <= b['l'] and b['used_w'] + kerf + w <= st['w'] and (l == b['l'] or (mr >= 4 and l >= min4)) and _sirina_ok(st, w, ms):
                         b['subs'].append(dict(w3=w, parts=[(l, idx)]))
                         b['used_w'] += kerf + w
                         return True
         # 2) novi blok u postojećoj traci (razina 2): ista širina (trake) ili ≤ (uzduzno/poprecno)
         for st in sheet['strips']:
-            if (w == st['w'] if samo_trake else w <= st['w']) and st['used_l'] + kerf + l <= LIM_L:
+            if (w == st['w'] if (samo_trake or mr <= 2) else w <= st['w']) and st['used_l'] + kerf + l <= LIM_L and _sirina_ok(st, w, ms):
                 st['blocks'].append(dict(l=l, used_w=w, subs=[dict(w3=w, parts=[(l, idx)])]))
                 st['used_l'] += kerf + l
                 return True
@@ -89,6 +91,58 @@ def slozi(dijelovi, ploca=(2800, 2070), trim=10, kerf=16.0, god=True, nacin='uzd
             if not try_place(s, w, l, idx):
                 raise ValueError('dio %d ne stane ni na praznu ploču' % idx)
     return sheets
+
+def _ogr(ogr):
+    """(max_razina, max_sirina, min_komad_4) iz dict-a ograničenja; bez ogr = bez ograničenja."""
+    if not ogr:
+        return 4, 0, 0
+    return int(ogr.get('max_razina') or 4), int(ogr.get('max_sirina') or 0), float(ogr.get('min_komad_4') or 0)
+
+def _sirine_trake(st):
+    return set(sb['w3'] for b in st['blocks'] for sb in b['subs'])
+
+def _sirina_ok(st, w, ms):
+    """Smije li širina komada w u traku st uz najviše ms različitih širina (0 = bez ograničenja)."""
+    if not ms:
+        return True
+    sir = _sirine_trake(st)
+    return w in sir or len(sir) < ms
+
+def dopusteno(sheets, dijelovi, ogr):
+    """D-91: može li pila realno izrezati slaganje uz ograničenja ogr = dict(max_razina 2|3|4, max_sirina (različitih širina komada u
+    traci, 0 = bez ograničenja), min_komad_4 (mm, najmanji komad 4. razine, 0 = bez), mijesana (1 = smije miješati orijentaciju)).
+    Vraća (ok, razlozi[])."""
+    mr, ms, min4 = _ogr(ogr)
+    mij = bool(int((ogr or {}).get('mijesana') or 0))
+    razlozi = []
+    dims = {idx: (W, L) for idx, W, L, _ in dijelovi}
+    orij = {}
+    for s in sheets:
+        for st in s['strips']:
+            if ms and len(_sirine_trake(st)) > ms:
+                razlozi.append('traka %s ima %d širina komada (najviše %d)' % (st['w'], len(_sirine_trake(st)), ms))
+            for b in st['blocks']:
+                for sb in b['subs']:
+                    for l4, idx in sb['parts']:
+                        W, L = dims.get(idx, (sb['w3'], l4))
+                        if W != L:
+                            orij.setdefault(idx, set()).add('N' if (sb['w3'], l4) == (W, L) else 'R')
+        for razina, poz, _, _ in sheme_u_cuts(s):
+            if razina > mr:
+                razlozi.append('rez %d. razine (najviše %d)' % (razina, mr))
+            if razina == 4 and min4 and poz < min4:
+                razlozi.append('komad 4. razine %s mm (najmanje %s)' % (poz, min4))
+    if not mij:
+        if len(set(s['dir'] for s in sheets)) > 1:
+            razlozi.append('ploče se ne režu u istom smjeru (uzdužno / poprečno)')
+        if any(len(o) > 1 for o in orij.values()):
+            razlozi.append('isti element u obje orijentacije')
+    # sažmi ponavljanja, zadrži redoslijed
+    kratko = []
+    for r in razlozi:
+        if r not in kratko:
+            kratko.append(r)
+    return not kratko, kratko
 
 def sheme_u_cuts(sheet):
     """CUT1 zapisi (razina, pozicija, je_dio, idx) po PW pravilima."""
@@ -336,17 +390,23 @@ def dotjeraj_zadnju(sheets, dijelovi, ploca, trim, kerf, god, nacini=None):
     out = sheets[:-1] + [best[1]]
     return _premjesti_u_prethodne(out, dijelovi, ploca, trim, kerf, god)
 
-def najbolje(dijelovi, ploca=(2800, 2070), trim=10, kerf=16.0, god=True, nacini=None, brzo=False):
+def najbolje(dijelovi, ploca=(2800, 2070), trim=10, kerf=16.0, god=True, nacini=None, brzo=False, ogr=None):
     """D-19: probaj dopuštene načine (× varijante slaganja), vrati (najbolja_ploce, ocjena, opis, sve_kandidate).
     Kandidati: slozi() s tri redoslijeda + slozi_trake() (širina trake = kombinacija širina komada); bez goda još i obrnuta orijentacija.
     brzo=True (D-75 „brzo“): samo osnovni kandidati (slozi, trake, kolone bez startova, best-fit bez startova), bez smjera po ploči
-    i bez dotjerivanja zadnje ploče — ~1 s i na najvećem nalogu; „najbolje“ je puna pretraga."""
+    i bez dotjerivanja zadnje ploče — ~1 s i na najvećem nalogu; „najbolje“ je puna pretraga.
+    ogr (D-91): ograničenja pile (vidi dopusteno). Tada se dodaju i kandidati složeni UZ ograničenja ('slozi-p', 'trake-p'), svaki
+    kandidat dobiva 9. član = dopušteno (bool), a vraća se najbolji DOPUŠTENI kandidat; ako nijedan nije dopušten, najbolji ukupno
+    (opis završava s '/izvan-ogranicenja'). Bez ogr 9. član je uvijek True."""
     nacini = nacini or (NACINI_S_GODOM if god else NACINI_BEZ_GODA)
     kand = []
     for nacin in nacini:
         for duz in ((True,) if god else (True, False)):
             varijante = [('slozi/' + so, lambda so=so: slozi(dijelovi, ploca, trim, kerf, god, nacin, so, duz)) for so in ('w', 'l', 'area')]
             varijante.append(('trake', lambda: slozi_trake(dijelovi, ploca, trim, kerf, god, nacin, duz)))
+            if ogr:
+                varijante += [('slozi-p/' + so, lambda so=so: slozi(dijelovi, ploca, trim, kerf, god, nacin, so, duz, ogr)) for so in ('w', 'l', 'area')]
+                varijante.append(('trake-p', lambda: slozi_trake(dijelovi, ploca, trim, kerf, god, nacin, duz, 3, ogr)))
             if duz:                                      # kolone i best-fit sami biraju orijentaciju po komadu (korak 5) — jednom po načinu
                 komada = sum(k for _, _, _, k in dijelovi)
                 if brzo:
@@ -369,19 +429,21 @@ def najbolje(dijelovi, ploca=(2800, 2070), trim=10, kerf=16.0, god=True, nacini=
                 except ValueError:
                     continue
                 oc = ocijeni(sh, ploca, trim)
-                kand.append((oc['m2_naplata'], oc['ploca'], oc['rezova'], nacin, ime, duz, sh, oc))
+                kand.append((oc['m2_naplata'], oc['ploca'], oc['rezova'], nacin, ime, duz, sh, oc, (not ogr) or dopusteno(sh, dijelovi, ogr)[0]))
     if kand and not brzo:                                # zadnju ploču najboljih kandidata presloži za veći ostatak (korak 5)
         kand.sort(key=lambda k: (k[0], k[1], k[2]))
-        for k in kand[:3]:
+        prvi = kand[:3] + ([k for k in kand if k[8]][:3] if ogr else [])
+        for k in prvi:
             sh = dotjeraj_zadnju(k[6], dijelovi, ploca, trim, kerf, god, nacini)
             oc = ocijeni(sh, ploca, trim)
             if oc['m2_naplata'] < k[0] - 1e-9:
-                kand.append((oc['m2_naplata'], oc['ploca'], oc['rezova'], k[3], k[4] + '/zadnja', k[5], sh, oc))
+                kand.append((oc['m2_naplata'], oc['ploca'], oc['rezova'], k[3], k[4] + '/zadnja', k[5], sh, oc, (not ogr) or dopusteno(sh, dijelovi, ogr)[0]))
     if not kand:
         raise ValueError('nijedan način ne može složiti nalog')
     kand.sort(key=lambda k: (k[0], k[1], k[2]))
-    b = kand[0]
-    return b[6], b[7], '%s/%s%s' % (b[3], b[4], '' if b[5] else '/poprijeko'), kand
+    dop = [k for k in kand if k[8]]
+    b = dop[0] if dop else kand[0]
+    return b[6], b[7], '%s/%s%s%s' % (b[3], b[4], '' if b[5] else '/poprijeko', '' if dop else '/izvan-ogranicenja'), kand
 
 def optimiraj(dijelovi, ploca=(2800, 2070), trim=10, kerf=5.0, god=True):
     """Kompatibilnost: jednostavno uzdužno slaganje (kao prva verzija)."""
@@ -435,11 +497,17 @@ def _san(s):
     return nalog_io.bez_dijakritika(s).replace(',', '-').replace('/', '-')
 
 # ------------------------------------------------------------------ "pametne trake" (širina trake = kombinacija širina komada, kao PW)
-def _stack_fill(rem, sw, LIM_L, kerf, samo_trake=False):
+def _stack_fill(rem, sw, LIM_L, kerf, samo_trake=False, ogr=None):
     """Greedy punjenje jedne trake širine sw: blokovi duž trake; u bloku stog pod-traka (širine ≤ sw). rem = dict (w,l)->kom.
-    Vraća (blocks, used_area, used_l). Ne mijenja rem — vraća i popis potrošenih komada."""
+    Vraća (blocks, used_area, used_l). Ne mijenja rem — vraća i popis potrošenih komada. ogr: ograničenja pile (D-91)."""
     used_l = 0; blocks = []; taken = []
     local = dict(rem)
+    mr, ms, min4 = _ogr(ogr)
+    if mr <= 2:
+        samo_trake = True
+    sirine = set()
+    def sir_ok(w):
+        return not ms or w in sirine or len(sirine) < ms
     def take(w, l):
         local[(w, l)] -= 1
         if local[(w, l)] == 0: del local[(w, l)]
@@ -449,42 +517,50 @@ def _stack_fill(rem, sw, LIM_L, kerf, samo_trake=False):
         # najdulji komad koji stane u traku (širina ≤ sw) — kod 'trake' samo w == sw
         cands = [(l, w) for (w, l) in local if w <= sw and l <= avail_l and (w == sw or not samo_trake)]
         if not cands: break
+        if ms:
+            cands = [c for c in cands if sir_ok(c[1])]
+            if not cands: break
         l0, w0 = max(cands)
-        take(w0, l0)
+        take(w0, l0); sirine.add(w0)
         block = dict(l=l0, used_w=w0, subs=[dict(w3=w0, parts=[(l0, None)])])
         # stog: dopuni širinu bloka pod-trakama komada s l ≤ l0
         if not samo_trake:
             while True:
                 aw = sw - block['used_w'] - kerf
-                c2 = [(l, w) for (w, l) in local if w <= aw and l <= l0]
+                c2 = [(l, w) for (w, l) in local if w <= aw and l <= l0 and sir_ok(w) and (l == l0 or (mr >= 4 and l >= min4))]
                 if not c2: break
                 # najveći po površini koji stane; unutar pod-trake dopuni i po duljini (razina 4)
                 l1, w1 = max(c2, key=lambda t: (t[0] * t[1], t[0]))
-                take(w1, l1)
+                take(w1, l1); sirine.add(w1)
                 sub = dict(w3=w1, parts=[(l1, None)]); ul = l1
-                while True:
+                while mr >= 4:
                     al = l0 - ul - kerf
-                    c3 = [(l, w) for (w, l) in local if w == w1 and l <= al]
+                    c3 = [(l, w) for (w, l) in local if w == w1 and l <= al and l >= min4]
                     if not c3: break
                     l2, w2 = max(c3); take(w2, l2); sub['parts'].append((l2, None)); ul += kerf + l2
                 block['subs'].append(sub); block['used_w'] += kerf + w1
         # razina 4 u prvoj pod-traci (isti w0, kraći komadi) — samo ako ne 'trake'
-        if not samo_trake:
+        if not samo_trake and mr >= 4:
             ul = l0; sub = block['subs'][0]
             while True:
                 al = l0 - ul - kerf
-                c3 = [(l, w) for (w, l) in local if w == w0 and l <= al]
+                c3 = [(l, w) for (w, l) in local if w == w0 and l <= al and l >= min4]
                 if not c3: break
                 l2, w2 = max(c3); take(w2, l2); sub['parts'].append((l2, None)); ul += kerf + l2
         blocks.append(block); used_l += (kerf if len(blocks) > 1 else 0) + l0
     area = sum(l * w for (w, l) in taken)
     return blocks, area, used_l, taken
 
-def slozi_trake(dijelovi, ploca=(2800, 2070), trim=10, kerf=16.0, god=True, nacin='uzduzno', dulja_uz_traku=True, max_komb=3):
-    """Širina trake bira se kao najbolja kombinacija širina komada (do max_komb pod-traka) po popunjenosti trake."""
+def slozi_trake(dijelovi, ploca=(2800, 2070), trim=10, kerf=16.0, god=True, nacin='uzduzno', dulja_uz_traku=True, max_komb=3, ogr=None):
+    """Širina trake bira se kao najbolja kombinacija širina komada (do max_komb pod-traka) po popunjenosti trake. ogr: ograničenja pile (D-91)."""
     dir_ = 'S' if nacin == 'poprecno' else 'L'
     LIM_W, LIM_L = _os_ploce(ploca, trim, dir_)
     samo = nacin == 'trake'
+    mr, ms, _ = _ogr(ogr)
+    if mr <= 2:
+        samo = True
+    if ms:
+        max_komb = min(max_komb, ms)
     rem = {}; idmap = {}
     for idx, W, L, kom in dijelovi:
         w, l = _orijentiraj(W, L, god, dir_, dulja_uz_traku)
@@ -513,7 +589,7 @@ def slozi_trake(dijelovi, ploca=(2800, 2070), trim=10, kerf=16.0, god=True, naci
             if not cands: break
             best = None
             for sw in cands:
-                blocks, area, used_l, taken = _stack_fill(rem, sw, LIM_L, kerf, samo)
+                blocks, area, used_l, taken = _stack_fill(rem, sw, LIM_L, kerf, samo, ogr)
                 if not taken: continue
                 score = area / (sw * LIM_L)          # popunjenost trake
                 key = (score, area)

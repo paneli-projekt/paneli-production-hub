@@ -19,25 +19,25 @@ def url(conn):
     return (postavka(conn, "regal_traka_url", ZADANI_URL) or ZADANI_URL).rstrip("/")
 
 
-def stanje(conn, timeout=2.0):
+def stanje_sve(conn, timeout=2.0):
     """Cijelo stanje Regal trake (dict lok/q) ili None. Keš 60 s."""
     u = url(conn)
-    if _kes["stanje"] is not None and _kes["url"] == u and time.time() - _kes["t"] < KES_SEK:
-        return _kes["stanje"]
+    if _kes["url"] == u and time.time() - _kes["t"] < KES_SEK and (_kes["stanje"] is not None or _kes.get("neuspjeh")):
+        return _kes["stanje"]                     # i neuspjeh se pamti 60 s — inače svaki ident čeka svoj timeout (ekran skladišta 12 s)
     try:
         with urllib.request.urlopen(u + "/api/stanje", timeout=timeout) as r:
             d = json.loads(r.read().decode("utf-8"))
         s = d.get("stanje") or {}
-        _kes.update(t=time.time(), url=u, stanje=s)
+        _kes.update(t=time.time(), url=u, stanje=s, neuspjeh=False)
         return s
     except Exception:
-        _kes.update(t=time.time(), url=u, stanje=None)
+        _kes.update(t=time.time(), url=u, stanje=None, neuspjeh=True)
         return None
 
 
 def pretinac(conn, ident):
     """Adresa pretinca trake (npr. 'R3-05-B') ili None."""
-    s = stanje(conn)
+    s = stanje_sve(conn)
     if not s or not ident:
         return None
     return (s.get("lok") or {}).get(ident) or None
@@ -45,7 +45,7 @@ def pretinac(conn, ident):
 
 def metri(conn, ident):
     """Preostali metri na roli po zadnjem upisu ili None."""
-    s = stanje(conn)
+    s = stanje_sve(conn)
     if not s or not ident:
         return None
     q = (s.get("q") or {}).get(ident)
@@ -58,4 +58,10 @@ def metri(conn, ident):
 
 
 def ocisti_kes():
-    _kes.update(t=0.0, url=None, stanje=None)
+    _kes.update(t=0.0, url=None, stanje=None, neuspjeh=False)
+
+
+def stanje(conn, ident):
+    """Isto sučelje kao ploče / restlovi: {ident, metri, pretinac, dostupno} — dostupno=False kad Regal traka ne odgovara."""
+    s = stanje_sve(conn)
+    return dict(ident=ident, metri=metri(conn, ident), pretinac=pretinac(conn, ident), dostupno=s is not None)

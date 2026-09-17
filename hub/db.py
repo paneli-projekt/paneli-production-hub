@@ -11,7 +11,7 @@ import os
 import sqlite3
 from datetime import datetime
 
-SHEMA_VERZIJA = 10
+SHEMA_VERZIJA = 16
 
 # Migracije starijih baza (verzija → popis SQL naredbi); 'duplicate column' se preskače (svježa baza već ima stupce iz schema.sql).
 MIGRACIJE = {
@@ -51,6 +51,25 @@ MIGRACIJE = {
     10: ["ALTER TABLE optimizacija ADD COLUMN %s" % c for c in           # potvrda i snimka slaganja, D-75
          ("status TEXT", "nacin_trazen TEXT", "dubina TEXT", "slaganje_json TEXT", "elementi_hash TEXT", "kerf REAL", "obrez REAL",
           "potvrdio_id INTEGER REFERENCES korisnik (id)", "potvrdjeno TEXT", "napomena TEXT")],
+    11: ["ALTER TABLE element ADD COLUMN %s" % c for c in            # mjera za rezanje + majka (korak 6: D-70, D-79, D-80); tablica majka iz schema.sql
+         ("rez_L REAL", "rez_W REAL", "rez_razlog TEXT", "vrsta TEXT NOT NULL DEFAULT 'element'", "majka_id INTEGER REFERENCES majka (id)",
+          "majka_poz TEXT", "niz TEXT", "napomena_rez TEXT")],
+    12: [                               # Warehouse (D-64): restl po RESTLOVI_V7.xlsm (oznaka, dekor, razina, kandidati…), rezervacija bez ploca_stanje_id
+        "REBUILD rezervacija", "REBUILD restl", "DROP TABLE IF EXISTS ploca_stanje",
+    ],
+    13: [                               # nabava (D-42/5): tablica dobavljac iz schema.sql; narudžbenica pamti adresu i PDF
+        "ALTER TABLE narudzbenica ADD COLUMN poslano_na TEXT", "ALTER TABLE narudzbenica ADD COLUMN put_pdf TEXT",
+    ],
+    14: [                               # ručne stavke ponude (D-87) i korisnici s lozinkom (D-88): tablice rucna_stavka, sesija iz schema.sql
+        "ALTER TABLE korisnik ADD COLUMN lozinka_hash TEXT", "ALTER TABLE korisnik ADD COLUMN email TEXT", "ALTER TABLE korisnik ADD COLUMN telefon TEXT",
+        "ALTER TABLE korisnik ADD COLUMN funkcija TEXT", "ALTER TABLE korisnik ADD COLUMN potpis TEXT",
+    ],
+    15: [                               # ponuda kao Pantheon (D-90): napomena na dokumentu, korekcije izračunatih stavki (tablica iz schema.sql)
+        "ALTER TABLE nalog ADD COLUMN napomena_ponude TEXT",
+    ],
+    16: [                               # D-90: zbroji iste idente u ponudi; mape izvoza kao postavke (seed iz schema.sql)
+        "ALTER TABLE nalog ADD COLUMN zbroji_idente INTEGER NOT NULL DEFAULT 0",
+    ],
 }
 OVDJE = os.path.dirname(os.path.abspath(__file__))
 

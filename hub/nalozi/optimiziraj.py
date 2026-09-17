@@ -1,8 +1,10 @@
 """optimiziraj.py — optimizacija materijala naloga S POTVRDOM (D-75, korak 5b).
 
 Ponuda i izvoz na pilu uvijek koriste ISTO slaganje, jer se iz tog dokumenta naručuje materijal (Igor, 16. 9. 2026.).
-Hub po D-19 PREDLOŽI slaganje s najmanje materijala; korisnik ga provjeri (sheme) i POTVRDI; tek potvrđeno slaganje ide u
-ponudu (obracun), CPO (export_pila) i nabavu. Alternative: način (auto | uzduzno | poprecno | trake) × dubina (brzo | najbolje).
+Hub PREDLOŽI slaganje; korisnik ga provjeri (sheme) i POTVRDI; tek potvrđeno slaganje ide u ponudu (obracun), CPO (export_pila) i nabavu.
+D-91 (Igor, 17. 9. 2026., opcija B): zadani prijedlog „auto“ = najmanje materijala koje PILA REALNO MOŽE IZREZATI uz ograničenja iz
+postavki (pila_max_razina, pila_max_sirina_u_traci, pila_min_komad_4, pila_mijesana_orijentacija); način „hub“ = Hubov minimum bez
+ograničenja (rezerva, prikazuje se razlika m²). Alternative: način (auto | hub | uzduzno | poprecno | trake) × dubina (brzo | najbolje).
 
     py -m hub.nalozi.optimiziraj --db hub.db --nalog 12                       (prijedlog auto/najbolje za sve materijale, bez potvrde)
     py -m hub.nalozi.optimiziraj --db hub.db --nalog 12 --materijal 40 --nacin poprecno --dubina brzo
@@ -23,9 +25,12 @@ from ..db import sada, dnevnik, postavka
 from ..optimizacija import pila_optimizator as OPT
 from . import nalozi as N
 
-NACINI = ("auto", "uzduzno", "poprecno", "trake")
+NACINI = ("auto", "hub", "uzduzno", "poprecno", "trake")
 DUBINE = ("brzo", "najbolje")
 TRIM = 10
+OGRANICENJA_ZADANO = dict(pila_max_razina=3, pila_max_sirina_u_traci=2, pila_min_komad_4=0, pila_mijesana_orijentacija=0)   # D-91, početno (Igor)
+_KAND_CACHE = {}                # (hash, kerf, nacini, brzo, ogr) → kandidati iz OPT.najbolje — auto i hub prijedlog iz istog računa
+_KAND_CACHE_MAX = 12
 AUTO_POTVRDA = False            # True samo za probe / testove: ponuda i izvoz sami potvrde auto/najbolje prijedlog (CLI --potvrdi-opt)
 
 
@@ -35,6 +40,31 @@ class OptimizacijaGreska(Exception):
 
 def kerf_pile(conn):
     return float(postavka(conn, "kerf_pile", "5") or 5)
+
+
+def ogranicenja_pile(conn):
+    """D-91: dict(max_razina, max_sirina, min_komad_4, mijesana) iz postavki (pila_*). max_razina 2|3|4; max_sirina 0 = bez ograničenja."""
+    def broj(k):
+        v = postavka(conn, k, str(OGRANICENJA_ZADANO[k]))
+        try:
+            return float(str(v).replace(",", "."))
+        except (TypeError, ValueError):
+            return float(OGRANICENJA_ZADANO[k])
+    mr = int(broj("pila_max_razina") or 4)
+    return dict(max_razina=min(4, max(2, mr)), max_sirina=int(broj("pila_max_sirina_u_traci") or 0), min_komad_4=broj("pila_min_komad_4") or 0,
+                mijesana=1 if broj("pila_mijesana_orijentacija") else 0)
+
+
+def _kandidati(dijelovi, ploca, trim, kerf, god, nacini, brzo, ogr, h):
+    """OPT.najbolje s malim cacheom (isti elementi + iste postavke → isti kandidati, pa auto i hub ne računaju dvaput)."""
+    kljuc = (h, kerf, nacini, brzo, tuple(sorted((ogr or {}).items())))
+    r = _KAND_CACHE.get(kljuc)
+    if r is None:
+        r = OPT.najbolje(dijelovi, ploca, trim, kerf, god, nacini, brzo=brzo, ogr=ogr)
+        if len(_KAND_CACHE) >= _KAND_CACHE_MAX:
+            _KAND_CACHE.pop(next(iter(_KAND_CACHE)))
+        _KAND_CACHE[kljuc] = r
+    return r
 
 
 def _ploca(m):
@@ -57,24 +87,40 @@ def ulaz_materijala(conn, nm_id):
 
 
 def izracunaj(conn, nm_id, nacin="auto", dubina="najbolje"):
-    """Složi materijal bez upisa. Vraća dict(sheets, oc, nacin, ploca, trim, kerf, god, hash, komada, elemenata, st)."""
+    """Složi materijal bez upisa. Vraća dict(sheets, oc, nacin, ploca, trim, kerf, god, hash, komada, elemenata, st, napomena, dopusteno).
+    D-91: auto / uzduzno / poprecno / trake = najbolje slaganje koje pila realno može izrezati (ograničenja iz postavki); ako takvog nema,
+    uzima se najbolje bez ograničenja uz napomenu. hub = Hubov minimum bez ograničenja (rezerva)."""
     if nacin not in NACINI:
-        raise OptimizacijaGreska("nepoznat način '%s' (auto | uzduzno | poprecno | trake)" % nacin)
+        raise OptimizacijaGreska("nepoznat način '%s' (auto | hub | uzduzno | poprecno | trake)" % nacin)
     if dubina not in DUBINE:
         raise OptimizacijaGreska("nepoznata dubina '%s' (brzo | najbolje)" % dubina)
     m, els, dijelovi, ploca, trim, god, h = ulaz_materijala(conn, nm_id)
     if not els:
         raise OptimizacijaGreska("materijal %s nema elemenata" % (m["naziv_kratki"] or m["naziv_ulaz"] or nm_id))
     kerf = kerf_pile(conn)
-    nacini = None if nacin == "auto" else (nacin,)
+    ogr = ogranicenja_pile(conn)
+    nacini = None if nacin in ("auto", "hub") else (nacin,)
     try:
-        sheets, oc, pobjednik, _ = OPT.najbolje(dijelovi, ploca, trim, kerf, god, nacini, brzo=(dubina == "brzo"))
+        sheets, oc, pobjednik, kand = _kandidati(dijelovi, ploca, trim, kerf, god, nacini, dubina == "brzo", ogr, h)
     except ValueError as e:
         raise OptimizacijaGreska("%s: ne može se složiti (%s)" % (m["naziv_kratki"] or m["naziv_ulaz"], e))
+    napomena = None
+    dop = True
+    if nacin == "hub":                                                  # rezerva: najbolji kandidat bez obzira na ograničenja
+        b = min(kand, key=lambda k: (k[0], k[1], k[2]))
+        sheets, oc = b[6], b[7]
+        pobjednik = "%s/%s%s" % (b[3], b[4], "" if b[5] else "/poprijeko")
+        dop, razlozi = OPT.dopusteno(sheets, dijelovi, ogr)
+        if not dop:
+            napomena = "Hub rezerva — pila ovako ne reže: " + "; ".join(razlozi)
+    elif pobjednik.endswith("/izvan-ogranicenja"):
+        pobjednik = pobjednik[:-len("/izvan-ogranicenja")]
+        dop, razlozi = OPT.dopusteno(sheets, dijelovi, ogr)
+        napomena = "nijedno slaganje ne zadovoljava ograničenja pile (%s) — uzeto najbolje bez ograničenja" % "; ".join(razlozi)
     st = OPT.statistika(sheets, dijelovi, ploca)
     return dict(nalog_materijal_id=nm_id, sheets=sheets, oc=oc, nacin=pobjednik, nacin_trazen=nacin, dubina=dubina, ploca=ploca, trim=trim,
                 kerf=kerf, god=god, hash=h, elemenata=len(els), komada=sum(int(e["kom"]) for e in els), st=st,
-                element_ids=[e["element_id"] for e in els])
+                element_ids=[e["element_id"] for e in els], napomena=napomena, dopusteno=dop, ogranicenja=ogr)
 
 
 def _snimka(r):
@@ -89,9 +135,9 @@ def predlozi(conn, nm_id, nacin="auto", dubina="najbolje", tko="web", commit=Tru
     conn.execute("UPDATE optimizacija SET status = 'zamijenjeno' WHERE nalog_materijal_id = ? AND status = 'prijedlog' AND nacin_trazen = ? AND dubina = ?",
                  (nm_id, nacin, dubina))
     cur = conn.execute("INSERT INTO optimizacija (nalog_materijal_id, engine, nacin, datum, broj_ploca, iskoristenje, m2_dijelova, m2_ploca, m2_za_naplatu, "
-                       "rezova, status, nacin_trazen, dubina, slaganje_json, elementi_hash, kerf, obrez) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                       "rezova, status, nacin_trazen, dubina, slaganje_json, elementi_hash, kerf, obrez, napomena) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                        (nm_id, "hub", r["nacin"], sada(), r["st"]["ploca"], r["st"]["iskoristenje"], r["st"]["m2_dijelova"], r["st"]["m2_bruto"],
-                        r["oc"]["m2_naplata"], r["oc"]["rezova"], "prijedlog", nacin, dubina, _snimka(r), r["hash"], r["kerf"], r["trim"]))
+                        r["oc"]["m2_naplata"], r["oc"]["rezova"], "prijedlog", nacin, dubina, _snimka(r), r["hash"], r["kerf"], r["trim"], r.get("napomena")))
     oid = cur.lastrowid
     dnevnik(conn, tko, "optimizacija", oid, "prijedlog", "nm %d %s/%s: %s, %d ploča, %.2f m²" % (nm_id, nacin, dubina, r["nacin"], r["st"]["ploca"], r["oc"]["m2_naplata"]))
     if commit:
@@ -195,15 +241,41 @@ def prijedlog_auto(conn, nm_id):
     return s["sheets"], tuple(s["ploca"]), s["trim"], s["kerf"], s["god"], dict(r)
 
 
-def pripremi_prijedloge(conn, nalog_id, tko="web"):
-    """Za svaki materijal naloga bez potvrđenog slaganja i bez živog auto prijedloga napravi auto/najbolje prijedlog (ekran obračuna, D-75)."""
+def prijedlog_zivi(conn, nm_id, nacin, dubina="najbolje"):
+    """Živi prijedlog (isti elementi) traženog načina i dubine — red (dict) ili None."""
+    r = conn.execute("SELECT * FROM optimizacija WHERE nalog_materijal_id = ? AND status = 'prijedlog' AND nacin_trazen = ? AND dubina = ? "
+                     "ORDER BY id DESC LIMIT 1", (nm_id, nacin, dubina)).fetchone()
+    if not r:
+        return None
+    _, _, _, _, _, _, h = ulaz_materijala(conn, nm_id)
+    return dict(r) if h == r["elementi_hash"] else None
+
+
+def pripremi_prijedloge(conn, nalog_id, tko="web", nm_id=None, svjeze=False):
+    """Za svaki materijal naloga (ili samo nm_id) bez potvrđenog slaganja i bez živog auto prijedloga napravi auto/najbolje prijedlog (ekran slaganja, D-75).
+    D-91: uz njega i „hub“ rezervu (bez ograničenja pile) kad ona štedi materijal — da se razlika m² vidi odmah.
+    svjeze=True: računa iznova i kad živi prijedlozi postoje (gumb Optimiziraj — npr. nakon promjene ograničenja pile u postavkama)."""
     novi = []
     for nm in conn.execute("SELECT nm.id FROM nalog_materijal nm WHERE nm.nalog_id = ? AND EXISTS (SELECT 1 FROM element e WHERE e.nalog_materijal_id = nm.id) "
                            "ORDER BY nm.rb, nm.id", (nalog_id,)).fetchall():
-        if not treba_optimizaciju(conn, nm["id"]) or potvrdjena(conn, nm["id"]) or prijedlog_auto(conn, nm["id"]):
+        if nm_id and nm["id"] != nm_id:
             continue
+        if not treba_optimizaciju(conn, nm["id"]) or potvrdjena(conn, nm["id"]):
+            continue
+        auto = None if svjeze else prijedlog_auto(conn, nm["id"])
+        if svjeze:                                                      # stara rezerva ne smije ostati uz novo zadano slaganje
+            conn.execute("UPDATE optimizacija SET status = 'zamijenjeno' WHERE nalog_materijal_id = ? AND status = 'prijedlog' AND nacin_trazen = 'hub'", (nm["id"],))
         try:
-            novi.append(predlozi(conn, nm["id"], "auto", "najbolje", tko, commit=False))
+            if not auto:
+                a = predlozi(conn, nm["id"], "auto", "najbolje", tko, commit=False)
+                novi.append(a)
+                m2_auto = a["m2_za_naplatu"]
+            else:
+                m2_auto = auto[5]["m2_za_naplatu"]
+            if svjeze or not prijedlog_zivi(conn, nm["id"], "hub"):
+                r = izracunaj(conn, nm["id"], "hub", "najbolje")
+                if m2_auto is not None and r["oc"]["m2_naplata"] < m2_auto - 0.005:
+                    novi.append(predlozi(conn, nm["id"], "hub", "najbolje", tko, commit=False))
         except OptimizacijaGreska:
             continue
     return novi

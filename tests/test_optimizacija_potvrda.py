@@ -88,7 +88,7 @@ def test_brzo_i_nacini(rucno):
         for dubina in OP.DUBINE:
             r = OP.izracunaj(rucno, nm, nacin, dubina)
             assert r["st"]["ploca"] >= 1 and r["oc"]["m2_naplata"] > 0
-            if nacin != "auto":
+            if nacin not in ("auto", "hub"):
                 assert r["nacin"].startswith(nacin)
     with pytest.raises(OP.OptimizacijaGreska):
         OP.izracunaj(rucno, nm, "dijagonalno", "brzo")
@@ -99,7 +99,7 @@ def test_postavke_d77(rucno):
     r0 = OC.izracunaj(rucno, nid)
     traka0 = [s for s in r0["stavke"] if s["grupa"] == "traka"][0]
     rez0 = [s for s in r0["stavke"] if s["grupa"] == "rezanje"][0]
-    assert rez0["pantheon_ident"] == "US000002" and "nadmjera 10 %" in traka0["pravilo"]
+    assert rez0["pantheon_ident"] == "US000002" and traka0["pravilo"] == "" and traka0["kolicina"] == 3          # (800×2+400) × 1,10 = 2,2 → 3 m; bez napomene o nadmjeri (D-90)
     rucno.execute("UPDATE postavke SET vrijednost = '20' WHERE kljuc = 'nadmjera_trake'")
     rucno.execute("UPDATE postavke SET vrijednost = 'rezova' WHERE kljuc = 'obracun_rezanja'")
     rucno.execute("INSERT OR IGNORE INTO pantheon_ident (ident, naziv, klasif, jm, cijena_prodajna, cijena_neto, pdv, aktivan, azurirano) VALUES ('US000303','USLUGA REZ','US','KOM',1.25,1.0,25,1,'t')")
@@ -107,7 +107,7 @@ def test_postavke_d77(rucno):
     r1 = OC.izracunaj(rucno, nid)
     traka1 = [s for s in r1["stavke"] if s["grupa"] == "traka"][0]
     rez1 = [s for s in r1["stavke"] if s["grupa"] == "rezanje"][0]
-    assert "nadmjera 20 %" in traka1["pravilo"] and rez1["pantheon_ident"] == "US000303" and rez1["jm"] == "KOM" and rez1["kolicina"] >= 1
+    assert traka1["kolicina"] == 3 and traka1["pravilo"] == "" and rez1["pantheon_ident"] == "US000303" and rez1["jm"] == "KOM" and rez1["kolicina"] >= 1
     rucno.execute("UPDATE postavke SET vrijednost = 'm_reza' WHERE kljuc = 'obracun_rezanja'"); rucno.commit()
     r2 = OC.izracunaj(rucno, nid)
     assert [s for s in r2["stavke"] if s["grupa"] == "rezanje"][0]["pantheon_ident"] == "US000002" and any("dužnom metru" in u for u in r2["upozorenja"])

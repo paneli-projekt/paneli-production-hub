@@ -23,9 +23,10 @@ import sys
 from .. import db
 from ..db import sada, dnevnik, postavka, postavi
 from ..formati import nalog_io
-from . import nalozi as N
+from . import nalozi as N, grupe as G
 
 PODMAPA_KANT = "HORIZONTALNO_BUSENJE"   # Corpusov drugi CIX (bušenje u kant) ide u podmapu, kako operater već ima (D-55/3)
+PODMAPA_CLANOVA = {"niz": "NIZ", "mali": "MAJKA"}   # korak 6: CIX-ovi fronti / komada koji se režu IZ majke — nisu u CSV-u, program ide na Rover na izrezanom komadu
 PREFIKS = "H"          # Hubova imena: H0000001 — razlikuju se od PPNEST-ovih (ddmmyy_HHmmss) i Corpusovih (14 hex znamenki)
 STATUSI_ZA_STROJ = ("potvrdjeno", "skladiste", "pila_nesting")   # D-35: na stroj tek nakon potvrde kupca (Igor, 15. 9. 2026.)
 
@@ -137,8 +138,10 @@ def _corpus_cix(e):
     return out
 
 
-def _prenesi_corpus_cix(grupa, korijen, suho):
+def _prenesi_corpus_cix(grupa, korijen, suho, upozorenja=None):
     """Corpusove CIX-ove Hub ne generira nego kopira nepromijenjene (D-29); uz CIX za kant ide i .wmf slika ako postoji.
+    Korak 6 (D-80): element čija je mjera za rezanje veća od konačne dobiva KOPIJU s povećanim LPX / LPY (obrade ostaju na mjestu);
+    ima li i bušenje u kant (drugi CIX), rub koji se produžuje može ga pomaknuti → upozorenje „provjeri“.
     Vraća (popis odredišnih putanja, popis elemenata koje Hub sam mora napisati)."""
     kopije, hub_pise, plan = [], [], []
     for e in grupa:                                     # prvo sve provjeri, pa tek onda kopiraj — da ne ostane pola paketa
@@ -146,20 +149,45 @@ def _prenesi_corpus_cix(grupa, korijen, suho):
         if not izvorni:
             hub_pise.append(e)
             continue
+        prosiri = bool(e.get("rez_razlog")) and (abs(e["L"] - e.get("L_kon", e["L"])) > 0.01 or abs(e["W"] - e.get("W_kon", e["W"])) > 0.01)
+        if prosiri and len(izvorni) > 1 and upozorenja is not None:
+            upozorenja.append("%s: mjera za rezanje %gx%g (konačna %gx%g) i bušenje u kant — PROVJERITI program %s na produženom rubu"
+                              % (e.get("naziv") or e["cix"], e["L"], e["W"], e["L_kon"], e["W_kon"], izvorni[1][0]))
         for ime, put, podmapa in izvorni:
             if not os.path.isfile(put):
                 raise ExportGreska("izvorna CIX datoteka iz Corpusa ne postoji: %s (element %s)" % (put, e.get("naziv") or e["cix"]))
             cilj = os.path.join(os.path.join(korijen, podmapa) if podmapa else korijen, ime + ".cix")
             kopije.append(cilj)
-            plan.append((put, cilj))
+            plan.append((put, cilj, e if (prosiri and not podmapa) else None))
     if not suho:
-        for put, cilj in plan:
+        for put, cilj, e in plan:
             os.makedirs(os.path.dirname(cilj), exist_ok=True)
-            shutil.copyfile(put, cilj)
+            if e is not None:
+                ok, upoz = G.kopiraj_cix_prosiren(put, cilj, e["L_kon"], e["W_kon"], e["L"], e["W"])
+                if upoz and upozorenja is not None:
+                    upozorenja.append(upoz)
+            else:
+                shutil.copyfile(put, cilj)
             wmf = os.path.splitext(put)[0] + ".wmf"
             if os.path.isfile(wmf):
                 shutil.copyfile(wmf, os.path.splitext(cilj)[0] + ".wmf")
     return kopije, hub_pise
+
+
+def _prenesi_cix_clanova(conn, nm_id, korijen, suho):
+    """CIX-ovi članova majki (fronte niza, komadi iz majke) — nisu u CSV-u za nesting (režu se iz majke), program ide na Rover na
+    izrezanom komadu; kopiraju se u podmapu NIZ / MAJKA da operater ima sve na jednom mjestu. Vraća popis odredišnih putanja."""
+    out = []
+    for e in G.clanovi_s_cix(conn, nm_id):
+        for ime, put, podmapa in _corpus_cix(dict(cix_izvor=e["cix_izvor"], obrada_json=e["obrada_json"])):
+            if not os.path.isfile(put):
+                raise ExportGreska("izvorna CIX datoteka iz Corpusa ne postoji: %s (član %s)" % (put, e.get("naziv") or ime))
+            cilj = os.path.join(korijen, PODMAPA_CLANOVA[e["majka_vrsta"]], podmapa, ime + ".cix") if podmapa else os.path.join(korijen, PODMAPA_CLANOVA[e["majka_vrsta"]], ime + ".cix")
+            out.append(cilj)
+            if not suho:
+                os.makedirs(os.path.dirname(cilj), exist_ok=True)
+                shutil.copyfile(put, cilj)
+    return out
 
 
 def _po_materijalu(els):
@@ -211,17 +239,20 @@ def izvezi(conn, nalog_id, mapa, tko="web", stil="bsolid", samo_nesting=True, su
             e["mat"] = _bez_dij(e["mat"])
         baza_ime = "%s_%s_%s" % (_bez_dij(n["naziv"]), _bez_dij(grupa[0]["mat"]), zig)
         csv_put = os.path.join(korijen, baza_ime + ".CSV")
-        kopije, hub_pise = _prenesi_corpus_cix(grupa, korijen, suho)      # Corpusovi CIX-ovi se kopiraju (oba), ostale piše Hub
+        kopije, hub_pise = _prenesi_corpus_cix(grupa, korijen, suho, upozorenja)      # Corpusovi CIX-ovi se kopiraju (oba), ostale piše Hub
+        cix_clanova = _prenesi_cix_clanova(conn, nm_id, korijen, suho)             # korak 6: fronte / komadi iz majke → podmapa NIZ / MAJKA
         p = dict(nalog_materijal_id=nm_id, materijal=grupa[0]["mat"], ident=m["ident"], winstore_kod=m["winstore_kod"] or "",
                  debljina=deb, elemenata=len(grupa), komada=sum(x["kom"] for x in grupa),
                  m2=round(sum(x["L"] * x["W"] * x["kom"] for x in grupa) / 1e6, 3),
                  csv=csv_put, cix=[os.path.join(korijen, (x["cix"] or "") + ".cix") for x in hub_pise] + kopije,
-                 cix_corpus=len(kopije), bez_winstore_koda=not (m["winstore_kod"] or ""))
+                 cix_corpus=len(kopije), bez_winstore_koda=not (m["winstore_kod"] or ""), cix_clanova=cix_clanova,
+                 majke=[x for x in grupa if x.get("vrsta") == "majka"], suzeno=[x for x in grupa if x.get("rez_razlog") == "suziti"])
         if not suho:
             os.makedirs(korijen, exist_ok=True)
             nalog_io.write_ppnest_csv(grupa, csv_put)
             nalog_io.write_cix(hub_pise, korijen, stil=stil)
-            for vrsta, put in [("csv", csv_put)] + [("cix", x) for x in p["cix"]]:
+            p["skice"] = G.skice_materijala(conn, nm_id, korijen, baza_ime)         # skica majke za operatera (rezovi, oznake)
+            for vrsta, put in [("csv", csv_put)] + [("cix", x) for x in p["cix"] + cix_clanova] + [("png", x["png"]) for x in p["skice"]]:
                 conn.execute("INSERT INTO dokument (nalog_id, vrsta, putanja, datum) VALUES (?, ?, ?, ?)", (nalog_id, vrsta, put, sada()))
         paketi.append(p)
     if not paketi:
@@ -261,6 +292,12 @@ def main(argv=None):
                  " (%d iz Corpusa)" % p["cix_corpus"] if p.get("cix_corpus") else "",
                  "   PAZI: nema Winstore koda" if p["bez_winstore_koda"] else ""))
         print("      %s" % os.path.basename(p["csv"]))
+        for x in p.get("majke", []):
+            print("      MAJKA %-30s %gx%g x%d  [%s]" % (x["naziv"][:30], x["L"], x["W"], x["kom"], x["napomena"]))
+        for x in p.get("suzeno", []):
+            print("      SUZITI %-28s reze se %gx%g, konacna %gx%g  [%s]" % ((x["naziv"] or "")[:28], x["L"], x["W"], x["L_kon"], x["W_kon"], x["napomena"]))
+        if p.get("cix_clanova"):
+            print("      CIX clanova majki (Rover na izrezanom komadu): %d" % len(p["cix_clanova"]))
     for x in r["preskoceno"]:
         print("   preskoceno: %-28s %s (%d el.)" % ((x["materijal"] or "?")[:28], x["razlog"], x["elemenata"]))
     for x in r["upozorenja"]:

@@ -12,7 +12,11 @@ Odluke: [`docs/DECISIONS.md`](docs/DECISIONS.md) · parking ideja: [`docs/IDEJE_
 
 | Modul | Datoteka | Što |
 |---|---|---|
-| baza | `hub/schema.sql`, `hub/db.py` | SQLite shema v8 (04 §2 + 10 §4): šifrarnici, kupci, nalog, elementi, obračun, skladište, nabava, dnevnik; migracije starijih baza automatski |
+| baza | `hub/schema.sql`, `hub/db.py` | SQLite shema v16 (04 §2 + 10 §4): šifrarnici, kupci, nalog, elementi (konačna mjera + mjera za rezanje), majke, optimizacije s potvrdom, obračun, skladište (restlovi), nabava, dnevnik; migracije starijih baza automatski |
+| nalozi | `hub/nalozi/grupe.py` | **korak 6 (D-70 / D-79 / D-80, dokument 26):** mjera za rezanje (kanterica 150 / 60 → `SUZITI NA`), majka malih komada (≥ 4 ista), sklop lijepljenja (`_LA1`, Corpus `LJEPLJENJE`; kant na sklopu, klasa po Σ debljina, US000007), niz goda (`FR1_A1`, `E1H`, `C1-2`; majka Σ + kerf, skica, etiketa `A2/3`), niz iz kupčeve majke (`skica N`), CIX s povećanom mjerom; `py -m hub.nalozi.grupe --db hub.db --nalog N [--skice mapa]` |
+| skladište | `hub/skladiste/ploce.py`, `restlovi.py`, `trake.py`, `pogled.py` | **Warehouse (D-64) = pogled nad izvorima** (dokumenti 27, 28): pune ploče = Winstore, restlovi = Hub (uvoz `RESTLOVI_V7.xlsm`, oznaka R0001, dekor → ident kroz šifrarnik, prijedlog iz potvrđene sheme → potvrda skladištara), trake = Regal traka; iznad izvora rezervacija po nalogu, raspoloživo = fizičko − rezervirano + naručeno, provjera naloga u statusu Skladište (upozorenja + za nabavu), potrebe preko svih potvrđenih naloga (D-42/5) |
+| nabava | `hub/nabava/narudzbenica.py`, `hub/ispis/narudzbenica.py` | **narudžbenica (D-42/5, dokument 30):** iz potreba jedan nacrt po dobavljaču (dobavljač identa iz Pantheona), dorada, PDF + mail (D-41), naručeno ulazi u raspoloživo, zatvaranje iz eSlog primke (naš ident, m² → ploče, po broju narudžbe ili FIFO) ili ručno |
+| ispis | `hub/ispis/naljepnica_restl.py` | QR naljepnice restlova (A4 2 × 5 ili rola 62 × 40), QR = `…/r/R1364`; stranica `/r/{oznaka}` za skener |
 | šifrarnici | `hub/sifrarnici/pantheon.py` | uvoz `ph_identi.csv` → `pantheon_ident`, `materijal` (IV*/RP*), `traka` (TR* + „ABS …“ pod OK/US) |
 | šifrarnici | `hub/sifrarnici/winstore.py` | uvoz Winstore XML inventara → `winstore_ploca` + povezivanje MaterialCode ↔ materijal (D-24) |
 | šifrarnici | `hub/sifrarnici/nazivi.py` | normalizacija naziva: vrsta, debljina (iz naziva i iz dimenzije `4100X640X8MM`, zadana 38 mm za radne ploče — D-52), riječi dekora, kodovi dekora (W908 ST2, K2665 AI, VSM-06), oznake traka |
@@ -27,12 +31,16 @@ Odluke: [`docs/DECISIONS.md`](docs/DECISIONS.md) · parking ideja: [`docs/IDEJE_
 | nalozi | `hub/nalozi/export_pw.py` | izvoz CPW za PanelWizard (paralelni rad D-11): svi materijali naloga, zaglavlje kao kod PPNEST-a |
 | nalozi | `hub/nalozi/export_pila.py` | izvoz na pilu: optimizacija (D-19) + CPO za Selco OSI, programi `HUB_xxxxx` (D-22), kerf po D-21 |
 | nalozi | `hub/nalozi/uvoz_datoteka.py`, `provjera.py` | uvoz CPW (kupac / PW / Corpus) i PPNEST CSV u nalog kroz šifrarnik; provjera na 9 testnih naloga (CPW ↔ CSV isti elementi) |
-| api | `hub/api/app.py`, `hub/api/nalozi_api.py` | FastAPI: šifrarnik (pretraga, prepoznavanje, aliasi) + kupci, nalozi, materijali, elementi, statusi, upload datoteke (`/docs`) |
+| ponuda (D-90) | `hub/nalozi/obracun.py` (`korigiraj_stavku`, `rucne`), `PUT /api/nalog/{id}/stavka` | korekcija bilo koje stavke ponude za tu ponudu, ručne stavke, napomena i rabat na ponudi; kantiranje = metri trake |
+| korisnici | `hub/korisnici.py`, `hub/api/korisnici_api.py` | **prijava s lozinkom (D-88, dokument 32):** PBKDF2 hash, sesija u kolačiću, prijava obavezna od prve lozinke, admin uređuje korisnike; potpis prijavljene osobe u mailu (ponuda, narudžba) + Reply-To |
+| ispis | `hub/ispis/sheme_png.py` | sličice slaganja (sve ploče / jedna ploča s brojevima i mjerama) za ekran ponude i pile + pregled slaganja na ekranu (dokument 32) |
+| web | `hub/web/` (index.html, app.css, app.js, ekrani.js) | **web ekrani na API-ju (dokument 31):** popis naloga, unos (skica daske, trake s oznakama, za potvrdu), obračun → ponuda sa slaganjem s potvrdom, skladište, pila / nesting, nabava, šifrarnik, postavke — vanilla JS bez builda, servira ih FastAPI na `/` |
+| api | `hub/api/app.py`, `hub/api/nalozi_api.py`, `hub/api/skladiste_api.py` | FastAPI: šifrarnik (pretraga, prepoznavanje, aliasi) + kupci, nalozi, materijali, elementi, statusi, upload datoteke + skladište i nabava (`/api/skladiste/…`, `/api/nalog/{id}/skladiste`) (`/docs`) |
 | formati | `hub/formati/cpo_rw.py` | Selco OSI `.cpo` — čitanje i pisanje bajt-po-bajt (50/50 PW datoteka identično), validacija stabla rezova |
 | formati | `hub/formati/nalog_io.py` | standardni nalog ↔ PPNEST TXT/CSV, CIX za bNest (postavke operatera, alat 8D/14), CPW za PanelWizard |
-| formati | `hub/formati/parseri.py` | CPW, CPO, PPNEST CSV/TXT, bNest `.mno`, `_lbl.xml` |
+| formati | `hub/formati/parseri.py`, `nalog_io.read_pnl` | CPW, CPO, PPNEST CSV/TXT, bNest `.mno`, `_lbl.xml`; PanelWizard `.pnl` (spremljeni nalog — elementi, trake, materijal; dokument 32) |
 | optimizacija | `hub/optimizacija/obracun.py` | kalkulator količina PW-metodom: korisni ostatak, m² za naplatu, metri trake (točno kao PW PDF) |
-| optimizacija | `hub/optimizacija/pila_optimizator.py` | giljotinski optimizator (uzdužno / poprečno / trake) + izbor po D-19 + CPO za pilu |
+| optimizacija | `hub/optimizacija/pila_optimizator.py` | giljotinski optimizator (uzdužno / poprečno / trake, kolone, best-fit) + izbor po D-19; **D-91:** `dopusteno()` — ograničenja pile (razine rezanja, širine u traci, najmanji komad, orijentacija), `najbolje(..., ogr=)` vraća najbolje dopušteno slaganje + sve kandidate; CPO za pilu |
 | alati | `hub/alati/benchmark_optimizator.py` | Hub vs PanelWizard na svim testnim nalozima (11. 9.: +4,0 % m², 104 vs 102 ploče) |
 | alati | `hub/alati/provjera_exporta.py` | Hubov izvoz (stvarno napisane CPW/CSV datoteke) protiv PPNEST-ovog / PW-ovog na testnim nalozima (CSV 8/8, CPW 5/8 — razlike samo slovo M/A, D-61) |
 | alati | `hub/alati/cpo_crtaj.py`, `d09_tri_naloga.py`, `benchmark_nalozi.py` | slike shema iz CPO-a, D-09 dokument, benchmark naloga |
@@ -83,16 +91,31 @@ py -m hub.nalozi.export_nesting --db hub.db --nalog 9 --mapa C:\PPNESTING --fors
 rem 8. izvoz naloga za PanelWizard (CPW) i za pilu (CPO)
 py -m hub.nalozi.export_pw   --db hub.db --nalog 9 --mapa C:\PPNESTING
 py -m hub.nalozi.export_pila --db hub.db --nalog 9 --mapa C:\PILA            (isto pravilo statusa kao nesting; --forsiraj za probu)
-py -m hub.nalozi.optimiziraj --db hub.db --nalog 9 [--materijal 40 --nacin poprecno --dubina brzo]   (D-75: prijedlog slaganja; --potvrdi ID potvrđuje;
+py -m hub.nalozi.optimiziraj --db hub.db --nalog 9 [--materijal 40 --nacin auto|hub|uzduzno|poprecno|trake --dubina brzo]   (D-75: prijedlog slaganja; --potvrdi ID potvrđuje;
                                                                                ponuda i pila koriste SAMO potvrđeno slaganje; --potvrdi-sve za probe)
 py -m hub.ispis.krojni --db hub.db --nalog 9 [--materijal 40] [--mapa C:\ISPISI]      (D-76: krojni nacrt PDF iz potvrđenog slaganja; bez potvrde = PRIJEDLOG)
 
 rem 9. provjera izvoza: Hub protiv PPNEST-ovih / PW-ovih datoteka na svim testnim nalozima
 py -m hub.alati.provjera_exporta --db hub.db --nalozi ..\05_NALOZI_ZA_TEST --md ..\20_ANALIZA\provjera_exporta.md --obrisi
 
-rem 10. API (probno): http://localhost:8765/docs
+rem 10. skladište — restlovi (D-64): uvoz evidencije skladišta, izvještaj za potvrdu, stanje, potvrda dekora (postaje alias)
+py -m hub.skladiste.restlovi --db hub.db --uvoz ..\20_ANALIZA\RESTLOVI_V7.xlsm --md ..\20_ANALIZA\27_uvoz_restlova.md
+py -m hub.skladiste.restlovi --db hub.db --stanje [--ident IV000090]
+py -m hub.skladiste.restlovi --db hub.db --potvrdi "IV JAVOR (KRONO)" IV000013 --tko IVANA
+py -m hub.skladiste.restlovi --db hub.db --prijedlozi [--nalog N]                     (restlovi predloženi iz potvrđenih shema, D-64/3)
+py -m hub.skladiste.restlovi --db hub.db --potvrdi-restl R1364 --lokacija B004 --tko SKLADISTAR
+py -m hub.nabava.narudzbenica --db hub.db --iz-potreba --tko SANELA                  (nabava, D-42/5: nacrti po dobavljaču iz potreba)
+py -m hub.nabava.narudzbenica --db hub.db --posalji N-2026-001 --na narudzbe@dobavljac.hr --tko SANELA   (--suho = samo PDF)
+py -m hub.nabava.narudzbenica --db hub.db --primka ..\..\eslog_uvoz\primka.xml --tko KNJIGA           (eSlog primka zatvara narudžbenice)
+
+rem 11. API + web ekrani: http://192.168.5.201:8766/  (API dokumentacija: /docs)
 set HUB_DB=hub.db
-py -m uvicorn hub.api.app:app --host 0.0.0.0 --port 8765
+py -m uvicorn hub.api.app:app --host 0.0.0.0 --port 8766
+
+rem 12. korisnici i prijava (D-88): popis, lozinka s tipkovnice, isključi obaveznu prijavu (zaboravljene lozinke)
+py -m hub.korisnici --db hub.db --popis
+py -m hub.korisnici --db hub.db --lozinka IGOR
+py -m hub.korisnici --db hub.db --iskljuci-prijavu
 ```
 
 Baza `hub.db` je jedna SQLite datoteka (u `.gitignore`); shema se primjenjuje automatski pri prvom otvaranju (migracija v8 briše brojač naloga

@@ -265,8 +265,9 @@ def potvrdi_materijal(conn, alias, materijal_id, tko, izvor="rucno"):
 
 
 # ---------------------------------------------------------------- trake
-def prepoznaj_traku(conn, oznaka, materijal_id=None):
-    """oznaka = tekst iz naloga ('ABS-ISTI', 'MEL-ISTI', '1/22 JELA TAVERNA', 'taverna'…); materijal_id = ploča na kojoj je rub (za ISTI i širinu)."""
+def prepoznaj_traku(conn, oznaka, materijal_id=None, debljina=None):
+    """oznaka = tekst iz naloga ('ABS-ISTI', 'MEL-ISTI', '1/22 JELA TAVERNA', 'taverna'…); materijal_id = ploča na kojoj je rub (za ISTI i širinu);
+    debljina = debljina za širinu trake kad nije debljina ploče (sklop lijepljenja 36–42 mm → /44, D-79)."""
     upit = (oznaka or "").strip()
     n = norm(upit)
     mat = None
@@ -281,7 +282,7 @@ def prepoznaj_traku(conn, oznaka, materijal_id=None):
     t = rasclani_traku(upit)
     if t["vrsta"] is None and not t["dekor"]:
         return Rezultat(upit=upit, razina="nema", objasnjenje="oznaka nije traka")
-    sir = t["sirina"] or sirina_za_materijal(mat["debljina"] if mat else None)
+    sir = t["sirina"] or sirina_za_materijal(debljina if debljina is not None else (mat["debljina"] if mat else None))
     klasa = klasa_trake(t["debljina"], sir)
     # 2. zadana traka materijala (D-31): ISTI ili samo klasa
     if (t["isti"] or not t["dekor"]) and mat:

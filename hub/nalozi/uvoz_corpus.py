@@ -26,7 +26,7 @@ from .. import db
 from ..db import sada, dnevnik
 from ..formati import nalog_io, cix_citaj
 from ..sifrarnici.nazivi import norm
-from . import nalozi as N, uvoz_datoteka as U, export_nesting as EN
+from . import nalozi as N, uvoz_datoteka as U, export_nesting as EN, grupe as G
 
 PODMAPA_KANT = "HORIZONTALNO_BUSENJE"
 
@@ -50,10 +50,14 @@ def pronadji_paket(mapa):
     cpw = _nadji(mapa, "*.cpw")
     csv = _nadji(mapa, "*.csv")
     cix = _nadji(mapa, "*.cix")
-    if not cpw:                                        # Corpus CPW-ove piše u sestrinsku mapu <PROJEKT_S_PODVLAKAMA>
-        sestra = os.path.join(os.path.dirname(mapa), os.path.basename(mapa).replace(" ", "_"))
-        if os.path.isdir(sestra) and sestra != mapa:
-            cpw = _nadji(sestra, "*.cpw")
+    if not cpw:                                        # Corpus CPW-ove piše u sestrinsku mapu <PROJEKT_S_PODVLAKAMA> (ili u …\PW\<PROJEKT> uz …\NESTING\<PROJEKT>)
+        for sestra in (os.path.join(os.path.dirname(mapa), os.path.basename(mapa).replace(" ", "_")),
+                       os.path.join(os.path.dirname(os.path.dirname(mapa)), "PW", os.path.basename(mapa)),
+                       os.path.join(os.path.dirname(os.path.dirname(mapa)), "PW", os.path.basename(mapa).replace(" ", "_"))):
+            if os.path.isdir(sestra) and sestra != mapa:
+                cpw = _nadji(sestra, "*.cpw")
+                if cpw:
+                    break
     kant = {os.path.splitext(os.path.basename(p))[0].upper(): p for p in cix if PODMAPA_KANT.lower() in p.lower().split(os.sep)}
     glavni = {os.path.splitext(os.path.basename(p))[0].upper(): p for p in cix if PODMAPA_KANT.lower() not in p.lower().split(os.sep)}
     s3d = _nadji(mapa, "*.s3d") or _nadji(os.path.dirname(mapa), "*.s3d", rekurzivno=False)
@@ -129,8 +133,15 @@ def procitaj_paket(paket):
             e["god"] = r.get("god") or 0
             e["prolaza"] = r.get("prolaza") or e.get("prolaza")
             e["napomena"] = r.get("napomena") or ""
+            if (r.get("ljepljenje") or "").strip() not in ("", "0"):
+                e["_sloj"] = dict(sloj=int(float(r["ljepljenje"])), kljuc=(norm(r.get("cjelina") or ""), r.get("konacna")), konacna=r.get("konacna"))
             if int(r["kom"]) != int(e["kom"]):
                 upozorenja.append("%s %s: količina u CSV-u (%s) nije kao u CPW-u (%s)" % (e.get("naziv") or "", ime, r["kom"], e["kom"]))
+        if "_sloj" not in e:                                   # sloj bez CSV retka (ide na pilu): Corpus u naziv piše ',(I) (37)#: 1465.00 x 600.00', sloj u 'top_12'
+            ns = G.procitaj_naziv(e.get("naziv"))["corpus_sklop"]
+            mp = re.search(r"_(\d)(\d)$", (e.get("pozicija") or "").strip())
+            if ns and mp:
+                e["_sloj"] = dict(sloj=int(mp.group(1)), kljuc=(norm(e.get("cjelina") or ""), (ns["W"], ns["L"])), konacna=(ns["W"], ns["L"]))
         oznaka = "%s %gx%g %s" % (e.get("naziv") or "?", e["L"], e["W"], ime or "")
         if ime:
             put = paket["cix"].get(ime.upper()) or paket["cix_kant"].get(ime.upper())
@@ -164,6 +175,15 @@ def procitaj_paket(paket):
                     greske.append("%s: %s" % (oznaka, ex))
         if e["_obrada"]:
             e["_obrada"]["opis"] = ", ".join(x for x in (e["_obrada"].get("cix", {}).get("opis"), e["_obrada"].get("cix2", {}).get("opis")) if x)
+    # sklop lijepljenja (D-79): isti NAZIV ELEMENTA + ista konačna mjera = jedan sklop → slovo A, B…; sloj iz LJEPLJENJE
+    slova = {}
+    for e in svi:
+        if e.get("_sloj"):
+            k = e["_sloj"]["kljuc"]
+            if k not in slova:
+                slova[k] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[len(slova) % 26]
+            e["ljepljenje"] = "%s%d" % (slova[k], e["_sloj"]["sloj"])
+            e["konacna"] = e["_sloj"]["konacna"]
     # element bez CSV retka, a s obradom u CIX-u, ne smije na pilu (D-29)
     for e in svi:
         if e["_csv"] is None and e["_obrada"].get("ima_obradu"):
@@ -203,10 +223,11 @@ def uvezi_paket(conn, mapa, tko="web", kupac_id=None, kupac_kratki=None, projekt
         uk = dict(datoteke=0, materijali_novi=0, materijali_spojeni=0, elementi=0, komada=0, za_potvrdu_materijal=0, za_potvrdu_rub=0, preskoceno=0)
         for p, els in c["elementi"]:
             ids = []
-            st = U.uvezi_elemente(conn, nid, els, tko, "corpus", datoteka=p, vrsta_dok="cpw_ulaz", ids=ids)
+            st = U.uvezi_elemente(conn, nid, els, tko, "corpus", datoteka=p, vrsta_dok="cpw_ulaz", ids=ids, grupe=False)
             uk["datoteke"] += 1
             for k in st:
-                uk[k] += st[k]
+                if isinstance(st[k], (int, float)):
+                    uk[k] = uk.get(k, 0) + st[k]
             for e, eid in zip(els, ids):
                 conn.execute("UPDATE element SET obrada_json = ?, obrada = ? WHERE id = ?",
                              (json.dumps(e["_obrada"], ensure_ascii=False) if e["_obrada"] else None, (e["_obrada"] or {}).get("opis") or None, eid))
@@ -225,6 +246,9 @@ def uvezi_paket(conn, mapa, tko="web", kupac_id=None, kupac_kratki=None, projekt
             for ime in (e["cix"], e.get("program2")):
                 if ime and not EN.registriraj(conn, ime, e["_id"], nid, "corpus"):
                     raise CorpusGreska("ime CIX datoteke '%s' već pripada drugom elementu (D-23)" % ime)
+        g = G.primijeni(conn, nid, tko, commit=False)            # korak 6: sklopovi lijepljenja, nizovi goda (sufiks _A1), mali komadi (D-80)
+        izv["grupe"] = g["majke"]
+        izv["upozorenja"] += g["upozorenja"]
         for vrsta, put in ([("csv", c["csv"])] if c["csv"] else []) + [("cix", e["_obrada"][k]["put"]) for e in c["svi"] for k in ("cix", "cix2") if k in e["_obrada"]]:
             conn.execute("INSERT INTO dokument (nalog_id, vrsta, putanja, datum) VALUES (?, ?, ?, ?)", (nid, vrsta, os.path.abspath(put), sada()))
         dnevnik(conn, tko, "nalog", nid, "uvoz_corpus", "%s: %d CPW, %d el / %d kom, nesting %d, pila %d, CIX %d, za potvrdu %d mat + %d rub"

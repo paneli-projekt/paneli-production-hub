@@ -125,7 +125,7 @@ def po_nazivu(conn, naziv):
 
 
 def uredi_nalog(conn, nalog_id, tko, **polja):
-    dopusteno = {"naziv", "kupac_id", "vrsta", "kerf", "rabat_materijal", "rabat_usluge", "rok_kupca", "rok_obecan", "prioritet", "napomena", "corpus_projekt", "izvor"}
+    dopusteno = {"naziv", "kupac_id", "vrsta", "kerf", "rabat_materijal", "rabat_usluge", "rok_kupca", "rok_obecan", "prioritet", "napomena", "napomena_ponude", "zbroji_idente", "corpus_projekt", "izvor"}
     p = {k: v for k, v in polja.items() if k in dopusteno}
     if p:
         if "naziv" in p:
@@ -187,7 +187,19 @@ def postavi_status(conn, nalog_id, novi, tko, razlog=None, veza=None, **potvrda)
                  (nalog_id, sada(), tko_id, n["status"], novi, razlog, veza))
     dnevnik(conn, tko, "nalog", nalog_id, "status", "%s → %s%s" % (n["status"], novi, (" (" + razlog + ")") if razlog else ""))
     conn.commit()
-    return nalog(conn, nalog_id)
+    d = nalog(conn, nalog_id)
+    # Warehouse (D-35 / D-42/4 / D-64): u „Skladište" Hub rezervira ploče, predloži restlove iz potvrđenih shema i vrati upozorenja + popis za nabavu;
+    # na stroj = izdano (restl potrošen); natrag u potvrđeno ili zatvoren = oslobođeno / potrošeno
+    from ..skladiste import pogled as SK
+    if novi == "skladiste":
+        d["skladiste"] = SK.rezerviraj_nalog(conn, nalog_id, tko)
+    elif novi == "pila_nesting" and n["status"] == "skladiste":
+        SK.izdaj_nalog(conn, nalog_id, tko)
+    elif novi == "potvrdjeno" and n["status"] == "skladiste":
+        SK.oslobodi_nalog(conn, nalog_id, tko)
+    elif novi == "zatvoren":
+        SK.zatvori_nalog(conn, nalog_id, tko)
+    return d
 
 
 def dogadjaji(conn, nalog_id):
@@ -284,6 +296,14 @@ def _odvezi_elemente(conn, nm_id=None, nalog_id=None):
 def _obrisi_materijal_bez_provjere(conn, nm_id):
     """Sve što visi na materijalu naloga (optimizacija, obračun, rezervacije, narudžbe, operacije), pa elementi, pa materijal."""
     _odvezi_elemente(conn, nm_id=nm_id)
+    conn.execute("UPDATE element SET majka_id = NULL WHERE majka_id IN (SELECT id FROM majka WHERE nalog_materijal_id = ?)", (nm_id,))
+    conn.execute("UPDATE element SET majka_id = NULL WHERE nalog_materijal_id = ?", (nm_id,))
+    conn.execute("DELETE FROM majka WHERE nalog_materijal_id = ?", (nm_id,))
+    # skladište (D-64): rezervirani restl natrag na stanje, Hubovi prijedlozi restlova ovog materijala se brišu, ostali gube vezu
+    conn.execute("UPDATE restl SET status = 'slobodan' WHERE status = 'rezerviran' AND id IN "
+                 "(SELECT restl_id FROM rezervacija WHERE nalog_materijal_id = ? AND restl_id IS NOT NULL AND status = 'rezervirano')", (nm_id,))
+    conn.execute("DELETE FROM restl WHERE nalog_materijal_id = ? AND status = 'prijedlog'", (nm_id,))
+    conn.execute("UPDATE restl SET nalog_materijal_id = NULL WHERE nalog_materijal_id = ?", (nm_id,))
     for t in ("optimizacija", "obracun_stavka", "rezervacija", "operacija", "spojeni_posao_stavka"):
         conn.execute("DELETE FROM %s WHERE nalog_materijal_id = ?" % t, (nm_id,))
     conn.execute("UPDATE narudzbenica_st SET nalog_materijal_id = NULL WHERE nalog_materijal_id = ?", (nm_id,))
@@ -311,7 +331,7 @@ def obrisi_nalog(conn, nalog_id, tko, forsiraj=False):
     for (nm_id,) in conn.execute("SELECT id FROM nalog_materijal WHERE nalog_id = ?", (nalog_id,)).fetchall():
         _obrisi_materijal_bez_provjere(conn, nm_id)
     conn.execute("UPDATE spojeni_posao SET mno_dokument_id = NULL WHERE mno_dokument_id IN (SELECT id FROM dokument WHERE nalog_id = ?)", (nalog_id,))
-    for t in ("dogadjaj", "dokument", "okov_stavka", "obracun_stavka", "operacija", "ponuda_verzija", "spojeni_posao_stavka"):
+    for t in ("dogadjaj", "dokument", "okov_stavka", "obracun_stavka", "rucna_stavka", "korekcija_stavke", "operacija", "ponuda_verzija", "spojeni_posao_stavka"):
         conn.execute("DELETE FROM %s WHERE nalog_id = ?" % t, (nalog_id,))
     conn.execute("DELETE FROM nalog WHERE id = ?", (nalog_id,))
     dnevnik(conn, tko, "nalog", nalog_id, "obrisi", "%s %s" % (n["broj"], n["naziv"]))
@@ -351,9 +371,12 @@ def tip_ruba(klasa, kod):
 
 def dodaj_element(conn, nm_id, tko, L, W, kom, naziv=None, rubovi=None, tipovi=None, god=None, napomena=None, izvor="rucno",
                   cix_ime=None, cix_izvor=None, obrada=None, program1=None, program2=None, ljepljenje=None, cjelina=None, pozicija=None, gotova_mjera=None,
-                  prolaza=None):
+                  prolaza=None, niz=None, konacna=None, grupe=True):
     """rubovi = {'L':tekst,'O':tekst,'D':tekst,'G':tekst} (lijevo, dolje, desno, gore); tipovi = {'L':'M'|'A'|''…} kad tekst nedostaje.
-    Rub s tekstom prolazi prepoznavanje trake uz materijal; nesiguran rub → element.provjeri = 1."""
+    Rub s tekstom prolazi prepoznavanje trake uz materijal; nesiguran rub → element.provjeri = 1.
+    Korak 6: niz = oznaka niza goda ('A1', 'E1H', 'C1-2'; zadano se čita iz sufiksa naziva `FR1_A1`), ljepljenje = sloj sklopa ('A1', 'A2';
+    zadano iz sufiksa `_LA1`), konacna = (L, W) konačna mjera kad su L, W SIROVA mjera sloja (Corpus); grupe = odmah primijeni pravila
+    (majke, mjera za rezanje) — uvoz ih primijeni jednom na kraju."""
     nm = materijal_naloga(conn, nm_id)
     n = nalog(conn, nm["nalog_id"])
     if n["status"] not in ("unos", "ponuda"):
@@ -366,14 +389,29 @@ def dodaj_element(conn, nm_id, tko, L, W, kom, naziv=None, rubovi=None, tipovi=N
     rb = (conn.execute("SELECT COALESCE(MAX(rb), 0) FROM element WHERE nalog_materijal_id = ?", (nm_id,)).fetchone()[0] or 0) + 1
     if god is None:
         god = "H" if nm.get("god") else None
+    from . import grupe as G
+    naz = G.procitaj_naziv(naziv)
+    if niz is None and naz["niz"]:
+        niz = naz["niz"]["oznaka"]                          # FR1_A1 → niz A1 (D-70, 23 §5)
+    if ljepljenje is None and naz["sloj"]:
+        ljepljenje = "%s%d" % naz["sloj"]                   # POLICA_LA1 → sloj A1 (D-79)
+    rez_L = rez_W = rez_razlog = None
+    if konacna and ljepljenje:                              # Corpus: L, W su sirova mjera sloja, konačna je poznata
+        rez_L, rez_W, rez_razlog = L, W, "sloj"
+        L, W = float(konacna[0]), float(konacna[1])
+        if abs(L - W) > 0.6 and (L < W) != (rez_L < rez_W):
+            L, W = W, L                                      # ista orijentacija kao sirova (Corpus konačnu piše kao 600x1465 uz sirovu 1475 x 610)
     cur = conn.execute("INSERT INTO element (nalog_materijal_id, rb, naziv, L, W, kom, god, gotova_mjera, obrada, program1, program2, ljepljenje, napomena, "
-                       "cix_ime, cix_izvor, cjelina, pozicija, izvor, prolaza, provjeri) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+                       "cix_ime, cix_izvor, cjelina, pozicija, izvor, prolaza, provjeri, niz, rez_L, rez_W, rez_razlog) "
+                       "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)",
                        (nm_id, rb, naziv, L, W, kom, god, gotova_mjera, obrada, program1, program2, ljepljenje, napomena, cix_ime, cix_izvor, cjelina, pozicija, izvor,
-                        int(prolaza) if prolaza else None))
+                        int(prolaza) if prolaza else None, niz, rez_L, rez_W, rez_razlog))
     eid = cur.lastrowid
     kodovi = {r: _oznaka_ruba(rubovi.get(r), tipovi.get(r), nm["traka_zadana"]) for r in RUBOVI}
     conn.execute("UPDATE element SET rub1_kod = ?, rub2_kod = ?, rub3_kod = ?, rub4_kod = ? WHERE id = ?", (kodovi["L"] or None, kodovi["O"] or None, kodovi["D"] or None, kodovi["G"] or None, eid))
     _prepoznaj_rubove_elementa(conn, eid, nm["materijal_id"])
+    if grupe:
+        G.primijeni(conn, nm["nalog_id"], tko, commit=False)
     conn.commit()
     return element(conn, eid)
 
@@ -389,19 +427,28 @@ def element(conn, eid):
         raise NalogGreska("nema elementa %s" % eid)
     d = dict(r)
     # na etiketu ide napomena; kad je nema, naziv elementa (kupčev PPW piše napomenu u 2. polje CPW-a = naziv; Corpus id na etiketi, D-55) — Igor, 16. 9.
-    d["napomena_etiketa"] = ((d["napomena"] or "").strip() or (d["naziv"] or "").strip())[:NAPOMENA_ETIKETA]
+    # Korak 6: ono što Hub dodaje za rezanje (SUZITI NA…, sloj, niz, majka) ima prednost — bez toga komad izađe kriv (D-80).
+    d["napomena_etiketa"] = ((d.get("napomena_rez") or "").strip() or (d["napomena"] or "").strip() or (d["naziv"] or "").strip())[:NAPOMENA_ETIKETA]
     d["m2"] = round(d["L"] * d["W"] * d["kom"] / 1e6, 4)
+    d["rez_L"] = d["rez_L"] if d.get("rez_L") else d["L"]              # mjera za rezanje (korak 6); ista kao konačna kad nema razloga
+    d["rez_W"] = d["rez_W"] if d.get("rez_W") else d["W"]
+    d["m2_rez"] = round(d["rez_L"] * d["rez_W"] * d["kom"] / 1e6, 4)
     return d
 
 
-def _prepoznaj_rubove_elementa(conn, eid, materijal_id):
-    e = conn.execute("SELECT rub1_kod, rub2_kod, rub3_kod, rub4_kod FROM element WHERE id = ?", (eid,)).fetchone()
+def _prepoznaj_rubove_elementa(conn, eid, materijal_id, debljina=None):
+    """debljina: debljina za klasu trake kad nije debljina materijala — sloj 1 sklopa lijepljenja kantira se po Σ debljina slojeva (D-79)."""
+    e = conn.execute("SELECT rub1_kod, rub2_kod, rub3_kod, rub4_kod, majka_id FROM element WHERE id = ?", (eid,)).fetchone()
+    if debljina is None and e["majka_id"]:
+        mk = conn.execute("SELECT vrsta, debljina FROM majka WHERE id = ?", (e["majka_id"],)).fetchone()
+        if mk and mk["vrsta"] == "lijepljenje" and mk["debljina"]:
+            debljina = mk["debljina"]
     ids, provjeri = [], 0
-    for i, kod in enumerate(e):
+    for i, kod in enumerate(tuple(e)[:4]):
         if not kod:
             ids.append(None)
             continue
-        r = P.prepoznaj_traku(conn, kod, materijal_id=materijal_id) if materijal_id else None
+        r = P.prepoznaj_traku(conn, kod, materijal_id=materijal_id, debljina=debljina) if materijal_id else None
         if r is not None and r.siguran:
             ids.append(r.id)
         else:
@@ -425,8 +472,14 @@ def uredi_element(conn, eid, tko, **polja):
     nm = materijal_naloga(conn, e["nalog_materijal_id"])
     if nalog(conn, nm["nalog_id"])["status"] not in ("unos", "ponuda"):
         raise NalogGreska("elementi se mijenjaju samo u statusu unos / ponuda")
-    dopusteno = {"naziv", "L", "W", "kom", "god", "gotova_mjera", "obrada", "program1", "program2", "ljepljenje", "napomena", "cjelina", "pozicija", "rb", "prolaza"}
+    if e["vrsta"] != "element":
+        raise NalogGreska("element-majku Hub slaže sam iz članova — mijenjaju se članovi (D-70 / D-80)")
+    dopusteno = {"naziv", "L", "W", "kom", "god", "gotova_mjera", "obrada", "program1", "program2", "ljepljenje", "napomena", "cjelina", "pozicija", "rb", "prolaza", "niz"}
     p = {k: v for k, v in polja.items() if k in dopusteno}
+    if "ljepljenje" in p and not p["ljepljenje"] and e["rez_razlog"] == "sloj":
+        p.update(L=e["rez_L"], W=e["rez_W"], rez_L=None, rez_W=None, rez_razlog=None)     # više nije sloj: natrag na upisanu (sirovu) mjeru
+    if ("L" in p or "W" in p) and e["rez_razlog"] == "sloj" and "rez_L" not in p:
+        p.update(rez_L=float(p.get("L", e["L"])) + 10.0, rez_W=float(p.get("W", e["W"])) + 10.0)   # konačna se mijenja → sirova = konačna + 10
     if "L" in p or "W" in p or "kom" in p:
         L, W, kom = float(p.get("L", e["L"])), float(p.get("W", e["W"])), int(p.get("kom", e["kom"]))
         if L <= 0 or W <= 0 or kom <= 0:
@@ -441,6 +494,9 @@ def uredi_element(conn, eid, tko, **polja):
     if rubovi or "rubovi" in polja:
         _prepoznaj_rubove_elementa(conn, eid, nm["materijal_id"])
     dnevnik(conn, tko, "element", eid, "uredi", ", ".join("%s=%s" % kv for kv in p.items()))
+    if polja.get("grupe", True):
+        from . import grupe as G
+        G.primijeni(conn, nm["nalog_id"], tko, commit=False)
     conn.commit()
     return element(conn, eid)
 
@@ -450,9 +506,13 @@ def obrisi_element(conn, eid, tko):
     nm = materijal_naloga(conn, e["nalog_materijal_id"])
     if nalog(conn, nm["nalog_id"])["status"] not in ("unos", "ponuda"):
         raise NalogGreska("elementi se mijenjaju samo u statusu unos / ponuda")
+    if e["vrsta"] != "element":
+        raise NalogGreska("element-majku Hub slaže sam iz članova — brišu se članovi (D-70 / D-80)")
     conn.execute("UPDATE cix_registar SET element_id = NULL WHERE element_id = ?", (eid,))   # ime ostaje zauzeto (D-23)
     conn.execute("DELETE FROM element WHERE id = ?", (eid,))
     dnevnik(conn, tko, "element", eid, "obrisi", "%gx%g x%d" % (e["L"], e["W"], e["kom"]))
+    from . import grupe as G
+    G.primijeni(conn, nm["nalog_id"], tko, commit=False)
     conn.commit()
 
 
@@ -540,7 +600,8 @@ def pregled(conn, nalog_id):
     uk_m2 = 0.0
     for nm in conn.execute("SELECT id FROM nalog_materijal WHERE nalog_id = ? ORDER BY rb, id", (nalog_id,)).fetchall():
         m = materijal_naloga(conn, nm["id"])
-        m["elementi"] = [element(conn, e["id"]) for e in conn.execute("SELECT id FROM element WHERE nalog_materijal_id = ? ORDER BY rb, id", (nm["id"],))]
+        m["elementi"] = [element(conn, e["id"]) for e in conn.execute("SELECT id FROM element WHERE nalog_materijal_id = ? AND vrsta = 'element' ORDER BY rb, id", (nm["id"],))]
+        m["majke"] = [element(conn, e["id"]) for e in conn.execute("SELECT id FROM element WHERE nalog_materijal_id = ? AND vrsta = 'majka' ORDER BY rb, id", (nm["id"],))]
         m["elemenata"] = len(m["elementi"])
         m["komada"] = sum(e["kom"] for e in m["elementi"])
         m["m2"] = round(sum(e["m2"] for e in m["elementi"]), 3)
@@ -548,6 +609,8 @@ def pregled(conn, nalog_id):
         uk_kom += m["komada"]
         uk_m2 += m["m2"]
         d["materijali"].append(m)
+    from . import grupe as G
+    d["grupe"] = G.pregled(conn, nalog_id)
     d["dogadjaji"] = dogadjaji(conn, nalog_id)
     d["za_potvrdu"] = za_potvrdu(conn, nalog_id)
     d["sazetak"] = dict(materijala=len(d["materijali"]), elemenata=uk_el, komada=uk_kom, m2=round(uk_m2, 3), za_potvrdu=len(d["za_potvrdu"]))
@@ -555,15 +618,23 @@ def pregled(conn, nalog_id):
 
 
 # ---------------------------------------------------------------- za exporte (korak 3): element-zapis kakav čitaju hub.formati.nalog_io
+def elementi_konacni(conn, nm_id):
+    """Svi PRAVI elementi materijala (i članovi majki), s konačnom mjerom — za trake, kantiranje, CNC, etikete članova."""
+    return [element(conn, e["id"]) for e in conn.execute("SELECT id FROM element WHERE nalog_materijal_id = ? AND vrsta = 'element' ORDER BY rb, id", (nm_id,)).fetchall()]
+
+
 def elementi_za_export(conn, nalog_id):
-    """Lista element-dictova (rb, nalog, kupac, L, W, kom, sifra_mat, deb, mat, god, traka{L,D,G,O}, tip{…}, cix, napomena, prolaza, glodalo)."""
+    """Ono što ide NA STROJ (pila, nesting, PW, optimizacija, krojni nacrt): lista element-dictova (rb, nalog, kupac, L, W, kom, sifra_mat, deb, mat,
+    god, traka{L,D,G,O}, tip{…}, cix, napomena, prolaza, glodalo…). Korak 6: L, W su MJERA ZA REZANJE (konačna je u L_kon / W_kon),
+    element-majke (niz goda, mali komadi) idu umjesto svojih članova, slojevi lijepljenja na sirovu mjeru."""
     n = nalog(conn, nalog_id)
     out = []
     rb = 0
     for nm in conn.execute("SELECT id FROM nalog_materijal WHERE nalog_id = ? ORDER BY rb, id", (nalog_id,)).fetchall():
         m = materijal_naloga(conn, nm["id"])
         deb = m["debljina"] or m["debljina_ulaz"] or 0
-        for e in conn.execute("SELECT id FROM element WHERE nalog_materijal_id = ? ORDER BY rb, id", (nm["id"],)).fetchall():
+        for e in conn.execute("SELECT e.id FROM element e LEFT JOIN majka mk ON mk.id = e.majka_id WHERE e.nalog_materijal_id = ? "
+                              "AND NOT (e.vrsta = 'element' AND COALESCE(mk.vrsta, '') IN ('niz', 'mali')) ORDER BY e.rb, e.id", (nm["id"],)).fetchall():
             el = element(conn, e["id"])
             rb += 1
             traka, tip = {}, {}
@@ -572,13 +643,15 @@ def elementi_za_export(conn, nalog_id):
                 klasa = el["rub%d_klasa" % i] or ""
                 traka[r] = naziv_t or (el["rub%d_kod" % i] or "")
                 tip[r] = tip_ruba(klasa, el["rub%d_kod" % i])
-            out.append(dict(rb=rb, nalog=n["naziv"], kupac=n["kupac_naziv"] or "", L=el["L"], W=el["W"], kom=el["kom"],
+            out.append(dict(rb=rb, nalog=n["naziv"], kupac=n["kupac_naziv"] or "", L=el["rez_L"], W=el["rez_W"], kom=el["kom"],
                             sifra_mat=m["winstore_kod"] or "", deb=deb, mat=m["naziv_kratki"] or m["naziv_ulaz"] or "",
                             god=1 if el["god"] else 0, traka=traka, tip=tip, cix=el["cix_ime"] or "", napomena=el["napomena_etiketa"],
                             naziv=el["naziv"] or "", cjelina=el["cjelina"] or "", pozicija=el["pozicija"] or "",
                             program1=el["program1"] or "", program2=el["program2"] or "",
-                            prolaza=int(el["prolaza"]) if el["prolaza"] else (2 if (el["L"] < 200 or el["W"] < 200) else 1),
+                            prolaza=int(el["prolaza"]) if el["prolaza"] else (2 if (el["rez_L"] < 200 or el["rez_W"] < 200) else 1),
                             glodalo=14 if deb > 20 else 12,
                             element_id=el["id"], materijal_ident=m["ident"], nalog_materijal_id=nm["id"],
-                            cix_izvor=el["cix_izvor"] or "", obrada_json=el["obrada_json"] or ""))
+                            cix_izvor=el["cix_izvor"] or "", obrada_json=el["obrada_json"] or "",
+                            L_kon=el["L"], W_kon=el["W"], rez_razlog=el["rez_razlog"] or "", vrsta=el["vrsta"], majka_id=el["majka_id"],
+                            majka_poz=el["majka_poz"] or ""))
     return out

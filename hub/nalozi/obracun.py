@@ -9,7 +9,7 @@ izvede stavke kakve danas ured tipka u Pantheon — istim redoslijedom (materija
               radna / zidna ploča (RP, ZO) po dužnom metru = Σ dulja stranica × kom
   rezanje     US000002 (iveral i sve ostalo) / US000013 (MDF do 8 mm) po m² ploče; RP/ZO: US000303 = 2 reza × komada
   traka       PW metri (Σ stranica × kom × 1,10 — 10 % otpada je već unutra) zaokruženi NAVIŠE na cijeli metar po traci (D-20)
-  kantiranje  US000003 (0,5 mm) / US000011 (1 i 2 mm /22) / US000012 (/44) = TOČNI PW metri po klasi trake (D-20)
+  kantiranje  US000003 (0,5 mm) / US000011 (1 i 2 mm /22) / US000012 (/44) = ISTI metri kao traka (naviše na cijeli m, D-90)
   CNC         iz CIX-a (Corpus) ili napomene elementa: fi35 → US000149 (kom), NUT / FALC → US000016 (m), UREZ GOLA → US002075 (m);
               ostala obrada iz CIX-a (bušenje, utor, krivolinija) samo se JAVI (usluga po skici, ured dodaje ručno)
   okov        potvrđene stavke iz `okov_stavka` (D-32; nikad se ne pogađa)
@@ -35,6 +35,7 @@ from . import nalozi as N, optimiziraj as OP
 US_REZANJE, US_REZANJE_MDF, US_REZ_RP = "US000002", "US000013", "US000303"
 KERF_SLAGANJA = 5.0
 US_FI35, US_NUT, US_UREZ_GOLA = "US000149", "US000016", "US002075"
+US_LJEPLJENJE = "US000007"      # USLUGA LJEPLJENJA PLOČA, po m² sirove mjere jednog sloja (D-79)
 MDF_TANKI_MM = 8
 STANDARDNE_PLOCE = [(2800, 2070), (2780, 2050), (2800, 1300), (2440, 1220), (2800, 1220), (2800, 2100), (2620, 2070), (4100, 600), (4100, 640),
                     (4100, 900), (4200, 1300), (3050, 1300), (2800, 1250)]
@@ -140,13 +141,16 @@ def izracunaj(conn, nalog_id, pravila=True, kerf=None):
         sheets, oc, nacin, _ = OPT.najbolje(dijelovi, ploca, trim, kerf, god)
         return sheets, oc, nacin, False
 
-    def add(ident, kolicina, grupa, pravilo, nm_id=None, naziv=None, jm=None, rabat=None):
+    def add(ident, kolicina, grupa, pravilo, nm_id=None, naziv=None, jm=None, rabat=None, cijena=None):
         if not ident or kolicina <= 0:
             return None
         pi = _ident(conn, ident)
         if not pi:
-            upoz.append("ident %s nema u šifrarniku (%s) — stavka bez cijene" % (ident, pravilo))
+            if cijena is None:
+                upoz.append("ident %s nema u šifrarniku (%s) — stavka bez cijene" % (ident, pravilo))
             pi = dict(ident=ident, naziv=naziv or ident, jm=jm or "KOM", cijena_neto=None, aktivan=1)
+        if cijena is not None:                       # ručna stavka s dogovorenom cijenom (D-87)
+            pi = dict(pi, cijena_neto=float(cijena), naziv=naziv or pi["naziv"], jm=jm or pi["jm"])
         elif not pi["aktivan"]:
             upoz.append("ident %s (%s) nije aktivan u Pantheonu" % (ident, pi["naziv"]))
         r = rab_u if grupa in ("rezanje", "kantiranje", "usluga") else rab_m
@@ -215,9 +219,9 @@ def izracunaj(conn, nalog_id, pravila=True, kerf=None):
             pm.update(nacin=nacin, kolicina=m2, jm="M2", ploca=oc["ploca"], m2_pw=oc["m2_naplata"], provjeri=provjeri, ostaci=oc.get("ostaci"),
                       optimizacija_potvrdjena=potvrdjeno)
         # trake ovog materijala: po TR identu (Σ stranica × kom × 1,10) — u ponudi idu odmah iza ploče, kao što ured piše (D-32)
+        # korak 6: po KONAČNOJ mjeri pravih elemenata (i članova majki — majka se reže, komadi se kantiraju), ne po mjeri za rezanje
         kant_m, kant_klasa = {}, {}
-        for e in els:
-            el = N.element(conn, e["element_id"])
+        for el in N.elementi_konacni(conn, nm["id"]):
             for i, strana in enumerate(("L", "O", "D", "G"), 1):
                 tid = el["rub%d_traka" % i]
                 if not tid:
@@ -236,18 +240,26 @@ def izracunaj(conn, nalog_id, pravila=True, kerf=None):
                 add(US_UREZ_GOLA, round(urez, 2), "usluga", "UREZ GOLA po duljini (%s ×%d)" % (el["L"], el["kom"]), nm["id"])
             for o in ostalo:
                 upoz.append("%s el. %s (%gx%g): obrada %s — usluga se dodaje ručno" % (pm["materijal"], el["naziv"] or el["rb"], el["L"], el["W"], o))
-        # trake i kantiranje (D-20): metri naviše po traci, usluga točni metri po klasi — sve uz ovaj materijal
+        # trake i kantiranje (D-20, D-90): metri s nadmjerom naviše na cijeli metar po traci; kantiranje = ISTI metri kao traka (Igor, 17. 9.);
+        # nadmjera je postavka definirana jednom (D-77) — u stavci se ne spominje ni na ekranu ni na dokumentu
         kant_po_klasi = {}
         for tid, metri in kant_m.items():
-            add(tid, math.ceil(metri - 1e-9), "traka", "PW metri %.2f (nadmjera %g %% unutra) naviše na cijeli m" % (metri, (faktor_trake - 1) * 100), nm["id"])
+            cijeli = math.ceil(metri - 1e-9)
+            add(tid, cijeli, "traka", "", nm["id"])
             us = P.usluga_kantiranja(kant_klasa.get(tid))
             if us:
-                kant_po_klasi[us] = kant_po_klasi.get(us, 0.0) + metri
+                kant_po_klasi[us] = kant_po_klasi.get(us, 0) + cijeli
             else:
                 upoz.append("traka %s: nepoznata klasa — kantiranje nije obračunato" % tid)
         for us, metri in kant_po_klasi.items():
-            add(us, round(metri, 2), "kantiranje", "točni PW metri po klasi trake", nm["id"])
+            add(us, metri, "kantiranje", "", nm["id"])
         pm["kant_m"] = {k: round(v, 2) for k, v in kant_m.items()}
+        # lijepljenje (D-79): sklop čiji je sloj 1 na ovom materijalu → US000007 × m² SIROVE mjere jednog sloja × kom; rez na konačnu se ne naplaćuje
+        for mk in conn.execute("SELECT * FROM majka WHERE nalog_materijal_id = ? AND vrsta = 'lijepljenje'", (nm["id"],)).fetchall():
+            sl = conn.execute("SELECT rez_L, rez_W, L, W, kom FROM element WHERE majka_id = ? AND majka_poz = '1'", (mk["id"],)).fetchone()
+            if sl:
+                m2_l = round((sl["rez_L"] or sl["L"]) * (sl["rez_W"] or sl["W"]) * sl["kom"] / 1e6, 3)
+                add(US_LJEPLJENJE, m2_l, "usluga", "lijepljenje sklopa %s: %d slojeva, %gx%g sirova × %d kom" % (mk["oznaka"], mk["clanova"], sl["rez_L"] or sl["L"], sl["rez_W"] or sl["W"], sl["kom"]), nm["id"])
         po_mat.append(pm)
     # okov (D-32): samo potvrđeno
     for o in conn.execute("SELECT * FROM okov_stavka WHERE nalog_id = ? ORDER BY id", (nalog_id,)).fetchall():
@@ -255,6 +267,56 @@ def izracunaj(conn, nalog_id, pravila=True, kerf=None):
             upoz.append("okov '%s' nije potvrđen — nije u ponudi" % (o["naziv"] or o["izvor_tekst"] or "?"))
             continue
         add(o["pantheon_ident"], o["kom"] or 0, "okov", "okov iz naloga")
+    # ručne stavke (D-87): ured sam doda artikl / uslugu koja se ne izvodi iz elemenata
+    for r in conn.execute("SELECT * FROM rucna_stavka WHERE nalog_id = ? ORDER BY id", (nalog_id,)).fetchall():
+        s = add(r["pantheon_ident"], r["kolicina"] or 0, r["grupa"] or "usluga", "ručno" + ((": " + r["napomena"]) if r["napomena"] else ""),
+                naziv=r["naziv"], jm=r["jm"], rabat=r["rabat"], cijena=r["cijena"])
+        if s:
+            s["rucna_id"] = r["id"]
+    # zbroji iste idente (D-90, opcija naloga): isti ident, cijena i rabat → jedan redak sa zbrojenom količinom
+    if n["zbroji_idente"]:
+        spojene, po_kljucu = [], {}
+        for s in stavke:
+            if s.get("rucna_id"):
+                spojene.append(s)
+                continue
+            k = (s["pantheon_ident"], s["cijena"], s["rabat"])
+            if k in po_kljucu:
+                t = po_kljucu[k]
+                t["kolicina"] = round(t["kolicina"] + s["kolicina"], 3)
+                t["iznos"] = round(t["kolicina"] * (t["cijena"] or 0) * (1 - (t["rabat"] or 0) / 100), 2)
+                if s["pravilo"] and s["pravilo"] not in t["pravilo"]:
+                    t["pravilo"] = (t["pravilo"] + "; " if t["pravilo"] else "") + s["pravilo"]
+                t["nalog_materijal_id"] = None
+                t["zbrojeno"] = t.get("zbrojeno", 1) + 1
+            else:
+                po_kljucu[k] = s
+                spojene.append(s)
+        for i, s in enumerate(spojene, 1):
+            s["rb"] = i
+        stavke = spojene
+    # korekcije izračunatih stavki (D-90): ured smije za TU ponudu promijeniti količinu / cijenu / rabat bilo koje stavke
+    kor = {r["kljuc"]: dict(r) for r in conn.execute("SELECT * FROM korekcija_stavke WHERE nalog_id = ?", (nalog_id,)).fetchall()}
+    videni = {}
+    for s in stavke:
+        if s.get("rucna_id"):
+            continue
+        k = kljuc_stavke(s)
+        videni[k] = videni.get(k, 0) + 1
+        if videni[k] > 1:
+            k = "%s#%d" % (k, videni[k])          # ista stavka dvaput (rijetko) → drugi ključ
+        s["kljuc"] = k
+        c = kor.get(k)
+        if not c:
+            continue
+        if c["kolicina"] is not None:
+            s["kolicina"] = round(float(c["kolicina"]), 3)
+        if c["cijena"] is not None:
+            s["cijena"] = round(float(c["cijena"]), 2)
+        if c["rabat"] is not None:
+            s["rabat"] = float(c["rabat"])
+        s["iznos"] = round(s["kolicina"] * (s["cijena"] or 0) * (1 - (s["rabat"] or 0) / 100), 2)
+        s["korekcija"] = {a: c[a] for a in ("kolicina", "cijena", "rabat") if c[a] is not None}
     neto = round(sum(s["iznos"] for s in stavke), 2)
     upoz = list(dict.fromkeys(upoz))                # isto upozorenje jednom
     return dict(nalog_id=nalog_id, naziv=n["naziv"], stavke=stavke, upozorenja=upoz, po_materijalu=po_mat, rabat_materijal=rab_m, rabat_usluge=rab_u,
@@ -279,6 +341,96 @@ def upisi(conn, nalog_id, tko="web", pravila=True):
         raise
     r["upisano"] = len(r["stavke"])
     return r
+
+
+def kljuc_stavke(s):
+    """Ključ izračunate stavke za korekciju: grupa|ident|nalog_materijal_id — stabilan dok se ne promijene elementi (tada korekcija i dalje vrijedi za taj ident)."""
+    return "%s|%s|%s" % (s.get("grupa") or "", s.get("pantheon_ident") or "", s.get("nalog_materijal_id") or "")
+
+
+def korigiraj_stavku(conn, nalog_id, kljuc, tko="web", kolicina=None, cijena=None, rabat=None):
+    """Upiši / promijeni korekciju izračunate stavke; sve tri None = ukloni korekciju."""
+    N.nalog(conn, nalog_id)
+    if not kljuc or "|" not in kljuc:
+        raise ObracunGreska("korekcija: nepoznat ključ stavke")
+    if kolicina is not None and float(kolicina) <= 0:
+        raise ObracunGreska("količina mora biti > 0")
+    if kolicina is None and cijena is None and rabat is None:
+        conn.execute("DELETE FROM korekcija_stavke WHERE nalog_id = ? AND kljuc = ?", (nalog_id, kljuc))
+        dnevnik(conn, tko, "nalog", nalog_id, "korekcija_uklonjena", kljuc)
+        conn.commit()
+        return dict(nalog_id=nalog_id, kljuc=kljuc, uklonjeno=True)
+    r = conn.execute("SELECT * FROM korekcija_stavke WHERE nalog_id = ? AND kljuc = ?", (nalog_id, kljuc)).fetchone()
+    nova = dict(kolicina=r["kolicina"] if r else None, cijena=r["cijena"] if r else None, rabat=r["rabat"] if r else None)
+    for a, v in (("kolicina", kolicina), ("cijena", cijena), ("rabat", rabat)):
+        if v is not None:
+            nova[a] = None if v == "" else float(v)
+    conn.execute("INSERT INTO korekcija_stavke (nalog_id, kljuc, kolicina, cijena, rabat, tko, kada) VALUES (?,?,?,?,?,?,?) "
+                 "ON CONFLICT (nalog_id, kljuc) DO UPDATE SET kolicina = excluded.kolicina, cijena = excluded.cijena, rabat = excluded.rabat, tko = excluded.tko, kada = excluded.kada",
+                 (nalog_id, kljuc, nova["kolicina"], nova["cijena"], nova["rabat"], tko, sada()))
+    dnevnik(conn, tko, "nalog", nalog_id, "korekcija_stavke", "%s: %s" % (kljuc, ", ".join("%s=%s" % kv for kv in nova.items() if kv[1] is not None)))
+    conn.commit()
+    return dict(nalog_id=nalog_id, kljuc=kljuc, **nova)
+
+
+def rucne(conn, nalog_id):
+    """Ručne stavke naloga (D-87) s cijenom iz šifrarnika kad nije upisana."""
+    out = []
+    for r in conn.execute("SELECT * FROM rucna_stavka WHERE nalog_id = ? ORDER BY id", (nalog_id,)).fetchall():
+        d = dict(r)
+        pi = _ident(conn, d["pantheon_ident"])
+        d["u_sifrarniku"] = bool(pi)
+        d["cijena_sifrarnik"] = round(pi["cijena_neto"], 2) if pi and pi["cijena_neto"] is not None else None
+        out.append(d)
+    return out
+
+
+def dodaj_rucnu(conn, nalog_id, pantheon_ident, kolicina, grupa="usluga", naziv=None, jm=None, cijena=None, rabat=None, napomena=None, tko="web"):
+    """Ured sam upiše artikl u ponudu: ident iz šifrarnika (cijena iz Pantheona, ili dogovorena ručna); naziv se smije prilagoditi."""
+    N.nalog(conn, nalog_id)
+    ident = (pantheon_ident or "").strip().upper()
+    if not ident:
+        raise ObracunGreska("ručna stavka: treba ident (ili naziv kao ident uz ručnu cijenu)")
+    if kolicina is None or float(kolicina) <= 0:
+        raise ObracunGreska("ručna stavka: količina mora biti > 0")
+    if grupa not in ("usluga", "okov", "materijal", "ostalo"):
+        raise ObracunGreska("ručna stavka: grupa %s (usluga | okov | materijal | ostalo)" % grupa)
+    pi = _ident(conn, ident)
+    if not pi:                                       # ponuda ide u Pantheon (eSlog) samo s pravim identom — slobodan tekst ne prolazi
+        raise ObracunGreska("ident %s nema u šifrarniku — artikl prvo otvoriti u Pantheonu i osvježiti šifrarnik, ili odabrati postojeći ident" % ident)
+    cur = conn.execute("INSERT INTO rucna_stavka (nalog_id, pantheon_ident, naziv, kolicina, jm, cijena, rabat, grupa, napomena, tko, kada) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                       (nalog_id, ident, (naziv or (pi["naziv"] if pi else None) or ident).strip(), round(float(kolicina), 3), (jm or (pi["jm"] if pi else None) or "KOM").upper(),
+                        None if cijena is None else round(float(cijena), 2), None if rabat is None else float(rabat), grupa, (napomena or "").strip() or None, tko, sada()))
+    dnevnik(conn, tko, "nalog", nalog_id, "rucna_stavka", "%s × %s %s" % (ident, kolicina, jm or ""))
+    conn.commit()
+    return dict(conn.execute("SELECT * FROM rucna_stavka WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+def promijeni_rucnu(conn, rucna_id, tko="web", **polja):
+    """Korekcija ručne stavke u ponudi (količina, cijena, rabat, naziv, jm, napomena); None = vrati na zadano (cijena / rabat iz šifrarnika / naloga)."""
+    r = conn.execute("SELECT * FROM rucna_stavka WHERE id = ?", (rucna_id,)).fetchone()
+    if not r:
+        raise ObracunGreska("ručna stavka %s ne postoji" % rucna_id)
+    dopusteno = ("kolicina", "cijena", "rabat", "naziv", "jm", "napomena")
+    polja = {k: v for k, v in polja.items() if k in dopusteno}
+    if "kolicina" in polja and (polja["kolicina"] is None or float(polja["kolicina"]) <= 0):
+        raise ObracunGreska("količina mora biti > 0")
+    if not polja:
+        return dict(r)
+    conn.execute("UPDATE rucna_stavka SET %s WHERE id = ?" % ", ".join("%s = ?" % k for k in polja), list(polja.values()) + [rucna_id])
+    dnevnik(conn, tko, "nalog", r["nalog_id"], "rucna_stavka_izmjena", "%s: %s" % (r["pantheon_ident"], ", ".join("%s=%s" % kv for kv in polja.items())))
+    conn.commit()
+    return dict(conn.execute("SELECT * FROM rucna_stavka WHERE id = ?", (rucna_id,)).fetchone())
+
+
+def obrisi_rucnu(conn, rucna_id, tko="web"):
+    r = conn.execute("SELECT * FROM rucna_stavka WHERE id = ?", (rucna_id,)).fetchone()
+    if not r:
+        raise ObracunGreska("ručna stavka %s ne postoji" % rucna_id)
+    conn.execute("DELETE FROM rucna_stavka WHERE id = ?", (rucna_id,))
+    dnevnik(conn, tko, "nalog", r["nalog_id"], "rucna_stavka_brisi", "%s × %s" % (r["pantheon_ident"], r["kolicina"]))
+    conn.commit()
+    return dict(nalog_id=r["nalog_id"], obrisano=True)
 
 
 def stavke(conn, nalog_id, ponuda_verzija_id=None):

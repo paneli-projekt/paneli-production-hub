@@ -263,10 +263,10 @@ def klasa_trake(deb, sir):
 
 
 def sirina_za_materijal(deb_materijala):
-    """Zadana širina trake po debljini ploče: ≤ 19 → 22, 20–30 → 29, > 30 (radne ploče 38) → 44."""
+    """Zadana širina trake po debljini ploče: ≤ 20 → 22, 25 → 29, > 30 (radne ploče 38, sklop lijepljenja 36–42) → 44 (D-79, Igor 16. 9. 2026.)."""
     if deb_materijala is None:
         return 22
-    if deb_materijala <= 19.5:
+    if deb_materijala <= 20.5:
         return 22
     if deb_materijala <= 30:
         return 29

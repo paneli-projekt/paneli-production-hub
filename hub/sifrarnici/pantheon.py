@@ -98,7 +98,7 @@ def uvezi_pantheon(conn, putanja, tko="uvoz"):
 
 def _izbaci_sto_vise_nije(cur, identi_materijala, identi_traka):
     """Materijali / trake u Hubu čiji ident u ovom uvozu više nije ploča / traka (D-53) ili ga u Pantheonu više nema:
-    obriši ako ih ništa ne koristi (nalog, potvrđeni alias, Winstore, restl, stanje), inače označi 'ne koristi se' + neaktivan."""
+    obriši ako ih ništa ne koristi (nalog, potvrđeni alias, Winstore, restl), inače označi 'ne koristi se' + neaktivan."""
     m_out = t_out = 0
     for r in cur.execute("SELECT id, pantheon_ident FROM materijal").fetchall():
         if r["pantheon_ident"] in identi_materijala:
@@ -107,7 +107,7 @@ def _izbaci_sto_vise_nije(cur, identi_materijala, identi_traka):
         koristi = any(cur.execute(q, (mid,)).fetchone() for q in (
             "SELECT 1 FROM nalog_materijal WHERE materijal_id = ? LIMIT 1", "SELECT 1 FROM materijal_alias WHERE materijal_id = ? AND potvrdio IS NOT NULL LIMIT 1",
             "SELECT 1 FROM winstore_ploca WHERE materijal_id = ? LIMIT 1", "SELECT 1 FROM restl WHERE materijal_id = ? LIMIT 1",
-            "SELECT 1 FROM ploca_stanje WHERE materijal_id = ? LIMIT 1", "SELECT 1 FROM materijal_traka WHERE materijal_id = ? AND potvrdio IS NOT NULL LIMIT 1",
+            "SELECT 1 FROM materijal_traka WHERE materijal_id = ? AND potvrdio IS NOT NULL LIMIT 1",
             "SELECT 1 FROM traka_alias WHERE materijal_id = ? LIMIT 1"))
         if koristi:
             cur.execute("UPDATE materijal SET aktivan = 0, ne_koristi_se = 1 WHERE id = ? AND (aktivan = 1 OR ne_koristi_se = 0)", (mid,))

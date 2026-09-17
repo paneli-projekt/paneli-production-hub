@@ -19,7 +19,7 @@
     POST /api/nalog/materijal/{nm}/potvrdi-traku {oznaka, traka, tko, zapamti}
     POST /api/nalog/materijal/{nm}/elementi    {L, W, kom, naziv, rubovi{L,O,D,G}, god, napomena, tko}
     PUT  /api/nalog/element/{id}    DELETE /api/nalog/element/{id}?tko=
-    POST /api/nalog/{id}/uvoz?izvor=           multipart datoteka CPW ili PPNEST CSV → materijali + elementi kroz šifrarnik
+    POST /api/nalog/{id}/uvoz?izvor=           multipart datoteka CPW, PNL (PanelWizard) ili PPNEST CSV → materijali + elementi kroz šifrarnik
     POST /api/nalog/{id}/ponovi-prepoznavanje  nakon potvrda
     POST /api/nalozi/uvoz-corpus               {mapa, kupac_id | kupac_kratki, projekt, suho, tko} cijeli Corpus paket → novi nalog vlastite proizvodnje (D-55)
     POST /api/rezultat/nesting                 {put | mapa, suho, tko} bNest .mno → stvarna potrošnja po materijalu naloga, razdioba spojenog posla (D-38)
@@ -27,8 +27,13 @@
     GET  /api/slika?put=                       PNG sheme rezanja (samo putanje zabilježene u dokumentima naloga)
     GET  /api/nalog/{id}/obracun               stavke ponude iz obračuna (bez upisa) — ekran 3            POST …/obracun {pravila, tko} upiše radne stavke
     GET  /api/nalog/{id}/ponude                verzije ponude;  POST /api/nalog/{id}/ponude {pravila, tko, potvrdi_opt} nova verzija iz obračuna (D-40)
+    PUT  /api/nalog/{id}/stavka {kljuc, kolicina?, cijena?, rabat?, ponisti?}   korekcija izračunate stavke (D-90)
+    GET  /api/nalog/{id}/rucne  POST {pantheon_ident, kolicina, grupa, naziv?, jm?, cijena?, rabat?, napomena}  PUT /api/rucne/{id} {kolicina, cijena, rabat…}  DELETE /api/rucne/{id}   ručne stavke ponude (D-87)
+    GET  /api/sifrarnik/identi?q=&klasif=      pretraga Pantheon identa (za ručne stavke)
     GET  /api/nalog/{id}/optimizacija          potvrđeno slaganje + prijedlozi po materijalu (D-75)
     POST /api/nalog/{id}/materijal/{nm}/optimizacija {nacin, dubina, tko}  novi prijedlog;  POST /api/optimizacija/{oid}/potvrdi {tko}
+    POST /api/nalog/{id}/optimizacija/pripremi {nm, tko}   zadani prijedlog (realno za pilu) + Hub rezerva kad štedi m² (D-91)
+    GET  /api/optimizacija/{oid}/sheme.png?h=&list=   sličica slaganja (sve ploče / jedna) za ekran;  GET …/pregled  listovi + elementi (JSON)
     GET  /api/postavke/optimizacija            skrivene postavke (kerf, kerf_pile, nadmjera_trake, obracun_rezanja…, D-77); POST {kljuc: vrijednost}
     GET  /api/nalog/{id}/ispis/krojni.pdf      krojni nacrt PDF iz potvrđenog slaganja (D-76); ?materijal=nm (jedan) ?oid= (prijedlog) ?mapa= ; POST … {materijal, mapa, tko} napravi i zabilježi
     GET  /api/ponuda/{vid}                     verzija sa stavkama;  POST /api/ponuda/{vid}/eslog {mapa, broj}  POST /api/ponuda/{vid}/poslana {na, mail_tekst}
@@ -42,6 +47,9 @@
     POST /api/nalog/{id}/izvoz/nesting         {mapa, stil, suho, tko} CSV + CIX za bNest po materijalu (korak 3, D-23/D-24)
     POST /api/nalog/{id}/izvoz/pw              {mapa, zaglavlje_jednom, samo_pila, suho, tko} CPW za PanelWizard (D-11)
     POST /api/nalog/{id}/izvoz/pila            {mapa, suho, sve, tko} optimizacija + CPO za pilu (D-19/D-21/D-22)
+    GET  /api/nalog/{id}/grupe                 korak 6: majke (niz goda, mali komadi) i sklopovi lijepljenja s članovima;  POST … {tko} ponovno primijeni pravila
+    POST /api/nalog/element/{eid}/niz          {fronte[{L, W, rubovi, naziv, napomena}], smjer, tko} kupčev veći komad ('skica N') → niz goda iz upisanih fronti (D-70)
+    GET  /api/majka/{id}/skica.png             skica majke (rezovi, oznake) za ekran / operatera
 """
 import os
 import re
@@ -52,7 +60,7 @@ from pydantic import BaseModel
 
 from .. import db
 from ..nalozi import nalozi as N, kupci as K, uvoz_datoteka as U, spajanje as SP, export_nesting as EX, export_pw as EW, export_pila as EP, uvoz_corpus as UC, rezultat_nesting as RN
-from ..nalozi import obracun as OC, ponuda as PO, optimiziraj as OP
+from ..nalozi import obracun as OC, ponuda as PO, optimiziraj as OP, grupe as G
 
 router = APIRouter()
 _ctx = {}   # puni app.py: {"veza": callable, "brava": Lock}
@@ -76,11 +84,19 @@ def _rollback():
         pass
 
 
+def pdf_inline(put, media_type="application/pdf"):
+    """PDF se otvara u pregledniku (inline), ne skida se automatski (Igor, 17. 9.); ime datoteke ostaje za „Spremi kao“."""
+    from fastapi.responses import FileResponse
+    from urllib.parse import quote
+    ime = os.path.basename(put)
+    return FileResponse(put, media_type=media_type, headers={"Content-Disposition": "inline; filename*=UTF-8''%s" % quote(ime)})
+
+
 def _greska(fn, *a, **kw):
     """Pozovi funkciju modula; poslovna greška → 400, sve ostalo → 500, u oba slučaja s rollbackom."""
     try:
         return fn(*a, **kw)
-    except (N.NalogGreska, EX.ExportGreska, SP.SpajanjeGreska, OC.ObracunGreska, PO.PonudaGreska, OP.OptimizacijaGreska, ValueError) as e:
+    except (N.NalogGreska, EX.ExportGreska, SP.SpajanjeGreska, OC.ObracunGreska, PO.PonudaGreska, OP.OptimizacijaGreska, G.GrupeGreska, ValueError) as e:
         _rollback()
         raise HTTPException(400, str(e))
     except HTTPException:
@@ -199,6 +215,8 @@ class NalogUredi(BaseModel):
     rok_obecan: Optional[str] = None
     prioritet: Optional[str] = None
     napomena: Optional[str] = None
+    napomena_ponude: Optional[str] = None
+    zbroji_idente: Optional[int] = None
     corpus_projekt: Optional[str] = None
     tko: str = "web"
 
@@ -430,6 +448,18 @@ class ElementUredi(BaseModel):
     napomena: Optional[str] = None
     obrada: Optional[str] = None
     rb: Optional[int] = None
+    niz: Optional[str] = None            # korak 6: oznaka niza goda 'A1' / 'E1H' / 'C1-2' ('' = makni)
+    ljepljenje: Optional[str] = None     # korak 6: sloj sklopa 'A1' / 'A2' ('' = makni)
+    tko: str = "web"
+
+
+class GrupeP(BaseModel):
+    tko: str = "web"
+
+
+class NizIzMajke(BaseModel):
+    fronte: List[dict]                   # [{L, W, rubovi{L,O,D,G}, naziv, napomena}] redom uz god
+    smjer: str = "V"                     # V okomito (jedna iznad druge) | H vodoravno
     tko: str = "web"
 
 
@@ -451,6 +481,38 @@ def element_obrisi(eid: int, tko: str = "web"):
     with _brava():
         _greska(N.obrisi_element, _c(), eid, tko)
         return dict(ok=True)
+
+
+# ---------------------------------------------------------------- korak 6: majke i sklopovi (D-70 / D-79 / D-80)
+@router.get("/api/nalog/{nalog_id}/grupe")
+def nalog_grupe(nalog_id: int):
+    with _brava():
+        _greska(N.nalog, _c(), nalog_id)
+        return dict(majke=G.pregled(_c(), nalog_id))
+
+
+@router.post("/api/nalog/{nalog_id}/grupe")
+def nalog_grupe_primijeni(nalog_id: int, p: GrupeP):
+    with _brava():
+        return _greska(G.primijeni, _c(), nalog_id, p.tko)
+
+
+@router.post("/api/nalog/element/{eid}/niz")
+def element_niz_iz_majke(eid: int, p: NizIzMajke):
+    with _brava():
+        return _greska(G.niz_iz_kupceve_majke, _c(), eid, p.fronte, p.tko, p.smjer)
+
+
+@router.get("/api/majka/{majka_id}/skica.png")
+def majka_skica(majka_id: int):
+    import tempfile
+    from fastapi.responses import FileResponse
+    with _brava():
+        m = _greska(G.majka, _c(), majka_id)
+        put = os.path.join(tempfile.gettempdir(), "hub_majka_%d.png" % majka_id)
+        if not G.skica_png(_c(), majka_id, put):
+            raise HTTPException(500, "matplotlib nije instaliran — skica se ne može nacrtati")
+    return FileResponse(put, media_type="image/png")
 
 
 # ---------------------------------------------------------------- uvoz Corpus paketa (D-29, D-55)
@@ -517,6 +579,103 @@ def nalog_obracun_upisi(nalog_id: int, p: ObracunP):
         return _greska(OC.upisi, _c(), nalog_id, p.tko, p.pravila)
 
 
+class RucnaP(BaseModel):
+    pantheon_ident: str
+    kolicina: float
+    grupa: str = "usluga"
+    naziv: Optional[str] = None
+    jm: Optional[str] = None
+    cijena: Optional[float] = None
+    rabat: Optional[float] = None
+    napomena: Optional[str] = None
+    tko: str = "web"
+
+
+@router.get("/api/nalog/{nalog_id}/rucne")
+def nalog_rucne(nalog_id: int):
+    """Ručne stavke ponude (D-87) — artikli koje ured sam doda (okov, usluga, bilo koji ident)."""
+    with _ctx["brava"]:
+        c = _c()
+        _greska(N.nalog, c, nalog_id)
+        return OC.rucne(c, nalog_id)
+
+
+@router.post("/api/nalog/{nalog_id}/rucne")
+def nalog_rucna_dodaj(nalog_id: int, p: RucnaP):
+    with _brava():
+        return _greska(OC.dodaj_rucnu, _c(), nalog_id, p.pantheon_ident, p.kolicina, p.grupa, p.naziv, p.jm, p.cijena, p.rabat, p.napomena, p.tko)
+
+
+class RucnaIzmjenaP(BaseModel):
+    kolicina: Optional[float] = None
+    cijena: Optional[float] = None
+    rabat: Optional[float] = None
+    naziv: Optional[str] = None
+    jm: Optional[str] = None
+    napomena: Optional[str] = None
+    ponisti: Optional[List[str]] = None       # polja koja se vraćaju na zadano (cijena / rabat)
+    tko: str = "web"
+
+
+@router.put("/api/rucne/{rucna_id}")
+def rucna_promijeni(rucna_id: int, p: RucnaIzmjenaP):
+    """Korekcija ručne stavke na ekranu ponude (kao redak u Pantheonu): količina, cijena, rabat, naziv."""
+    polja = {k: v for k, v in p.dict().items() if k not in ("tko", "ponisti") and v is not None}
+    for k in (p.ponisti or []):
+        polja[k] = None
+    with _brava():
+        return _greska(OC.promijeni_rucnu, _c(), rucna_id, p.tko, **polja)
+
+
+class KorekcijaP(BaseModel):
+    kljuc: str
+    kolicina: Optional[float] = None
+    cijena: Optional[float] = None
+    rabat: Optional[float] = None
+    ponisti: Optional[List[str]] = None       # polja koja se vraćaju na izračunato
+    tko: str = "web"
+
+
+@router.put("/api/nalog/{nalog_id}/stavka")
+def nalog_stavka_korekcija(nalog_id: int, p: KorekcijaP):
+    """Korekcija izračunate stavke ponude (D-90): količina / cijena / rabat; `ponisti` vraća polje na izračunato; sva tri prazna = korekcija se briše."""
+    polja = {a: getattr(p, a) for a in ("kolicina", "cijena", "rabat") if getattr(p, a) is not None}
+    for a in (p.ponisti or []):
+        polja[a] = ""
+    with _brava():
+        c = _c()
+        if not polja:
+            return _greska(OC.korigiraj_stavku, c, nalog_id, p.kljuc, p.tko)
+        r = _greska(OC.korigiraj_stavku, c, nalog_id, p.kljuc, p.tko, **polja)
+        if r.get("kolicina") is None and r.get("cijena") is None and r.get("rabat") is None:
+            _greska(OC.korigiraj_stavku, c, nalog_id, p.kljuc, p.tko)
+        return r
+
+
+@router.delete("/api/rucne/{rucna_id}")
+def rucna_obrisi(rucna_id: int, tko: str = "web"):
+    with _brava():
+        return _greska(OC.obrisi_rucnu, _c(), rucna_id, tko)
+
+
+@router.get("/api/sifrarnik/identi")
+def sifrarnik_identi(q: str = "", klasif: Optional[str] = None, limit: int = 30):
+    """Pretraga Pantheon identa (ident / naziv / klasif) za ručne stavke ponude."""
+    from ..sifrarnici.nazivi import norm
+    q = (q or "").strip()
+    rijeci = norm(q).split()                       # bez dijakritike (ŠARKA = sarka), sve riječi moraju biti u nazivu ili identu
+    with _ctx["brava"]:
+        c = _c()
+        sql = "SELECT ident, naziv, klasif, jm, cijena_neto, aktivan FROM pantheon_ident" + (" WHERE klasif = ?" if klasif else "")
+        out = []
+        for r in c.execute(sql, ([klasif.upper()] if klasif else [])):
+            polje = norm(r["naziv"]) + " " + r["ident"].upper()
+            if all(w in polje for w in rijeci):
+                out.append(dict(r))
+    out.sort(key=lambda r: (not r["aktivan"], not r["ident"].upper().startswith(q.upper()), r["ident"]))
+    return out[:max(1, min(int(limit), 200))]
+
+
 @router.get("/api/nalog/{nalog_id}/ponude")
 def nalog_ponude(nalog_id: int):
     with _ctx["brava"]:
@@ -538,7 +697,7 @@ def nalog_nova_ponuda(nalog_id: int, p: PonudaNovaP):
 
 # ---------------------------------------------------------------- optimizacija s potvrdom (D-75) i postavke (D-77)
 class OptimizacijaP(BaseModel):
-    nacin: str = "auto"                    # auto | uzduzno | poprecno | trake
+    nacin: str = "auto"                    # auto | hub | uzduzno | poprecno | trake (D-91)
     dubina: str = "najbolje"               # brzo | najbolje
     tko: str = "web"
 
@@ -547,11 +706,28 @@ class TkoP(BaseModel):
     tko: str = "web"
 
 
+class PripremiP(BaseModel):
+    nm: Optional[int] = None               # samo taj materijal; None = svi bez potvrde
+    svjeze: bool = False                   # True = računaj iznova i kad prijedlozi postoje (gumb Optimiziraj)
+    tko: str = "web"
+
+
 @router.get("/api/nalog/{nalog_id}/optimizacija")
 def nalog_optimizacija(nalog_id: int):
     with _ctx["brava"]:
         c = _c()
         _greska(N.nalog, c, nalog_id)
+        return _greska(OP.pregled, c, nalog_id)
+
+
+@router.post("/api/nalog/{nalog_id}/optimizacija/pripremi")
+def nalog_optimizacija_pripremi(nalog_id: int, p: PripremiP):
+    """D-91: za materijale bez potvrde napravi zadani prijedlog (realno za pilu) i, kad štedi m², Hub rezervu; vraća pregled kao GET."""
+    with _brava():
+        c = _c()
+        _greska(N.nalog, c, nalog_id)
+        _greska(OP.pripremi_prijedloge, c, nalog_id, p.tko, p.nm, p.svjeze)
+        c.commit()
         return _greska(OP.pregled, c, nalog_id)
 
 
@@ -566,6 +742,37 @@ def nalog_optimizacija_prijedlog(nalog_id: int, nm_id: int, p: OptimizacijaP):
         return _greska(OP.predlozi, c, nm_id, p.nacin, p.dubina, p.tko)
 
 
+@router.get("/api/optimizacija/{oid}/pregled")
+def optimizacija_pregled(oid: int):
+    """Pregled slaganja na ekranu (bez PDF-a): listovi, elementi, statistika, trake."""
+    from ..ispis import sheme_png as SPNG, krojni as KR
+    with _brava():
+        try:
+            r = SPNG.pregled(_c(), oid)
+        except (KR.IspisGreska, ValueError) as e:
+            raise HTTPException(400, str(e))
+    if not r:
+        raise HTTPException(404, "optimizacija %s ne postoji" % oid)
+    return r
+
+
+@router.get("/api/optimizacija/{oid}/sheme.png")
+def optimizacija_sheme_png(oid: int, h: int = 150, list: int = 0):
+    """Sličica slaganja (sve ploče u redu, uspravno) za ekran obračuna / pile — vidi se odmah, bez PDF-a; ?list=n = jedna ploča s brojevima i mjerama."""
+    from fastapi.responses import FileResponse
+    from ..ispis import sheme_png as SPNG, krojni as KR
+    with _brava():
+        try:
+            put = SPNG.png(_c(), oid, visina_px=max(80, min(h, 900)), list_br=list or None)
+        except (KR.IspisGreska, ValueError) as e:
+            raise HTTPException(400, str(e))
+        except ImportError:
+            raise HTTPException(500, "matplotlib nije instaliran — sličica se ne može nacrtati")
+    if not put:
+        raise HTTPException(404, "optimizacija %s nema slaganja" % oid)
+    return FileResponse(put, media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
 @router.post("/api/optimizacija/{oid}/potvrdi")
 def optimizacija_potvrdi(oid: int, p: TkoP):
     """Prijedlog → potvrđeno slaganje (jedino za ponudu, pilu i nabavu). `ponuda_poslana` = treba nova verzija ponude."""
@@ -573,7 +780,8 @@ def optimizacija_potvrdi(oid: int, p: TkoP):
         return _greska(OP.potvrdi, _c(), oid, p.tko)
 
 
-POSTAVKE_OPT = ("kerf", "kerf_pile", "nadmjera_trake", "obracun_rezanja", "ident_rezanje_rez", "ident_rezanje_m")
+POSTAVKE_OPT = ("kerf", "kerf_pile", "nadmjera_trake", "obracun_rezanja", "ident_rezanje_rez", "ident_rezanje_m", "mapa_nesting", "mapa_pila",
+                "pila_max_razina", "pila_max_sirina_u_traci", "pila_min_komad_4", "pila_mijesana_orijentacija")
 
 
 def _postavke_opt(c):
@@ -595,12 +803,18 @@ def postavke_optimizacija_upisi(p: dict):
         for k, v in p.items():
             if k not in POSTAVKE_OPT:
                 raise HTTPException(400, "nepoznata postavka %s" % k)
-            if k in ("kerf", "kerf_pile", "nadmjera_trake"):
+            if k in ("kerf", "kerf_pile", "nadmjera_trake", "pila_min_komad_4"):
                 try:
                     float(str(v).replace(",", "."))
                 except ValueError:
                     raise HTTPException(400, "%s mora biti broj" % k)
                 v = str(v).replace(",", ".")
+            if k == "pila_max_razina" and str(v) not in ("2", "3", "4"):
+                raise HTTPException(400, "pila_max_razina: 2 | 3 | 4")
+            if k == "pila_max_sirina_u_traci" and not str(v).isdigit():
+                raise HTTPException(400, "pila_max_sirina_u_traci mora biti cijeli broj (0 = bez ograničenja)")
+            if k == "pila_mijesana_orijentacija" and str(v) not in ("0", "1"):
+                raise HTTPException(400, "pila_mijesana_orijentacija: 0 | 1")
             if k == "obracun_rezanja" and v not in ("m2", "rezova", "m_reza"):
                 raise HTTPException(400, "obracun_rezanja: m2 | rezova | m_reza")
             c.execute("UPDATE postavke SET vrijednost = ? WHERE kljuc = ?", (str(v), k))
@@ -740,7 +954,7 @@ def nalog_ispis_krojni(nalog_id: int, materijal: Optional[int] = None, oid: Opti
             r = KR.napravi(c, nalog_id, mapa, materijal, oid, "web", zabiljezi=False)
         except (KR.IspisGreska, OP.OptimizacijaGreska) as e:
             raise HTTPException(400, str(e))
-        return FileResponse(r["put"], media_type="application/pdf", filename=os.path.basename(r["put"]))
+        return pdf_inline(r["put"])
 
 
 @router.post("/api/nalog/{nalog_id}/ispis/krojni.pdf")
@@ -786,6 +1000,8 @@ async def nalog_uvoz(nalog_id: int, datoteka: UploadFile = File(...), izvor: str
             st = _greska(U.uvezi_ppnest_csv, c, nalog_id, putanja, tko)
         elif ime.lower().endswith(".cpw"):
             st = _greska(U.uvezi_cpw, c, nalog_id, putanja, tko, izvor)
+        elif ime.lower().endswith(".pnl"):
+            st = _greska(U.uvezi_pnl, c, nalog_id, putanja, tko)
         else:
-            raise HTTPException(400, "podržane su datoteke .CPW i .CSV (PPNEST)")
+            raise HTTPException(400, "podržane su datoteke .CPW, .PNL (PanelWizard) i .CSV (PPNEST)")
         return dict(st, datoteka=ime, za_potvrdu=N.za_potvrdu(c, nalog_id), sazetak=N.pregled(c, nalog_id)["sazetak"])

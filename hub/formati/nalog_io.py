@@ -91,12 +91,68 @@ def read_ppnest_csv(path, kupac=None):
                         cix=_st(r, 'CIX'), napomena='' if nap in ('True', 'False') else nap,
                         prolaza=int(_num(_st(r, 'GLODANJE') or 1)), glodalo=14 if _num(r['MAT DEB']) > 20 else 12,
                         cjelina=_st(r, 'NAZIV ELEMENTA'), pozicija=_st(r, 'IME DASKE'),
-                        program1=_st(r, 'PROGRAM1'), program2=_st(r, 'PROGRAM2')))
+                        program1=_st(r, 'PROGRAM1'), program2=_st(r, 'PROGRAM2'),
+                        ljepljenje=_st(r, 'LJEPLJENJE').strip(), konacna=_konacna(_st(r, 'KONACNA DIMENZIJA'))))   # Corpus: sloj 1/2 + konačna mjera sklopa (D-79)
     return els
+
+
+def _konacna(s):
+    """'600x1465' iz Corpusovog stupca KONACNADIMENZIJA → (600.0, 1465.0); prazno / 0x0 → None."""
+    m = re.match(r'\s*(\d+(?:[.,]\d+)?)\s*[xX×]\s*(\d+(?:[.,]\d+)?)\s*$', s or '')
+    if not m:
+        return None
+    a, b = float(m.group(1).replace(',', '.')), float(m.group(2).replace(',', '.'))
+    return (a, b) if a and b else None
 
 def _is_utf8(b):
     try: b.decode('utf-8'); return True
     except UnicodeDecodeError: return False
+
+PNL_ZAPIS = 630                                   # PanelWizard .pnl: binarni VB6 zapisi fiksne širine (Igor, 17. 9.: uvoz spremljenog PW naloga)
+
+
+def read_pnl(path, nalog='', kupac=''):
+    """PanelWizard .pnl (spremljeni nalog, jedan materijal): zaglavlje 4 B, zatim zapisi od 630 B do prvog praznog:
+    int32 L, W, ?, kom, ? | naziv[30] | int16 zastavice: MEL po rubu ×4 (+1 rezerva), ABS po rubu ×4 (+1) | 4 × naziv trake[30] |
+    80 B rezerva | program (CPO / CIX)[60] | ostatak. Redoslijed rubova kao u CPW-u (L, O, D, G). Materijal = naziv iz repa datoteke koji
+    je i u imenu datoteke (`PROJEKT_MATERIJAL_ggmmdd_hhmmss.pnl`), debljina iz naziva (… 18 MM). Za oslanjanje samo na ova polja — ostalo
+    (sheme, postavke) čita se iz CPO-a / PDF-a (dokument 02 §3.5)."""
+    import struct
+    raw = open(path, 'rb').read()
+    els, off = [], 4
+    while off + PNL_ZAPIS <= len(raw):
+        r = raw[off:off + PNL_ZAPIS]
+        L, W, _x, kom, _y = struct.unpack_from('<iiiii', r, 0)
+        if L <= 0 or W <= 0 or kom <= 0 or L > 10000 or W > 10000 or kom > 10000:
+            break
+        naziv = r[20:50].decode('cp1250', errors='replace').strip('\x00 ')
+        mel = struct.unpack_from('<hhhh', r, 50)
+        abs_ = struct.unpack_from('<hhhh', r, 60)
+        n = [r[70 + i * 30:100 + i * 30].decode('cp1250', errors='replace').strip('\x00 ') for i in range(4)]
+        t = [('M' if mel[i] else 'A' if abs_[i] else '') if n[i] else '' for i in range(4)]
+        program = r[270:330].decode('cp1250', errors='replace').strip('\x00 ')
+        els.append(dict(rb=len(els) + 1, nalog=nalog, kupac=kupac, L=float(L), W=float(W), kom=int(kom), sifra_mat='', deb=0, mat='', god=0,
+                        traka={'L': n[0], 'O': n[1], 'D': n[2], 'G': n[3]}, tip={'L': t[0], 'O': t[1], 'D': t[2], 'G': t[3]},
+                        cix='', naziv=naziv, napomena='', program=program, prolaza=2 if (L < 200 or W < 200) else 1, glodalo=12))
+        off += PNL_ZAPIS
+    # materijal: polje od 25 znakova u repu datoteke (iza zapisa elemenata), iza njega 4 nul-bajta; ime datoteke je samo rezerva
+    stem = re.sub(r'_\d{6}_\d{6}$', '', os.path.splitext(os.path.basename(path))[0])
+    rep = raw[off:]
+    mat = None
+    for m in re.finditer(rb'(?<=[\x00\xff])([A-Z][A-Za-z0-9_ .,()\-/]{24})\x00\x00\x00\x00', rep):
+        c = m.group(1).decode('cp1250', errors='replace').strip()
+        if c and 'ISTI' not in c.upper() and not c.startswith('I_0'):
+            mat = c
+            break
+    if not mat:
+        mat = re.sub(r'^[A-Z0-9]+_[A-Z]+_', '', stem) or stem            # PROJEKT_KUPAC_ ispred materijala
+    mat_txt = mat.replace('_', ' ').strip()
+    m = re.search(r'(\d+(?:[.,]\d+)?)\s*MM$', mat_txt, re.I) or re.search(r'\s(\d{1,2})$', mat_txt)     # „… 18 MM“ ili „… 18“ (PW naziv)
+    deb = float(m.group(1).replace(',', '.')) if m and 3 <= float(m.group(1).replace(',', '.')) <= 50 else 0
+    for e in els:
+        e['mat'], e['deb'] = mat_txt, deb
+    return els
+
 
 def read_cpw(path, nalog='', kupac=''):
     """CPW (PPW/PanelWizard): FORMAT;CORPUS->PW;002600; / MATERIJAL;naziv;deb; / ELEMENT;naziv;L;W;kom;t1;t2;t3;t4;n1;n2;n3;n4;"""

@@ -76,3 +76,29 @@ def test_prepoznaj_i_potvrda(klijent):
     assert (t["razina"], t["ident"]) == ("alias", "TR000100")
     z = klijent.get("/api/zdravlje").json()
     assert z["aliasa"] == 6 and z["aliasa_traka"] == 1        # 5 iz ponuda + 1 potvrda; TR001254 (taverna) nije u sintetičkom skupu
+
+
+def test_web_ekrani_serviraju_se(klijent):
+    """Web ekrani (hub/web) idu s istog poslužitelja: / = index.html, /static/app.js i ekrani.js postoje i registriraju sve ekrane."""
+    r = klijent.get("/")
+    assert r.status_code == 200 and "/static/app.js" in r.text and "Hub.start()" in r.text
+    js = klijent.get("/static/app.js").text + klijent.get("/static/ekrani.js").text
+    for e in ("ekrani.nalozi", "ekrani.nalog_unos", "E.nalog_obracun", "E.nalog_skladiste", "E.nalog_pila", "E.skladiste", "E.nabava", "E.sifrarnik", "E.postavke"):
+        assert e in js, e
+    import re
+    assert not re.search(r"D-\d\d", js + klijent.get("/static/app.css").text)     # na ekranu (ni u kodu ekrana) nema oznaka odluka
+
+
+def test_regal_traka_neuspjeh_se_pamti(klijent, monkeypatch):
+    """Kad Regal traka ne odgovara, neuspjeh se pamti 60 s — ekran skladišta ne čeka timeout po svakom identu."""
+    from hub.skladiste import trake as RT
+    import hub.api.app as A
+    pozivi = []
+    def lazni(url, timeout=2.0):
+        pozivi.append(url); raise OSError("nema veze")
+    monkeypatch.setattr(RT.urllib.request, "urlopen", lazni)
+    RT.ocisti_kes()
+    c = A.veza()
+    assert RT.stanje(c, "TR000168")["dostupno"] is False and RT.metri(c, "TR000017") is None and RT.pretinac(c, "TR000016") is None
+    assert len(pozivi) == 1
+    RT.ocisti_kes()

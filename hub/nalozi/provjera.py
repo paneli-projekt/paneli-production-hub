@@ -49,7 +49,8 @@ def _uvezi(conn, naziv, datoteke, izvor, tko="PROVJERA"):
         st = U.uvezi_ppnest_csv(conn, n["id"], p, tko) if p.lower().endswith(".csv") else U.uvezi_cpw(conn, n["id"], p, tko, izvor)
         uk["datoteke"] += 1
         for k in st:
-            uk[k] += st[k]
+            if isinstance(st[k], (int, float)):
+                uk[k] = uk.get(k, 0) + st[k]
     return n["id"], uk
 
 

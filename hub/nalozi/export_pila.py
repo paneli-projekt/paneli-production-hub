@@ -22,7 +22,7 @@ from .. import db
 from ..db import sada, dnevnik, postavka, postavi
 from ..formati import cpo_rw
 from ..optimizacija import pila_optimizator as OPT
-from . import nalozi as N, sheme as SH, optimiziraj as OP
+from . import nalozi as N, sheme as SH, optimiziraj as OP, grupe as G
 from .export_nesting import ExportGreska, _bez_dij, _po_materijalu, provjeri_spremnost, _dogadjaj_izvoza, uz_rollback
 
 MAPA = "PILA"
@@ -110,6 +110,7 @@ def izvezi(conn, nalog_id, mapa, tko="web", samo_pila=True, suho=False, vrijeme=
         p = dict(nalog_materijal_id=nm_id, materijal=grupa[0]["mat"], ident=m["ident"], debljina=grupa[0]["deb"],
                  program=prog, elemenata=len(grupa), komada=sum(x["kom"] for x in grupa), cpo=put, nacin=nacin, obrez=trim,
                  optimizacija_potvrdjena=bool(opt_red),
+                 majke=[x for x in grupa if x.get("vrsta") == "majka"], suzeno=[x for x in grupa if x.get("rez_razlog") == "suziti"],
                  ploca=st["ploca"], m2_dijelova=st["m2_dijelova"], m2_za_naplatu=oc["m2_naplata"],
                  iskoristenje=st["iskoristenje"], rezova=sum(len(x["cuts"]) for x in cpo_rw.parse(bajtovi)["pat"]),
                  bajtova=len(bajtovi))
@@ -124,6 +125,9 @@ def izvezi(conn, nalog_id, mapa, tko="web", samo_pila=True, suho=False, vrijeme=
             for sl in slike:
                 conn.execute("INSERT INTO dokument (nalog_id, vrsta, putanja, datum) VALUES (?, 'png', ?, ?)", (nalog_id, sl["png"], sada()))
             p["sheme"] = slike
+            p["skice_majki"] = G.skice_materijala(conn, nm_id, korijen, prog)          # korak 6: skica majke (niz goda, mali komadi) uz CPO
+            for sk in p["skice_majki"]:
+                conn.execute("INSERT INTO dokument (nalog_id, vrsta, putanja, datum) VALUES (?, 'png', ?, ?)", (nalog_id, sk["png"], sada()))
             if zapisi_optimizaciju and opt_red:                      # potvrđeno slaganje dobiva CPO, sheme i program (isti red, D-75)
                 conn.execute("UPDATE optimizacija SET sheme_json = ?, dokument_id = ?, rezova = ? WHERE id = ?",
                              (json.dumps(dict(program=prog, kerf=kerf_naloga, obrez=trim, sheme=slike)), cur.lastrowid, p["rezova"], opt_red["id"]))
@@ -171,6 +175,12 @@ def main(argv=None):
                  100 * (p["iskoristenje"] or 0), p["m2_za_naplatu"], p["nacin"]))
         print("      %s   %d rezova%s" % (os.path.basename(p["cpo"]), p["rezova"],
                                            ("   sheme: " + ", ".join(os.path.basename(x["png"]) for x in p["sheme"])) if p.get("sheme") else ""))
+        for x in p.get("majke", []):
+            print("      MAJKA %-30s %gx%g x%d  [%s]" % (x["naziv"][:30], x["L"], x["W"], x["kom"], x["napomena"]))
+        for x in p.get("suzeno", []):
+            print("      SUZITI %-28s reze se %gx%g, konacna %gx%g  [%s]" % ((x["naziv"] or "")[:28], x["L"], x["W"], x["L_kon"], x["W_kon"], x["napomena"]))
+        if p.get("skice_majki"):
+            print("      skice majki: " + ", ".join(os.path.basename(x["png"]) for x in p["skice_majki"]))
     for x in r["preskoceno"]:
         print("   preskoceno: %-26s %s (%d el.)" % ((x["materijal"] or "?")[:26], x["razlog"], x["elemenata"]))
     for x in r["upozorenja"]:
