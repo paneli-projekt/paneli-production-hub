@@ -26,7 +26,7 @@ def _redovi(conn, statusi):
     SELECT n.id nalog_id, n.broj, n.naziv, n.status, n.rok_obecan, n.prioritet,
            nm.id nm_id, nm.put, nm.ploca_L nm_L, nm.ploca_W nm_W,
            m.id materijal_id, m.pantheon_ident ident, m.naziv_kratki kratki, m.naziv_pantheon naziv_pun,
-           m.debljina, m.god, m.winstore_kod, COALESCE(nm.ploca_L, m.ploca_L) pL, COALESCE(nm.ploca_W, m.ploca_W) pW,
+           m.debljina, m.god, m.winstore_kod, m.vrsta, COALESCE(nm.ploca_L, m.ploca_L) pL, COALESCE(nm.ploca_W, m.ploca_W) pW,
            SUM(e.L * e.W * e.kom) / 1e6 m2, SUM(e.kom) kom, COUNT(*) redaka
     FROM nalog n
     JOIN nalog_materijal nm ON nm.nalog_id = n.id
@@ -57,7 +57,7 @@ def kandidati(conn, statusi=STATUSI_ZA_REZANJE, prag_ploca=1.0):
     """
     po_materijalu = {}
     for r in _redovi(conn, statusi):
-        if r["restl"] or (r["debljina"] or 0) > 26:          # vezano na restl, ili deblje nego što nesting reže (nalog_io.alat_za_debljinu)
+        if r["restl"] or (r["debljina"] or 0) > 26 or r["vrsta"] in ("RP", "ZO"):   # restl, deblje nego što nesting reže, ili radna ploča / zidna obloga (uvijek pila, D-92)
             continue
         po_materijalu.setdefault(r["materijal_id"], []).append(r)
     out = []

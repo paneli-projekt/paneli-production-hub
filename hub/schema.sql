@@ -234,6 +234,7 @@ CREATE TABLE IF NOT EXISTS nalog_materijal (
     put_prijedlog  TEXT,
     god            INTEGER,
     ploca_L        REAL, ploca_W REAL,                 -- override (restl!)
+    obrub          REAL,                               -- obrub (rubljenje) ploče u mm za optimizaciju; NULL = zadano: 10, radne ploče / ploče stola / zidne obloge 0 (Igor, 17. 9.)
     traka_zadana   TEXT NOT NULL DEFAULT 'ABS-ISTI',   -- izbornik iznad daske: MEL-ISTI | ABS-ISTI | ABS-ISTI 2mm (D-31, D-36)
     status_opt     TEXT,
     napomena       TEXT,

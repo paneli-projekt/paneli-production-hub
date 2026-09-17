@@ -67,7 +67,7 @@ def potrebe_naloga(conn, nalog_id):
         if r:
             d.update(ploce=int(r["broj_ploca"] or 0), optimizacija_id=r["id"], potvrdjena=True)
         else:
-            d["upozorenje"] = "slaganje nije potvrđeno (D-75) — broj ploča nepoznat"
+            d["upozorenje"] = "optimizacija nije potvrđena (D-75) — broj ploča nepoznat"
         out.append(d)
     return out
 

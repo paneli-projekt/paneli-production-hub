@@ -74,11 +74,10 @@ def izvezi(conn, nalog_id, mapa, tko="web", samo_pila=True, suho=False, vrijeme=
             e["mat"] = _bez_dij(e["mat"])
         prog = "HUB_SUHO" if suho else novi_program(conn)
         pL, pW = _ploca(m)
-        trim = TRIM
-        if any(x["L"] > pL - 2 * TRIM or x["W"] > pW - 2 * TRIM for x in grupa):
+        trim, auto0 = OP.obrub(m, grupa, (pL, pW))            # obrub s materijala naloga ili zadani (10 mm, radne ploče / stol / zidne 0)
+        if auto0:
             # element na punu mjeru ploče (HUMER: 2800 × 1190 na ploči 2800): PW ga reže BEZ obreza ruba 10 mm (Igor, 15. 9. 2026.)
-            trim = 0
-            upozorenja.append("%s: element na punu mjeru ploče (%s) — složeno bez obreza ruba"
+            upozorenja.append("%s: element na punu mjeru ploče (%s) — složeno bez obruba"
                               % (ime_m, ", ".join("%gx%g" % (x["L"], x["W"]) for x in grupa if x["L"] > pL - 2 * TRIM or x["W"] > pW - 2 * TRIM)))
         # D-75: na pilu ide POTVRĐENO slaganje (isto kao u ponudi); bez potvrde izvoz stane — osim uz forsiraj / suho (probe, pregled)
         try:
@@ -86,7 +85,7 @@ def izvezi(conn, nalog_id, mapa, tko="web", samo_pila=True, suho=False, vrijeme=
         except OP.OptimizacijaGreska:
             potvrdjeno = None                              # ne može se složiti (prevelik element) — poruka s popisom dolje iz napravi_cpo
         if not potvrdjeno and not forsiraj and not suho and not any(x["L"] > pL or x["W"] > pW for x in grupa):
-            raise ExportGreska("%s: optimizacija nije potvrđena — ponuda i pila koriste isto slaganje (D-75); prvo potvrditi prijedlog" % ime_m)
+            raise ExportGreska("%s: optimizacija nije potvrđena — ponuda i pila koriste istu optimizaciju (D-75); prvo potvrditi prijedlog" % ime_m)
         if not potvrdjeno:
             upozorenja.append("%s: optimizacija nije potvrđena (D-75) — %s" % (ime_m, "prikaz je Hubov prijedlog" if suho else "izvoz uz forsiraj koristi Hubov prijedlog"))
         sheets_p = potvrdjeno[0] if potvrdjeno else None
@@ -102,7 +101,7 @@ def izvezi(conn, nalog_id, mapa, tko="web", samo_pila=True, suho=False, vrijeme=
                 nacin = opt_red["nacin"]
         except ValueError as e:                     # ni bez obreza ne stane (element veći od ploče) — poruka umjesto rušenja
             preveliki = ["%gx%g" % (x["L"], x["W"]) for x in grupa if x["L"] > pL or x["W"] > pW]
-            raise ExportGreska("shema za %s se ne može složiti (%s); ploča %gx%g, obrez %g mm%s"
+            raise ExportGreska("shema za %s se ne može složiti (%s); ploča %gx%g, obrub %g mm%s"
                                % (ime_m, e, pL, pW, trim, (" — preveliki elementi: " + ", ".join(preveliki[:5])) if preveliki else ""))
         if greske:
             raise ExportGreska("shema za %s nije valjana: %s" % (ime_m, "; ".join(greske[:3])))

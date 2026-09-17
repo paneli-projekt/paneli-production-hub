@@ -50,7 +50,7 @@ def test_potrebe_provjera_rezervacija_i_prijedlog_restla(skl):
     nid, nm, e1, e2 = _nalog(skl, status="potvrdjeno")
     # bez potvrđenog slaganja: broj ploča nepoznat, trake poznate
     p = SK.potrebe_naloga(skl, nid)[0]
-    assert p["ploce"] is None and "nije potvrđeno" in p["upozorenje"]
+    assert p["ploce"] is None and "nije potvrđena" in p["upozorenje"]
     t = list(p["trake"].values())[0]
     assert t["ident"] == "TR000168" and abs(t["metri_tocno"] - 2.2) < 1e-6 and t["metri"] == 3        # (800×2 + 400) × 1,10 = 2,2 → 3 m
     OP.potvrdi(skl, OP.predlozi(skl, nm, "auto", "najbolje", "IVANA")["id"], "IVANA")

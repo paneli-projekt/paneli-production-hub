@@ -17,7 +17,7 @@ import sys
 from .. import db
 from ..db import sada, dnevnik, postavka
 from ..nalozi import nalozi as N, optimiziraj as OP, sheme as SH, grupe as G
-from ..optimizacija import obracun as OB, pila_optimizator as OPT
+from ..optimizacija import obracun as OB, pila_optimizator as OPT, radne_ploce as RPP
 from ..skladiste import trake as RT
 
 OVDJE = os.path.dirname(os.path.abspath(__file__))
@@ -144,6 +144,14 @@ def podaci(conn, nm_id, oid=None):
         listovi.append(dict(br=i + 1, dir=s["dir"], pravokutnici=g["pravokutnici"], komadi=len(komadi), m2_dijelova=round(m2_dio, 3),
                             iskoristenje=round(m2_dio / (L * W / 1e6), 4), rezova=len(g["pravokutnici"]), ostatak=ost, strips=s["strips"]))
     oc = OPT.ocijeni(sheets, ploca, trim, kerf_obracun)
+    ob = OP.obitelj_rp(conn, m=m)
+    rp = None
+    if ob:                                                   # radna ploča / ploča stola / zidna obloga: naplata i ostatak po ploči (D-92)
+        orp = RPP.ocijeni(sheets, ploca, trim, kerf, ob)
+        rp = dict(orp["rp"], opis_kratko=RPP.opis(orp["rp"]))
+        oc = dict(oc, m2_naplata=orp["m2_naplata"], ostaci=orp["ostaci"])
+        for li, x in zip(listovi, rp["listovi"]):
+            li.update(ostatak=x["ostatak"], ostatak_duz=True, naplata=x)
     m2_dijelova = sum(x["m2_dijelova"] for x in listovi)
     m2_ploca = len(sheets) * L * W / 1e6
     stanje = conn.execute("SELECT COALESCE(SUM(kom_ukupno), 0) FROM winstore_ploca WHERE materijal_id = ? AND ambalaza = 0 AND drop_ploca = 0",
@@ -168,7 +176,12 @@ def podaci(conn, nm_id, oid=None):
                 elementi=elementi, trake=sorted(trake.values(), key=lambda t: (t["vrsta"] != "ABS", t["broj"])), listovi=listovi,
                 statistika=dict(ploca=len(sheets), m2_ploca=round(m2_ploca, 2), m2_dijelova=round(m2_dijelova, 2), m2_naplata=oc["m2_naplata"],
                                 iskoristenje=round(m2_dijelova / m2_ploca, 4) if m2_ploca else 0, ostaci=oc["ostaci"], rezova=oc["rezova"],
-                                komada=sum(e["kom"] for e in elementi), elemenata=len(elementi), faktor_trake=faktor_trake))
+                                komada=sum(e["kom"] for e in elementi), elemenata=len(elementi), faktor_trake=faktor_trake, rp=rp))
+
+
+
+def _rp_pravilo(ob):
+    return {"radna": "po ploči: do 2,7 m metri (min. 1,4)", "stola": "po ploči: pola ili cijela", "zidna": "samo cijela ploča"}.get(ob, "")
 
 
 # ---------------------------------------------------------------- PDF
@@ -266,9 +279,9 @@ class _Nacrt:
         lijevo = [("Nalog", "%s%s" % (n["naziv"], (" · " + n["kupac"]) if n["kupac"] and n["kupac"] not in n["naziv"] else "")),
                   ("Materijal", "%s  %s" % (m["ident"] or "—", m["naziv"] or "")),
                   ("Winstore", "%s%s" % (m["winstore_kod"] or "—", ("  · na stanju %d kom" % m["stanje_kom"]) if m["stanje_kom"] is not None and m["winstore_kod"] else ""))]
-        desno = [("Ploča", "%s × %s × %s mm · obrez %s mm" % (_mm(p["L"]), _mm(p["W"]), _mm(m["debljina"] or 0), _mm(p["trim"]))),
+        desno = [("Ploča", "%s × %s × %s mm · obrub %s mm" % (_mm(p["L"]), _mm(p["W"]), _mm(m["debljina"] or 0), _mm(p["trim"]))),
                  ("God", "DA" if p["god"] else "NE"),
-                 ("Slaganje", "%s · kerf %s mm" % (s["nacin"], _mm(p["kerf_pile"]))),
+                 ("Optimizacija", "%s · kerf %s mm" % (s["nacin"], _mm(p["kerf_pile"]))),
                  ("Potvrdio", ("%s, %s" % (s["potvrdio"] or "—", (s["potvrdjeno_kad"] or "")[:16].replace("T", " "))) if s["potvrdjeno"] else "— PRIJEDLOG, nije potvrđeno")]
         lijevo.append(("", ""))
         y -= 3 * mm
@@ -365,7 +378,8 @@ class _Nacrt:
         c.setFont(self.f, 8.5)
         c.drawString(self.M + 30 * mm, y - 5 * mm, "smjer %s · komada %d · rezova %d · iskorištenje %s %% · dijelova %s m²%s" % (
             "uzdužno" if li["dir"] == "L" else "poprečno", li["komadi"], li["rezova"], _fmt(100 * li["iskoristenje"], 1), _fmt(li["m2_dijelova"]),
-            (" · KORISNI OSTATAK %s × %s mm (%s m²)" % (_mm(o[0]), _mm(o[1]), _fmt(o[2]))) if o else ""))
+            (" · KORISNI OSTATAK %s × %s mm (%s m²)" % (_mm(o[0]), _mm(o[1]), _fmt(o[2]))) if o else "") +
+            ((" · ZA NAPLATU %s m (%s)" % (_fmt(li["naplata"]["naplata_m"]), li["naplata"]["opis"])) if li.get("naplata") else ""))
         y -= 8 * mm
         # crtež: ploča USPRAVNO — duža stranica (L = 2800) je okomita na papiru, kao u PW (Igor, 16. 9.)
         # koordinate ploče (x uz L, y uz W) → papir: X = oy_papir + y, Y = ox_papir + x
@@ -446,7 +460,7 @@ class _Nacrt:
         if o:
             c.setFont(self.fb, 8)
             c.setFillColor(colors.black)
-            if li["dir"] == "L":                          # ostatak uz kraj W = desni rub papira, cijelom visinom
+            if li["dir"] == "L" and not li.get("ostatak_duz"):   # ostatak uz kraj W = desni rub papira, cijelom visinom (radna ploča: uz duljinu, dolje)
                 c.saveState()
                 c.translate(ox + (W - o[1] / 2) * sk + 3, oy + L * sk / 2)
                 c.rotate(90)
@@ -524,7 +538,8 @@ class _Nacrt:
         sirina = self.PW - 2 * self.M
         kut = [("PLOČE", "%d kom" % st["ploca"], "%s × %s × %s mm" % (_mm(d["ploca"]["L"]), _mm(d["ploca"]["W"]), _mm(m["debljina"] or 0))),
                ("POVRŠINA SVIH PLOČA", "%s m²" % _fmt(st["m2_ploca"]), "dijelova %s m² · iskorištenje %s %%" % (_fmt(st["m2_dijelova"]), _fmt(100 * st["iskoristenje"], 1))),
-               ("POVRŠINA ZA NAPLATU", "%s m²" % _fmt(st["m2_naplata"]), "korisni ostatak odbijen (≥ 400 mm, ≥ 1 m²)")]
+               ("POVRŠINA ZA NAPLATU", "%s m²" % _fmt(st["m2_naplata"]), "korisni ostatak odbijen (≥ 400 mm, ≥ 1 m²)") if not st.get("rp") else
+               ("ZA NAPLATU", "%s m" % _fmt(st["rp"]["ukupno_m"]), _rp_pravilo(st["rp"]["obitelj"]))]
         kw = sirina / 3
         for i, (naslov, broj, opis) in enumerate(kut):
             x0 = self.M + i * kw
@@ -568,7 +583,7 @@ class _Nacrt:
         if not d["slaganje"]["potvrdjeno"]:
             c.setFont(self.fb, 9)
             c.setFillColor(colors.HexColor("#b00020"))
-            c.drawString(self.M, y, "PRIJEDLOG — slaganje nije potvrđeno (D-75); nacrt nije za pilu dok ga netko ne potvrdi.")
+            c.drawString(self.M, y, "PRIJEDLOG — optimizacija nije potvrđena (D-75); nacrt nije za pilu dok je netko ne potvrdi.")
             c.setFillColor(colors.black)
         self.podnozje(self.ukupno)
         c.showPage()

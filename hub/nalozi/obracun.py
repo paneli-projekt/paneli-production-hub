@@ -6,8 +6,9 @@ izvede stavke kakve danas ured tipka u Pantheon — istim redoslijedom (materija
 
   ploča       m² za naplatu (korisni ostatak odbijen) + pravilo načete ploče: >2/3 cijela, 1/3–2/3 +0,25 m², <1/3 minimum 1/3
               (svaki dodatak piše u `pravilo`, ured ga vidi i može maknuti); restl (ploča naloga nije standardna) = cijela površina;
-              radna / zidna ploča (RP, ZO) po dužnom metru = Σ dulja stranica × kom
-  rezanje     US000002 (iveral i sve ostalo) / US000013 (MDF do 8 mm) po m² ploče; RP/ZO: US000303 = 2 reza × komada
+              radna ploča / ploča stola / zidna obloga (RP, ZO) PO PLOČI iz potvrđenog slaganja (D-37 / D-92, radne_ploce.py):
+              radna 600 ≤ 2,7 m točni metri (najmanje 1,4 m), > 2,7 m cijela 4,1 m; stol 900 pola 2,05 / cijela 4,1 m; zidna uvijek cijela
+  rezanje     US000002 (iveral i sve ostalo) / US000013 (MDF do 8 mm) po m² ploče; radna / stol: US000303 = 2 reza × komada, zidna 4 reza × komada
   traka       PW metri (Σ stranica × kom × 1,10 — 10 % otpada je već unutra) zaokruženi NAVIŠE na cijeli metar po traci (D-20)
   kantiranje  US000003 (0,5 mm) / US000011 (1 i 2 mm /22) / US000012 (/44) = ISTI metri kao traka (naviše na cijeli m, D-90)
   CNC         iz CIX-a (Corpus) ili napomene elementa: fi35 → US000149 (kom), NUT / FALC → US000016 (m), UREZ GOLA → US002075 (m);
@@ -28,7 +29,7 @@ import sys
 
 from .. import db
 from ..db import sada, dnevnik, postavka
-from ..optimizacija import pila_optimizator as OPT, obracun as OB
+from ..optimizacija import pila_optimizator as OPT, obracun as OB, radne_ploce as RPP
 from ..sifrarnici import prepoznaj as P
 from . import nalozi as N, optimiziraj as OP
 
@@ -176,16 +177,43 @@ def izracunaj(conn, nalog_id, pravila=True, kerf=None):
         komada = sum(int(e["kom"]) for e in els)
         pm = dict(nalog_materijal_id=nm["id"], ident=m["ident"], materijal=m["naziv_kratki"] or m["naziv_ulaz"], vrsta=mat["vrsta"], elemenata=len(els), komada=komada,
                   m2_dijelova=round(sum(e["L"] * e["W"] * e["kom"] for e in els) / 1e6, 3))
-        if mat["vrsta"] in ("RP", "ZO"):                         # po dužnom metru + 2 reza po komadu
-            metara = round(sum(max(e["L"], e["W"]) * e["kom"] for e in els) / 1000, 2)
-            add(m["ident"], metara, "materijal", "RP/ZO po dužnom metru (Σ dulja stranica × kom)", nm["id"])
-            add(US_REZ_RP, 2 * komada, "rezanje", "2 reza × %d kom" % komada, nm["id"])
-            pm.update(nacin="dužni metar", kolicina=metara, jm="M")
+        if mat["vrsta"] in ("RP", "ZO"):                         # D-92: po ploči iz potvrđenog slaganja (radna 600 / stol 900 / zidna 640)
+            ob = RPP.obitelj(mat["vrsta"], mat["obitelj_rp"])
+            rez = RPP.REZOVA_PO_KOMADU.get(ob, 2)
+            s = OP.slaganje(conn, nm["id"])
+            potvrdjeno = bool(s)
+            s = s or OP.prijedlog_auto(conn, nm["id"])
+            greska = None
+            try:
+                if s:
+                    sheets, pl, tr, kf, nacin = s[0], s[1], s[2], s[3], s[5]["nacin"]
+                else:
+                    r_ = OP.izracunaj(conn, nm["id"])
+                    sheets, pl, tr, kf, nacin = r_["sheets"], r_["ploca"], r_["trim"], r_["kerf"], r_["nacin"]
+            except OP.OptimizacijaGreska as ex:
+                sheets, greska = None, str(ex)
+            if sheets is None:                                    # ne stane na ploču (dulje od 4100 — spoj): zbroj duljina uz upozorenje
+                metara = round(sum(max(e["L"], e["W"]) * e["kom"] for e in els) / 1000, 2)
+                upoz.append("%s: %s — stavka po zbroju duljina, provjeriti" % (pm["materijal"], greska))
+                add(m["ident"], metara, "materijal", "zbroj duljina (ne stane na ploču — provjeriti)", nm["id"])
+                add(US_REZ_RP, rez * komada, "rezanje", "%d reza × %d kom" % (rez, komada), nm["id"])
+                pm.update(nacin="dužni metar", kolicina=metara, jm="M")
+            else:
+                if not potvrdjeno:
+                    upoz.append("%s: optimizacija nije potvrđena (D-75) — brojke su Hubov prijedlog" % pm["materijal"])
+                rp = RPP.ocijeni(sheets, pl, tr, kf, ob)["rp"]
+                jm = (_ident(conn, m["ident"]) or {}).get("jm")
+                kol, up = RPP.kolicina_za_jm(rp, jm)
+                if up:
+                    upoz.append("%s: %s" % (pm["materijal"], up))
+                add(m["ident"], kol, "materijal", "%s: %s%s" % (rp["naziv"], RPP.opis(rp), " (potvrđeno)" if potvrdjeno else ""), nm["id"])
+                add(US_REZ_RP, rez * komada, "rezanje", "%d reza × %d kom" % (rez, komada), nm["id"])
+                pm.update(nacin=nacin, kolicina=kol, jm=jm or "M", ploca=len(sheets), naplata_rp=rp, optimizacija_potvrdjena=potvrdjeno)
         elif m["ploca_L"] or m["ploca_W"]:                        # restl / vlastita ploča: cijela površina (skill §2)
             n_pl, oc, potvrdjeno = 1, None, False
             try:
                 dijelovi = [(k + 1, float(e["W"]), float(e["L"]), int(e["kom"])) for k, e in enumerate(els)]
-                sheets, oc, nacin, potvrdjeno = slaganje(nm["id"], dijelovi, (pL, pW), 10, bool(m["god"]))
+                sheets, oc, nacin, potvrdjeno = slaganje(nm["id"], dijelovi, (pL, pW), OP.obrub(m, els, (pL, pW))[0], bool(m["god"]))
                 n_pl = oc["ploca"]
             except ValueError:
                 upoz.append("%s: elementi ne stanu na restl %gx%g" % (pm["materijal"], pL, pW))
@@ -197,9 +225,7 @@ def izracunaj(conn, nalog_id, pravila=True, kerf=None):
             pm.update(nacin="restl", kolicina=m2, jm="M2", ploca=n_pl, optimizacija_potvrdjena=potvrdjeno)
         else:
             dijelovi = [(k + 1, float(e["W"]), float(e["L"]), int(e["kom"])) for k, e in enumerate(els)]
-            trim = 10
-            if any(e["L"] > pL - 2 * trim or e["W"] > pW - 2 * trim for e in els):
-                trim = 0                                          # element na punu mjeru ploče: bez obreza (D-65/10)
+            trim = OP.obrub(m, els, (pL, pW))[0]                  # obrub s materijala naloga ili zadani; puna mjera ploče → 0 (D-65/10)
             try:
                 sheets, oc, nacin, potvrdjeno = slaganje(nm["id"], dijelovi, (pL, pW), trim, bool(m["god"]))
             except ValueError as e:

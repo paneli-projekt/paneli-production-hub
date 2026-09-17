@@ -228,7 +228,7 @@ def test_pila_element_na_punu_plocu_bez_obreza(baza, tmp_path):
     N.uredi_element(baza, e1["id"], "TEST", L=2800, W=1190)
     N.postavi_status(baza, nid, "potvrdjeno", "TEST")
     r = EP.izvezi(baza, nid, str(tmp_path), "TEST", samo_pila=False)
-    assert r["paketi"][0]["obrez"] == 0 and any("2800x1190" in u and "bez obreza" in u for u in r["upozorenja"])
+    assert r["paketi"][0]["obrez"] == 0 and any("2800x1190" in u and "bez obruba" in u for u in r["upozorenja"])
     assert cpo_rw.parse(r["paketi"][0]["cpo"])["inv"][0]["trim"] == [0.0, 0.0, 0.0, 0.0]
     N.postavi_status(baza, nid, "ponuda", "TEST")
     N.uredi_element(baza, e1["id"], "TEST", L=2900, W=1190)

@@ -28,9 +28,9 @@ def pregled(conn, oid):
         return None
     d = KR.podaci(conn, r["nalog_materijal_id"], oid=oid)
     return dict(id=r["id"], nalog_materijal_id=r["nalog_materijal_id"], status=r["status"], nacin=r["nacin"], materijal=d["materijal"], ploca=d["ploca"],
-                statistika=d["statistika"], trake=[dict(oznaka=t["oznaka"], naziv=t["naziv"], metri=round(t["metri"], 1)) for t in d["trake"]],
+                statistika=d["statistika"], naplata_rp=d["statistika"].get("rp"), trake=[dict(oznaka=t["oznaka"], naziv=t["naziv"], metri=round(t["metri"], 1)) for t in d["trake"]],
                 listovi=[dict(br=li["br"], dir=li["dir"], komadi=li["komadi"], rezova=li["rezova"], iskoristenje=li["iskoristenje"], m2_dijelova=li["m2_dijelova"],
-                              ostatak=list(li["ostatak"]) if li.get("ostatak") else None) for li in d["listovi"]],
+                              ostatak=list(li["ostatak"]) if li.get("ostatak") else None, naplata=li.get("naplata")) for li in d["listovi"]],
                 elementi=[dict(idx=e["idx"], naziv=e["naziv"], L=e["L"], W=e["W"], kom=e["kom"], napomena=e["napomena"], vrsta=e["vrsta"]) for e in d["elementi"]])
 
 
@@ -64,7 +64,7 @@ def png(conn, oid, put=None, visina_px=150, list_br=None):
         o = li.get("ostatak")
         if o:                                            # naš restl (plava): dir L = traka uz duljinu → ostatak po širini (desno), inače po duljini (dolje)
             oL, oW = float(o[0]), float(o[1])
-            if li["dir"] == "L":
+            if li["dir"] == "L" and not li.get("ostatak_duz"):        # radna ploča / stol / zidna: ostatak uz duljinu (dolje)
                 ax.add_patch(Rectangle((W - oW, 0), oW, L, fc=BOJA_NAS, ec=BOJA_NAS_RUB, lw=0.8, ls=(0, (3, 2))))
             else:
                 ax.add_patch(Rectangle((0, 0), W, oL, fc=BOJA_NAS, ec=BOJA_NAS_RUB, lw=0.8, ls=(0, (3, 2))))

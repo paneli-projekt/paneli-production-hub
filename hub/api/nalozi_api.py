@@ -362,6 +362,7 @@ class MaterijalUredi(BaseModel):
     ploca_W: Optional[float] = None
     napomena: Optional[str] = None
     rb: Optional[int] = None
+    obrub: Optional[float] = None          # mm; poslano null = natrag na zadano (10, radne ploče 0)
     tko: str = "web"
 
 
@@ -398,6 +399,8 @@ def materijal_dodaj(nalog_id: int, p: MaterijalNaloga):
 def materijal_uredi(nm_id: int, p: MaterijalUredi):
     with _brava():
         polja = {k: v for k, v in p.model_dump().items() if k != "tko" and v is not None}
+        if "obrub" in p.model_fields_set:
+            polja["obrub"] = p.obrub                       # i null (zadano)
         return _greska(N.uredi_materijal, _c(), nm_id, p.tko, **polja)
 
 
@@ -769,7 +772,7 @@ def optimizacija_sheme_png(oid: int, h: int = 150, list: int = 0):
         except ImportError:
             raise HTTPException(500, "matplotlib nije instaliran — sličica se ne može nacrtati")
     if not put:
-        raise HTTPException(404, "optimizacija %s nema slaganja" % oid)
+        raise HTTPException(404, "optimizacija %s nema sheme" % oid)
     return FileResponse(put, media_type="image/png", headers={"Cache-Control": "no-store"})
 
 

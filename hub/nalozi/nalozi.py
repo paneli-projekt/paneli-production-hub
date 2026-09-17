@@ -244,12 +244,21 @@ def dodaj_materijal(conn, nalog_id, tko, materijal_id=None, naziv_ulaz=None, deb
     return materijal_naloga(conn, nm_id), rez
 
 
+OBRUB_ZADANO = 10.0        # obrub (rubljenje) ploče za optimizaciju, mm — PW: 2800 × 2070 → 2780 × 2050
+
+
+def obrub_zadani(vrsta):
+    """Zadani obrub ploče: 10 mm; radne ploče, ploče stola i zidne obloge 0 (Igor, 17. 9. — režu se na mjeru bez rubljenja)."""
+    return 0.0 if vrsta in ("RP", "ZO") else OBRUB_ZADANO
+
+
 def materijal_naloga(conn, nm_id):
     r = conn.execute("SELECT nm.*, m.pantheon_ident AS ident, m.naziv_pantheon AS naziv, m.naziv_kratki, m.vrsta, m.debljina, m.winstore_kod, m.ploca_L AS m_ploca_L, "
                      "m.ploca_W AS m_ploca_W, m.god AS m_god FROM nalog_materijal nm LEFT JOIN materijal m ON m.id = nm.materijal_id WHERE nm.id = ?", (nm_id,)).fetchone()
     if not r:
         raise NalogGreska("nema materijala naloga %s" % nm_id)
     d = dict(r)
+    d["obrub_zadano"] = obrub_zadani(d["vrsta"])
     d["trake"] = {}
     if d["materijal_id"]:
         for t in conn.execute("SELECT mt.klasa, tr.pantheon_ident, tr.naziv, mt.izvor FROM materijal_traka mt JOIN traka tr ON tr.id = mt.traka_id WHERE mt.materijal_id = ?", (d["materijal_id"],)):
@@ -258,8 +267,10 @@ def materijal_naloga(conn, nm_id):
 
 
 def uredi_materijal(conn, nm_id, tko, **polja):
-    dopusteno = {"put", "put_prijedlog", "god", "ploca_L", "ploca_W", "traka_zadana", "napomena", "rb"}
+    dopusteno = {"put", "put_prijedlog", "god", "ploca_L", "ploca_W", "traka_zadana", "napomena", "rb", "obrub"}
     p = {k: v for k, v in polja.items() if k in dopusteno}
+    if p.get("obrub") is not None and not (0 <= float(p["obrub"]) <= 50):
+        raise NalogGreska("obrub mora biti između 0 i 50 mm")
     if "traka_zadana" in p and p["traka_zadana"] not in TRAKE_ZADANE:
         raise NalogGreska("traka_zadana mora biti jedna od: %s" % ", ".join(TRAKE_ZADANE))
     if p:

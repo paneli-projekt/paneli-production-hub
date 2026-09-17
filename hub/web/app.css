@@ -193,3 +193,7 @@ tr.korig td{background:#FFF8EA} tr.korig input.inl{border-color:var(--mel)}
 .drop.mali{flex-direction:row;justify-content:center;gap:8px;padding:9px 12px} .drop.mali .note{display:none}
 .ver-gumbi .btn.sm{flex:1 1 auto;text-align:center}
 @media (min-width:1500px){.dvo{grid-template-columns:minmax(0,1fr) 420px}}
+/* gumbi: zelena #4F8F32 umjesto tamno zelene (Igor, 17. 9.) */
+:root{--btn:#4F8F32;--btn-h:#427A29}
+.btn.pri,.alatna .tbtn.pri,.chip.on{background:var(--btn);border-color:var(--btn);color:#fff}
+.btn.pri:hover,.alatna .tbtn.pri:hover{background:var(--btn-h);border-color:var(--btn-h)}

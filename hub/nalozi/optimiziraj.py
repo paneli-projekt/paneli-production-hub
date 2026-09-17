@@ -22,7 +22,7 @@ import sys
 
 from .. import db
 from ..db import sada, dnevnik, postavka
-from ..optimizacija import pila_optimizator as OPT
+from ..optimizacija import pila_optimizator as OPT, radne_ploce as RPP
 from . import nalozi as N
 
 NACINI = ("auto", "hub", "uzduzno", "poprecno", "trake")
@@ -71,6 +71,21 @@ def _ploca(m):
     return float(m["ploca_L"] or m["m_ploca_L"] or 2800), float(m["ploca_W"] or m["m_ploca_W"] or 2070)
 
 
+def obrub(m, els, ploca):
+    """Obrub (rubljenje) ploče za optimizaciju → (mm, auto_0). Upisan na materijalu naloga vrijedi kakav jest; inače zadano
+    (10 mm, radne ploče / ploče stola / zidne obloge 0) — a kad element ne stane uz zadani obrub (puna mjera ploče), 0 (D-65/10)."""
+    def cijeli(x):                                  # 10 a ne 10.0: isti hash elemenata kao prije (potvrđene optimizacije ne zastare)
+        x = float(x)
+        return int(x) if x.is_integer() else x
+    if m.get("obrub") is not None:
+        return cijeli(m["obrub"]), False
+    t = cijeli(N.obrub_zadani(m.get("vrsta")))
+    pL, pW = ploca
+    if t and any(e["L"] > pL - 2 * t or e["W"] > pW - 2 * t for e in els):
+        return 0, True
+    return t, False
+
+
 def ulaz_materijala(conn, nm_id):
     """Sve što optimizator treba za jedan materijal naloga: (m, els, dijelovi, ploca, trim, god, hash).
     els su u istom redoslijedu kao u export_pila / obracun (elementi_za_export), pa je idx = redni broj u toj listi."""
@@ -78,12 +93,19 @@ def ulaz_materijala(conn, nm_id):
     els = [e for e in N.elementi_za_export(conn, m["nalog_id"]) if e["nalog_materijal_id"] == nm_id]
     dijelovi = [(k + 1, float(e["W"]), float(e["L"]), int(e["kom"])) for k, e in enumerate(els)]
     pL, pW = _ploca(m)
-    trim = TRIM
-    if any(e["L"] > pL - 2 * TRIM or e["W"] > pW - 2 * TRIM for e in els):
-        trim = 0                                            # element na punu mjeru ploče: bez obreza (D-65/10)
+    trim = obrub(m, els, (pL, pW))[0]                       # obrub s materijala naloga ili zadani (radne ploče 0; puna mjera ploče → 0, D-65/10)
     god = bool(m["god"]) or any(int(e.get("god", 0)) for e in els)
     h = hashlib.sha1(json.dumps([(e["element_id"], e["L"], e["W"], e["kom"]) for e in els] + [pL, pW, trim, god]).encode()).hexdigest()[:16]
     return m, els, dijelovi, (pL, pW), trim, god, h
+
+
+def obitelj_rp(conn, nm_id=None, m=None):
+    """'radna' | 'stola' | 'zidna' za radnu ploču, ploču stola ili zidnu oblogu (D-37 / D-92), inače None."""
+    m = m or N.materijal_naloga(conn, nm_id)
+    if not m["materijal_id"]:
+        return None
+    v = conn.execute("SELECT vrsta, obitelj_rp FROM materijal WHERE id = ?", (m["materijal_id"],)).fetchone()
+    return RPP.obitelj(v["vrsta"], v["obitelj_rp"]) if v else None
 
 
 def izracunaj(conn, nm_id, nacin="auto", dubina="najbolje"):
@@ -99,11 +121,25 @@ def izracunaj(conn, nm_id, nacin="auto", dubina="najbolje"):
         raise OptimizacijaGreska("materijal %s nema elemenata" % (m["naziv_kratki"] or m["naziv_ulaz"] or nm_id))
     kerf = kerf_pile(conn)
     ogr = ogranicenja_pile(conn)
+    ob = obitelj_rp(conn, m=m)
+    if ob in ("radna", "zidna"):                                        # D-92: komad iza komada, naplata po ploči — nema varijanti ni rezerve
+        try:
+            sheets = RPP.slozi_niz(dijelovi, ploca, trim, kerf)
+        except ValueError as e:
+            raise OptimizacijaGreska("%s: ne može se složiti (%s)%s" % (m["naziv_kratki"] or m["naziv_ulaz"], e,
+                                     " — obrub ploče %g mm, smanji ga u materijalu" % trim if trim and m.get("obrub") is not None else ""))
+        oc = RPP.ocijeni(sheets, ploca, trim, kerf, ob)
+        return dict(nalog_materijal_id=nm_id, sheets=sheets, oc=oc, nacin="komad iza komada", nacin_trazen=nacin, dubina=dubina, ploca=ploca, trim=trim,
+                    kerf=kerf, god=god, hash=h, elemenata=len(els), komada=sum(int(e["kom"]) for e in els), st=OPT.statistika(sheets, dijelovi, ploca),
+                    element_ids=[e["element_id"] for e in els], napomena=None, dopusteno=True, ogranicenja=ogr, obitelj=ob)
     nacini = None if nacin in ("auto", "hub") else (nacin,)
+    if ob == "stola" and nacini is None:
+        nacini = ("uzduzno", "trake")                                   # ploča stola: trake uz duljinu, smiju i uži komadi jedan uz drugi (D-92)
     try:
         sheets, oc, pobjednik, kand = _kandidati(dijelovi, ploca, trim, kerf, god, nacini, dubina == "brzo", ogr, h)
     except ValueError as e:
-        raise OptimizacijaGreska("%s: ne može se složiti (%s)" % (m["naziv_kratki"] or m["naziv_ulaz"], e))
+        raise OptimizacijaGreska("%s: ne može se složiti (%s)%s" % (m["naziv_kratki"] or m["naziv_ulaz"], e,
+                                     " — obrub ploče %g mm, smanji ga u materijalu" % trim if trim and m.get("obrub") is not None else ""))
     napomena = None
     dop = True
     if nacin == "hub":                                                  # rezerva: najbolji kandidat bez obzira na ograničenja
@@ -116,16 +152,18 @@ def izracunaj(conn, nm_id, nacin="auto", dubina="najbolje"):
     elif pobjednik.endswith("/izvan-ogranicenja"):
         pobjednik = pobjednik[:-len("/izvan-ogranicenja")]
         dop, razlozi = OPT.dopusteno(sheets, dijelovi, ogr)
-        napomena = "nijedno slaganje ne zadovoljava ograničenja pile (%s) — uzeto najbolje bez ograničenja" % "; ".join(razlozi)
+        napomena = "nijedna optimizacija ne zadovoljava ograničenja pile (%s) — uzeto najbolje bez ograničenja" % "; ".join(razlozi)
     st = OPT.statistika(sheets, dijelovi, ploca)
-    return dict(nalog_materijal_id=nm_id, sheets=sheets, oc=oc, nacin=pobjednik, nacin_trazen=nacin, dubina=dubina, ploca=ploca, trim=trim,
+    if ob == "stola":
+        oc = RPP.ocijeni(sheets, ploca, trim, kerf, ob)                 # naplata pola / cijela po ploči umjesto m² PW-metodom
+    return dict(nalog_materijal_id=nm_id, sheets=sheets, oc=oc, nacin=pobjednik, obitelj=ob, nacin_trazen=nacin, dubina=dubina, ploca=ploca, trim=trim,
                 kerf=kerf, god=god, hash=h, elemenata=len(els), komada=sum(int(e["kom"]) for e in els), st=st,
                 element_ids=[e["element_id"] for e in els], napomena=napomena, dopusteno=dop, ogranicenja=ogr)
 
 
 def _snimka(r):
     return json.dumps(dict(sheets=r["sheets"], element_ids=r["element_ids"], ploca=list(r["ploca"]), trim=r["trim"], kerf=r["kerf"], god=r["god"],
-                           ostaci=r["oc"].get("ostaci")))
+                           ostaci=r["oc"].get("ostaci"), rp=r["oc"].get("rp")))
 
 
 def predlozi(conn, nm_id, nacin="auto", dubina="najbolje", tko="web", commit=True):
@@ -150,6 +188,13 @@ def red(conn, oid):
     if not r:
         return None
     d = dict(r)
+    if r["slaganje_json"]:
+        try:
+            rp = json.loads(r["slaganje_json"]).get("rp")
+        except ValueError:
+            rp = None
+        if rp:                                                          # radna ploča / ploča stola / zidna obloga: naplata po ploči u metrima (D-92)
+            d["naplata_rp"] = dict(rp, opis_kratko=RPP.opis(rp))
     d.pop("slaganje_json", None)
     d.pop("sheme_json", None)
     auto = conn.execute("SELECT m2_za_naplatu, broj_ploca FROM optimizacija WHERE nalog_materijal_id = ? AND status IN ('prijedlog', 'potvrdjeno') "
@@ -303,12 +348,10 @@ def osiguraj_potvrdu(conn, nm_id, tko="web", auto=None):
 
 
 def treba_optimizaciju(conn, nm_id):
-    """Materijal koji se slaže na ploču (ne RP/ZO po dužnom metru)."""
+    """Materijal koji se slaže na ploču — svaki potvrđeni materijal. Od D-92 (Igor, 17. 9.) i radne ploče, ploče stola i zidne obloge:
+    režu se uvijek na pili iz ploče 4100 × 600 / 900 / 640, a naplata se računa po ploči iz potvrđenog slaganja (radne_ploce.py)."""
     m = N.materijal_naloga(conn, nm_id)
-    if not m["materijal_id"]:
-        return False
-    v = conn.execute("SELECT vrsta FROM materijal WHERE id = ?", (m["materijal_id"],)).fetchone()
-    return not (v and v["vrsta"] in ("RP", "ZO"))
+    return bool(m["materijal_id"])
 
 
 def pregled(conn, nalog_id):

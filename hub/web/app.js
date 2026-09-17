@@ -6,7 +6,7 @@ var Hub = (function () {
   var BOJE = ["--t1", "--t2", "--t3", "--t4", "--t5", "--t6"];
   var STATUSI = [["unos", "Unos"], ["ponuda", "Ponuda — čeka kupca"], ["potvrdjeno", "Potvrđeno"], ["skladiste", "Skladište"], ["pila_nesting", "Pila / nesting"],
                  ["proizvodnja", "Proizvodnja"], ["izdatnica", "Izdatnica"], ["zatvoren", "Zatvoren"]];
-  var KORAK = { unos: 0, ponuda: 2, potvrdjeno: 2, skladiste: 3, pila_nesting: 4, proizvodnja: 4, izdatnica: 4, zatvoren: 4 };   // koraci: unos, slaganje, ponuda, skladište, pila
+  var KORAK = { unos: 0, ponuda: 2, potvrdjeno: 2, skladiste: 3, pila_nesting: 4, proizvodnja: 4, izdatnica: 4, zatvoren: 4 };   // koraci: unos, optimizacija, ponuda, skladište, proizvodnja
   var ekrani = {};
 
   // ---------------------------------------------------------------- pomoćno
@@ -122,8 +122,8 @@ var Hub = (function () {
   function koraci(nalog) {
     if (!nalog) return "";
     /* bijela pilula = ekran koji je OTVOREN; kvačica = korak koji je nalog prošao; zelena točka = korak u kojem je nalog sada (Igor, 17. 9.) */
-    var k = KORAK[nalog.status] || 0, rute = ["", "/slaganje", "/ponuda", "/skladiste", "/proizvodnja"], imena = ["1 Unos", "2 Slaganje", "3 Ponuda", "4 Skladište", "5 Proizvodnja"];   // ekran pile / nestinga = Proizvodnja (Igor, 17. 9.)
-    var podovi = ["unos", "slaganje", "ponuda", "skladiste", "pila"], pod = (S.ruta || {}).pod || "unos", otvoren = podovi.indexOf(pod === "obracun" ? "ponuda" : pod === "proizvodnja" ? "pila" : pod);
+    var k = KORAK[nalog.status] || 0, rute = ["", "/optimizacija", "/ponuda", "/skladiste", "/proizvodnja"], imena = ["1 Unos", "2 Optimizacija", "3 Ponuda", "4 Skladište", "5 Proizvodnja"];   // ekran pile / nestinga = Proizvodnja (Igor, 17. 9.)
+    var podovi = ["unos", "slaganje", "ponuda", "skladiste", "pila"], pod = (S.ruta || {}).pod || "unos", otvoren = podovi.indexOf(pod === "obracun" ? "ponuda" : pod === "proizvodnja" ? "pila" : pod === "optimizacija" ? "slaganje" : pod);
     return '<div class="steps">' + imena.map(function (s, i) {
       var cls = (i === otvoren ? " on" : "") + (i < k ? " done" : "") + (i === k ? " tu" : "");
       var t = i === k ? "nalog je sada u ovom koraku (" + statusNaziv(nalog.status) + ")" : i < k ? "korak je prošao" : "još nije na redu";
@@ -297,12 +297,12 @@ var Hub = (function () {
         '<button class="btn sm ghost" data-potvrdi="' + i + '" data-ident="">drugi…</button></div></div>';
     }).join("");
     var akcije = '<span class="note">Status</span><select id="status" class="tbtn">' + STATUSI.map(function (s) { return '<option value="' + s[0] + '"' + (s[0] === d.status ? " selected" : "") + '>' + esc(s[1]) + '</option>'; }).join("") + '</select>' +
-      '<a class="tbtn" href="#/nalog/' + d.id + '/dogadjaji">Događaji</a><a class="tbtn pri" href="#/nalog/' + d.id + '/slaganje">Slaganje →</a>';
+      '<a class="tbtn" href="#/nalog/' + d.id + '/dogadjaji">Događaji</a><a class="tbtn pri" href="#/nalog/' + d.id + '/optimizacija">Optimizacija →</a>';
     var dis = (!m || !uredivo) ? " disabled" : "";
     ljuska({ crumb: 'Nalozi / <b>' + esc(d.naziv) + '</b> · ' + esc(d.kupac_naziv || "") + ' · ' + esc((d.datum || "").slice(0, 10)) + (d.ponuda_pantheon ? ' · ponuda ' + esc(d.ponuda_pantheon) : ""), koraci: koraci(d), akcije: akcije, rail: "nalozi", cls: "c3",
       sadrzaj:
         '<div class="col"><div class="pane" style="flex:1"><div class="hd"><b>Materijali</b><span class="grow"></span>' + (uredivo ? '<button class="btn sm" id="btnMat">+ Materijal</button><button class="btn sm" id="btnUvoz">Uvoz datoteke</button>' : "") + '</div><div class="bd tight">' + (matHtml || '<div class="note" style="padding:12px">nema materijala — dodaj ga ili uvezi CPW / CSV</div>') + '</div></div>' +
-          (m ? '<div class="pane"><div class="hd"><b>' + esc(m.naziv_kratki || m.naziv_ulaz || "") + '</b><span class="grow"></span>' + (uredivo ? '<button class="btn sm" id="btnMatUredi">…</button>' : "") + '</div><div class="bd"><div class="kv"><b>Ident</b><span>' + esc(m.ident || "—") + '</span><b>Naziv</b><span>' + esc(m.naziv || m.naziv_ulaz || "") + '</span><b>Debljina</b><span>' + n(m.debljina || m.debljina_ulaz, 0) + ' mm</span><b>Winstore</b><span>' + esc(m.winstore_kod || "—") + '</span><b>Put</b><span>' + esc(m.put || m.put_prijedlog || "—") + '</span><b>Zadana traka</b><span>' + esc(m.traka_zadana) + '</span></div></div></div>' : "") + '</div>' +
+          (m ? '<div class="pane"><div class="hd"><b>' + esc(m.naziv_kratki || m.naziv_ulaz || "") + '</b><span class="grow"></span>' + (uredivo ? '<button class="btn sm" id="btnMatUredi">…</button>' : "") + '</div><div class="bd"><div class="kv"><b>Ident</b><span>' + esc(m.ident || "—") + '</span><b>Naziv</b><span>' + esc(m.naziv || m.naziv_ulaz || "") + '</span><b>Debljina</b><span>' + n(m.debljina || m.debljina_ulaz, 0) + ' mm</span><b>Winstore</b><span>' + esc(m.winstore_kod || "—") + '</span><b>Put</b><span>' + esc(m.put || m.put_prijedlog || "—") + '</span><b>Zadana traka</b><span>' + esc(m.traka_zadana) + '</span><b>Obrub</b><span>' + n(m.obrub != null ? m.obrub : m.obrub_zadano, 0) + ' mm' + (m.obrub != null ? "" : ' <span class="note">zadano</span>') + '</span></div></div></div>' : "") + '</div>' +
         '<div class="col"><div class="pane"><div class="hd"><b>Element</b><span class="note">' + (sel ? "uređivanje — Esc za novi" : "novi — Enter prihvati") + '</span><span class="grow"></span>' + (m && uredivo ? '<button class="btn sm" id="btnGrupe" title="mjera za rezanje, majke, sklopovi">Grupe</button>' : "") + '</div>' +
           '<div class="bd"><div class="unos3">' +
           '<div class="zona z-mjere"><span class="zlbl">Mjere</span>' +
@@ -312,8 +312,8 @@ var Hub = (function () {
           '<div class="zona z-rub"><span class="zlbl">Kantiranje <span class="note">klik = aktivna traka · dvoklik na dasku = sva 4</span></span><div id="skicaBox">' + sk + '</div><div class="row"><button class="btn sm" id="btnSviA">svi rubovi</button><button class="btn sm" id="btnBez">bez trake</button></div></div>' +
           '<div class="zona z-trake"><span class="zlbl">Traka <span class="note">klik = aktivna</span></span><div id="trake">' + (trHtml || '<div class="note">odaberi materijal</div>') + '</div>' + (m && uredivo ? '<div class="row"><button class="btn sm" id="btnA">+ ABS</button><button class="btn sm" id="btnM">+ MEL</button></div>' : "") + '</div>' +
           '</div></div></div>' +
-          '<div class="pane" style="flex:1"><div class="hd tabs-hd"><div class="tabs"><button class="tb' + (tab === "elementi" ? " on" : "") + '" data-tab="elementi">Elementi <span class="note">' + (m ? m.elemenata + " el / " + m.komada + " kom / " + n(m.m2, 2) + " m²" : "") + '</span></button><button class="tb' + (tab === "slaganje" ? " on" : "") + '" data-tab="slaganje">Slaganje ploča ' + optSt + '</button></div><span class="grow"></span>' +
-          (tab === "slaganje" && m && opt.length && opt[0].treba ? '<button class="btn sm pri" id="btnOptim" title="novo zadano slaganje (realno za pilu) + Hub rezerva">Optimiziraj</button>' : "") + '</div>' +
+          '<div class="pane" style="flex:1"><div class="hd tabs-hd"><div class="tabs"><button class="tb' + (tab === "elementi" ? " on" : "") + '" data-tab="elementi">Elementi <span class="note">' + (m ? m.elemenata + " el / " + m.komada + " kom / " + n(m.m2, 2) + " m²" : "") + '</span></button><button class="tb' + (tab === "slaganje" ? " on" : "") + '" data-tab="slaganje">Optimizacija ' + optSt + '</button></div><span class="grow"></span>' +
+          (tab === "slaganje" && m && opt.length && opt[0].treba ? '<button class="btn sm pri" id="btnOptim" title="nova zadana optimizacija (realna za pilu) + Hub rezerva">Optimiziraj</button>' : "") + '</div>' +
           (tab === "elementi" ? '<div class="bd tight"><table><thead><tr><th>Naziv</th><th class="r">L</th><th class="r">W</th><th class="r">Kom</th><th>L</th><th>O</th><th>D</th><th>G</th><th>Napomena</th><th></th></tr></thead><tbody>' + (elHtml || '<tr><td colspan="10" class="note">nema elemenata</td></tr>') + '</tbody></table></div>'
             : '<div class="bd">' + (m ? (Hub.optBanner(d, opt, true) + '<div class="slag">' + Hub.optBlok(d, opt) + '</div>' + (opt.length && opt[0].treba ? Hub.legendaSheme() : "")) : '<div class="note">odaberi materijal</div>') + '</div>') + '</div></div>' +
         '<div class="col"><div class="pane"><div class="hd"><b>Za potvrdu</b> ' + (d.za_potvrdu.length ? '<span class="tag warn">' + d.za_potvrdu.length + '</span>' : '<span class="tag ok">0</span>') + '</div><div class="bd">' + (zp || '<div class="note">sve prepoznato</div>') + '</div></div>' +
@@ -383,12 +383,15 @@ var Hub = (function () {
       } });
   }
   function urediMaterijal(d, m) {
+    var ob0 = m.obrub != null ? m.obrub : m.obrub_zadano;       // obrub ploče za optimizaciju (Igor, 17. 9.): zadano 10 mm, radne ploče / stol / zidne 0
     dlg({ naslov: "Materijal " + (m.naziv_kratki || ""), tijelo: '<div class="grid2"><div class="field"><span class="lbl">Put</span><select id="put"><option value="">— (Hub predlaže)</option><option value="pila"' + (m.put === "pila" ? " selected" : "") + '>pila</option><option value="nesting"' + (m.put === "nesting" ? " selected" : "") + '>nesting</option></select></div>' +
       '<div class="field"><span class="lbl">God</span><select id="god"><option value="0"' + (!m.god ? " selected" : "") + '>ne</option><option value="1"' + (m.god ? " selected" : "") + '>da</option></select></div>' +
       '<div class="field"><span class="lbl">Restl / vlastita ploča L</span><input id="pL" value="' + (m.ploca_L || "") + '"></div><div class="field"><span class="lbl">W</span><input id="pW" value="' + (m.ploca_W || "") + '"></div>' +
-      '<div class="field"><span class="lbl">Zadana traka</span><select id="tz">' + ["ABS-ISTI", "MEL-ISTI", "ABS-ISTI 2mm"].map(function (x) { return '<option' + (x === m.traka_zadana ? " selected" : "") + '>' + x + '</option>'; }).join("") + '</select></div><div class="field"><span class="lbl">Napomena</span><input id="nap" value="' + esc(m.napomena || "") + '"></div></div>',
+      '<div class="field"><span class="lbl">Zadana traka</span><select id="tz">' + ["ABS-ISTI", "MEL-ISTI", "ABS-ISTI 2mm"].map(function (x) { return '<option' + (x === m.traka_zadana ? " selected" : "") + '>' + x + '</option>'; }).join("") + '</select></div><div class="field"><span class="lbl">Napomena</span><input id="nap" value="' + esc(m.napomena || "") + '"></div>' +
+      '<div class="field"><span class="lbl">Obrub (rubljenje) mm</span><input id="obrub" inputmode="decimal" value="' + n(ob0) + '"></div><div class="field"><span class="lbl">&nbsp;</span><span class="note" style="padding-top:8px">' + (m.obrub != null ? "upisano za ovaj materijal — prazno = zadano " + n(m.obrub_zadano, 0) + " mm" : "zadano " + n(m.obrub_zadano, 0) + " mm" + (m.obrub_zadano ? "" : " (radne ploče, ploče stola, zidne obloge)")) + '</span></div></div>',
       gumbi: [{ txt: "Obriši materijal", on: async function () { if (!confirm("Obrisati materijal i njegove elemente?")) return false; await api("/api/nalog/materijal/" + m.id + "?tko=" + S.korisnik, { method: "DELETE" }); S.nm = null; render(); } },
-              { txt: "Spremi", pri: true, on: async function (bg) { await api("/api/nalog/materijal/" + m.id, { method: "PUT", body: { put: q("#put", bg).value || null, god: +q("#god", bg).value, ploca_L: +q("#pL", bg).value || null, ploca_W: +q("#pW", bg).value || null, traka_zadana: q("#tz", bg).value, napomena: q("#nap", bg).value } }); render(); } }] });
+              { txt: "Spremi", pri: true, on: async function (bg) { await api("/api/nalog/materijal/" + m.id, { method: "PUT", body: { put: q("#put", bg).value || null, god: +q("#god", bg).value, ploca_L: +q("#pL", bg).value || null, ploca_W: +q("#pW", bg).value || null, traka_zadana: q("#tz", bg).value, napomena: q("#nap", bg).value, obrub: obrubIz(q("#obrub", bg).value) } }); render(); } }] });
+    function obrubIz(v) { v = String(v).trim().replace(",", "."); if (v === "") return null; var x = parseFloat(v); return isNaN(x) || x === ob0 ? (m.obrub != null ? m.obrub : undefined) : x; }
   }
   function urediNalog(d) {
     dlg({ naslov: "Zaglavlje naloga", tijelo: '<div class="grid2"><div class="field"><span class="lbl">Naziv</span><input id="naziv" value="' + esc(d.naziv) + '"></div><div class="field"><span class="lbl">Kerf (mm)</span><input id="kerf" value="' + (d.kerf || 16) + '"></div>' +

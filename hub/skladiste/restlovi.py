@@ -375,7 +375,7 @@ def predlozi_iz_sheme(conn, nm_id, tko="hub", commit=True):
     postojeci = conn.execute("SELECT id, L, W FROM restl WHERE nalog_materijal_id = ? AND status = 'prijedlog' ORDER BY id", (nm_id,)).fetchall()
     if postojeci and sorted((x["L"], x["W"]) for x in postojeci) == mjere:
         return [restl(conn, x["id"]) for x in postojeci]                   # isto slaganje, isti prijedlozi — ništa ne diraj
-    conn.execute("UPDATE restl SET status = 'otpisan', napomena = COALESCE(napomena || '; ', '') || 'prijedlog zamijenjen novim slaganjem' "
+    conn.execute("UPDATE restl SET status = 'otpisan', napomena = COALESCE(napomena || '; ', '') || 'prijedlog zamijenjen novom optimizacijom' "
                  "WHERE nalog_materijal_id = ? AND status = 'prijedlog'", (nm_id,))
     out = []
     n = conn.execute("SELECT naziv FROM nalog WHERE id = ?", (m["nalog_id"],)).fetchone()

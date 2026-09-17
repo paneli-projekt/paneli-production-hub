@@ -125,7 +125,7 @@ def nova_verzija(conn, nalog_id, tko="web", pravila=True, status="nacrt", stavke
                     OP.osiguraj_potvrdu(conn, nm["id"], tko, auto=True)
         nep = OP.nepotvrdjeni(conn, nalog_id)
         if nep:
-            raise PonudaGreska("optimizacija nije potvrđena za: %s — ponuda i pila koriste isto slaganje (D-75), prvo potvrditi" % ", ".join(nep))
+            raise PonudaGreska("optimizacija nije potvrđena za: %s — ponuda i pila koriste istu optimizaciju (D-75), prvo je potvrditi" % ", ".join(nep))
     r = dict(stavke=stavke, upozorenja=[]) if stavke is not None else OC.izracunaj(conn, nalog_id, pravila)
     if not r["stavke"]:
         raise PonudaGreska("obračun nema nijednu stavku")
