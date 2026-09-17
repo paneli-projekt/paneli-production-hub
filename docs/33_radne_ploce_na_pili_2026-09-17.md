@@ -46,6 +46,10 @@ Naš restl (plavo na shemi): samo kad ploča NIJE naplaćena cijela — ostatak 
 - **„Slaganje“ → „Optimizacija“** u koraku 2, gumbima, natpisima, porukama na ekranu i krojnom nacrtu („Optimizacija čeka potvrdu“, „Potvrdi optimizaciju“, „Izračunaj optimizaciju“, kartica „Optimizacija“ na unosu). Adresa `#/nalog/N/optimizacija` (stara `/slaganje` i dalje radi).
 - Slike `docs/ekrani_proba/17d_materijal_obrub.png`, `17d_optimizacija_gumbi.png`. **163 testa prolaze.**
 
+## Ispravak (17. 9., navečer) — komad radne ploče se ne okreće
+
+Igor na probi (RP ARCTIS DC, god uključen, elementi 500 × 600, 2000 × 600, 500 × 600): Hub je komad 500 × 600 okrenuo (600 uz duljinu, 500 u širinu) — pila bi odrezala zaobljeni rub. **Prva mjera (L) uvijek ide uz duljinu ploče, druga (W) je dubina** — za radnu ploču, zidnu oblogu i ploču stola, bez obzira na god. Element kojem je W veći od širine ploče više se ne okreće sam nego javlja „dubina W je veća od širine ploče — prva mjera (L) je dužina“. Proba nakon ispravka: 0,5 + 2,0 + 0,5 m na jednoj ploči, sva tri pune dubine 600, 4 reza, zbroj 3,0 m → cijela 4,1 m; prva proba (0,5 + 2,0) → 2,5 m (prije 2,6 zbog okrenutog komada). Slika `docs/ekrani_proba/17e_radna_ploca_orijentacija.png`.
+
 ## Otvoreno / za Igora
 
 1. **Radna ili stol iz PanelWizardovog naziva**: PW piše „RP BASANIT SAND“ bez 600 / 900, pa Hub svaki takav materijal pita „za potvrdu“ (radna i ploča stola istog dekora imaju jednake bodove). Kad se potvrdi sa „zapamti“, alias bi zauvijek vodio na jednu obitelj. Prijedlog: komad širi od 600 mm → sigurno ploča stola; inače pitati kao sada, bez pamćenja obitelji. Igor odlučuje.

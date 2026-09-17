@@ -135,8 +135,9 @@ def izracunaj(conn, nm_id, nacin="auto", dubina="najbolje"):
     nacini = None if nacin in ("auto", "hub") else (nacin,)
     if ob == "stola" and nacini is None:
         nacini = ("uzduzno", "trake")                                   # ploča stola: trake uz duljinu, smiju i uži komadi jedan uz drugi (D-92)
+    god_opt = True if ob == "stola" else god                            # ploča stola: L elementa uvijek uz duljinu ploče (profil ruba, Igor 17. 9.)
     try:
-        sheets, oc, pobjednik, kand = _kandidati(dijelovi, ploca, trim, kerf, god, nacini, dubina == "brzo", ogr, h)
+        sheets, oc, pobjednik, kand = _kandidati(dijelovi, ploca, trim, kerf, god_opt, nacini, dubina == "brzo", ogr, h)
     except ValueError as e:
         raise OptimizacijaGreska("%s: ne može se složiti (%s)%s" % (m["naziv_kratki"] or m["naziv_ulaz"], e,
                                      " — obrub ploče %g mm, smanji ga u materijalu" % trim if trim and m.get("obrub") is not None else ""))

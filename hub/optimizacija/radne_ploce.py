@@ -2,8 +2,9 @@
 """radne_ploce.py — radne ploče, ploče stola i zidne obloge (4100 × 600 / 900 / 640) na pili: slaganje i naplata PO PLOČI.
 
 Pravila (D-37, 12. 9. 2026., dopunjeno Igorovim odgovorima 17. 9. 2026. → D-92):
-  * radna ploča 600 (RP, obitelj 'radna' ili bez obitelji): KOMAD IZA KOMADA — duljina komada uz 4100, jedan komad u širini ploče
-    (profilirani prednji rub ostaje); naplata po ploči: zbroj duljina komada na ploči ≤ 2,7 m → točni metri, najmanje 1,4 m;
+  * radna ploča 600 (RP, obitelj 'radna' ili bez obitelji): KOMAD IZA KOMADA — prva mjera elementa (L) uvijek uz duljinu ploče (4100),
+    druga (W) je dubina preko širine ploče, jedan komad u širini (profilirani prednji rub ostaje; Igor 17. 9.: element 500 × 600 je
+    dužina 500 i dubina 600, NE smije se okrenuti); naplata po ploči: zbroj duljina komada na ploči ≤ 2,7 m → točni metri, najmanje 1,4 m;
     > 2,7 m → cijela ploča (4,1 m).
   * ploča stola 900 (RP 'stola'): smiju se rezati i uži komadi jedan uz drugi (trake uz duljinu ploče — obični optimizator, samo uzdužno /
     trake); naplata po ploči: iskorištena duljina (najdulja traka) ≤ pola ploče (2,05 m) → pola, inače cijela; ident DEKORA (M) × 2,05 / 4,1 m.
@@ -35,15 +36,19 @@ def obitelj(vrsta, obitelj_rp=None):
 
 
 def slozi_niz(dijelovi, ploca=(4100, 600), trim=0, kerf=5.0):
-    """Komad iza komada: dijelovi (idx, W, L, kom) → ploče s JEDNOM trakom uz duljinu; dulja mjera komada leži uz duljinu ploče.
-    Best-fit decreasing po duljini (najmanje ploča), ploče poredane od najpunije. ValueError kad komad ne stane (spoj ploča ide ručno)."""
+    """Komad iza komada: dijelovi (idx, W, L, kom) → ploče s JEDNOM trakom uz duljinu. Orijentacija je FIKSNA: L elementa uz duljinu
+    ploče, W (dubina) preko širine — komad se nikad ne okreće, jer bi pila tada odrezala profilirani (zaobljeni) rub (Igor, 17. 9.).
+    Best-fit decreasing po duljini (najmanje ploča), ploče poredane od najpunije. ValueError kad komad ne stane."""
     PL, PW = float(ploca[0]), float(ploca[1])
     LIM_L, LIM_W = PL - 2 * trim, PW - 2 * trim
     komadi = []
     for idx, W, L, kom in dijelovi:
-        duz, sir = max(float(W), float(L)), min(float(W), float(L))
-        if sir > LIM_W + 1e-6 or duz > LIM_L + 1e-6:
-            raise ValueError("dio %d (%g × %g) ne stane na ploču %g × %g — spoj ploča se radi ručno" % (idx, L, W, PL, PW))
+        duz, sir = float(L), float(W)
+        if sir > LIM_W + 1e-6:
+            raise ValueError("dio %d (L %g × W %g): dubina W je veća od širine ploče %g — prva mjera (L) je dužina uz ploču, druga (W) dubina"
+                             % (idx, L, W, PW - 2 * trim))
+        if duz > LIM_L + 1e-6:
+            raise ValueError("dio %d (L %g × W %g) dulji je od ploče %g — spoj ploča se radi ručno" % (idx, L, W, PL - 2 * trim))
         komadi += [(duz, sir, idx)] * int(kom)
     komadi.sort(key=lambda k: (-k[0], -k[1], k[2]))
     ploce = []                                   # [dict(used, items)]

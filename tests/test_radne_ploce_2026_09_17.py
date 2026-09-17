@@ -38,9 +38,20 @@ def test_radna_komad_iza_komada_i_naplata():
     sh = RPP.slozi_niz([(1, 600, 2500, 1), (2, 600, 3000, 1)], pl, 0, 5)
     oc = RPP.ocijeni(sh, pl, 0, 5, "radna")
     assert len(sh) == 2 and oc["rp"]["ukupno_m"] == 6.6 and [li["opis"] for li in oc["rp"]["listovi"]] == ["cijela", "metri"]
-    # komad upisan poprijeko (W > L) leži duljinom uz ploču; dulji od ploče → greška (spoj se radi ručno)
-    sh = RPP.slozi_niz([(1, 2000, 600, 2)], pl, 0, 5)
-    assert len(sh) == 1 and not OPT.napravi_cpo(_els([(1, 2000, 600, 2)]), "HUB_T", "K", ploca=pl, trim=0, kerf=5, sheets=sh)[2]
+    # Igor 17. 9.: element L 500 × W 600 je dužina 500 i dubina 600 — NE okreće se (pila bi odrezala zaobljeni rub); isto kad je god uključen
+    d = [(1, 600, 500, 1), (2, 600, 2000, 1)]
+    sh = RPP.slozi_niz(d, pl, 0, 5)
+    st = sh[0]["strips"][0]
+    assert st["w"] == 600 and sorted((b["l"], b["subs"][0]["w3"]) for b in st["blocks"]) == [(500, 600), (2000, 600)]
+    e = _els(d)
+    for x in e:
+        x["god"] = 1
+    cpo = OPT.napravi_cpo(e, "HUB_T", "K", ploca=pl, trim=0, kerf=5, sheets=sh)
+    assert not cpo[2]                                                          # stablo rezova valjano i s godom (L uz duljinu ploče)
+    assert RPP.ocijeni(sh, pl, 0, 5, "radna")["rp"]["ukupno_m"] == 2.5          # 0,5 + 2,0 m (ne 0,6 + 2,0)
+    assert RPP.ocijeni(RPP.slozi_niz([(1, 600, 500, 1), (2, 600, 2000, 1), (3, 600, 500, 1)], pl, 0, 5), pl, 0, 5, "radna")["rp"]["listovi"][0]["duljina_mm"] == 3000
+    with pytest.raises(ValueError, match="dubina W"):
+        RPP.slozi_niz([(1, 2000, 600, 1)], pl, 0, 5)                           # W 2000 ne stane u dubinu 600 — ne okreće se sam
     with pytest.raises(ValueError, match="spoj"):
         RPP.slozi_niz([(1, 600, 4200, 1)], pl, 0, 5)
     # jedinica identa
@@ -57,7 +68,7 @@ def test_stol_pola_cijela_i_zidna():
     rp = RPP.ocijeni(sh, pl, 0, 5, "stola")["rp"]
     assert len(sh) == 2 and rp["ukupno_m"] == 8.2
     # dva uža komada jedan uz drugi na istoj ploči → iskorišteno 1,0 m → pola
-    sh, oc, _, _ = OPT.najbolje([(1, 440, 1000, 2)], pl, 10, 5, False, ("uzduzno", "trake"))
+    sh, oc, _, _ = OPT.najbolje([(1, 440, 1000, 2)], pl, 10, 5, True, ("uzduzno", "trake"))
     o = RPP.ocijeni(sh, pl, 10, 5, "stola")
     assert len(sh) == 1 and o["rp"]["listovi"][0]["opis"] == "pola" and o["ostaci"] and o["ostaci"][0][1] == 900
     # zidna: uvijek cijela, 4 reza po komadu

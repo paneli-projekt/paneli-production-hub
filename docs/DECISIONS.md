@@ -421,6 +421,8 @@ Zašto: radne ploče se uvijek režu na pili iz ploče 4100, a pravilo prodaje (
 **D-93 ODLUČENO i UGRAĐENO (Igor, 17.9.2026. — obrub ploče po materijalu, naziv „Optimizacija“, boja gumba; dokument 33 dopuna):** (1) **obrub (rubljenje) ploče** upisuje se na materijalu naloga (dijalog materijala na unosu); zadano 10 mm, **radne ploče, ploče stola i zidne obloge 0**; upisani obrub vrijedi za optimizaciju, CPO, krojni nacrt i obračun, prazno = zadano; zadani obrub i dalje pada na 0 za element pune mjere ploče (D-65/10); promjena obruba poništava potvrđenu optimizaciju; shema v17 (`nalog_materijal.obrub`); (2) korak 2 i svi tekstovi na ekranu: **„Slaganje“ → „Optimizacija“** (ruta `/optimizacija`, `/slaganje` ostaje); (3) zeleni gumbi **#4F8F32**. 163 testa.
 Zašto: obrub je bio skriven u kodu (10 mm), a ploče koje dolaze obrubljene ili se režu na mjeru bez rubljenja (radne ploče, stol, zidne) moraju imati 0 — ured ga mora moći promijeniti po materijalu; „Optimizacija“ je riječ koju ured i operateri koriste.
 
+**D-92 ispravak (Igor, 17.9.2026. navečer):** komad radne ploče, zidne obloge i ploče stola **nikad se ne okreće** — prva mjera elementa (L) uvijek uz duljinu ploče (4100), druga (W) je dubina; inače pila odreže zaobljeni rub (proba RP ARCTIS DC: 500 × 600 bio je okrenut). Element s W većim od širine ploče javlja grešku umjesto okretanja.
+
 **Mockup v0.4 ZAKLJUČEN (Igor, 15.9.2026.)** — prezentacija kolegama i v0.5 se ne rade zasebno; D-59 (skica elementa) i D-62 (popis traka s oznakama) ulaze izravno u web ekrane na API-ju, a povratne informacije kolega skupljaju se na pravim ekranima.
 
 ---
