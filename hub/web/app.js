@@ -122,8 +122,8 @@ var Hub = (function () {
   function koraci(nalog) {
     if (!nalog) return "";
     /* bijela pilula = ekran koji je OTVOREN; kvačica = korak koji je nalog prošao; zelena točka = korak u kojem je nalog sada (Igor, 17. 9.) */
-    var k = KORAK[nalog.status] || 0, rute = ["", "/slaganje", "/ponuda", "/skladiste", "/pila"], imena = ["1 Unos", "2 Slaganje", "3 Ponuda", "4 Skladište", "5 Pila / nesting"];
-    var podovi = ["unos", "slaganje", "ponuda", "skladiste", "pila"], pod = (S.ruta || {}).pod || "unos", otvoren = podovi.indexOf(pod === "obracun" ? "ponuda" : pod);
+    var k = KORAK[nalog.status] || 0, rute = ["", "/slaganje", "/ponuda", "/skladiste", "/proizvodnja"], imena = ["1 Unos", "2 Slaganje", "3 Ponuda", "4 Skladište", "5 Proizvodnja"];   // ekran pile / nestinga = Proizvodnja (Igor, 17. 9.)
+    var podovi = ["unos", "slaganje", "ponuda", "skladiste", "pila"], pod = (S.ruta || {}).pod || "unos", otvoren = podovi.indexOf(pod === "obracun" ? "ponuda" : pod === "proizvodnja" ? "pila" : pod);
     return '<div class="steps">' + imena.map(function (s, i) {
       var cls = (i === otvoren ? " on" : "") + (i < k ? " done" : "") + (i === k ? " tu" : "");
       var t = i === k ? "nalog je sada u ovom koraku (" + statusNaziv(nalog.status) + ")" : i < k ? "korak je prošao" : "još nije na redu";
@@ -361,7 +361,7 @@ var Hub = (function () {
     qa("[data-potvrdi]").forEach(function (b) { b.onclick = function () { potvrdi(d, d.za_potvrdu[+b.dataset.potvrdi], b.dataset.ident); }; });
     q("#status").onchange = async function () { var novi = this.value, selEl = this; if (novi === d.status) return;
       if (novi === "potvrdjeno") { selEl.value = d.status; return kupacPotvrdio(d); }
-      try { var rr = await api("/api/nalog/" + d.id + "/status", { body: { status: novi } }); if (rr.skladiste && rr.skladiste.upozorenja.length) toast("Skladište: " + rr.skladiste.upozorenja.join("; "), true); idi("#/nalog/" + d.id + (novi === "skladiste" ? "/skladiste" : novi === "pila_nesting" ? "/pila" : "")); }
+      try { var rr = await api("/api/nalog/" + d.id + "/status", { body: { status: novi } }); if (rr.skladiste && rr.skladiste.upozorenja.length) toast("Skladište: " + rr.skladiste.upozorenja.join("; "), true); idi("#/nalog/" + d.id + (novi === "skladiste" ? "/skladiste" : novi === "pila_nesting" ? "/proizvodnja" : "")); }
       catch (e) { selEl.value = d.status; } };
     if (!sel) { var f0 = q("#fL"); if (f0 && document.activeElement === document.body) f0.focus(); }
   };
@@ -398,8 +398,65 @@ var Hub = (function () {
       gumbi: [{ txt: "Spremi", pri: true, on: async function (bg) { await api("/api/nalog/" + d.id, { method: "PUT", body: { naziv: q("#naziv", bg).value, kerf: +q("#kerf", bg).value || null, rabat_materijal: q("#rm", bg).value === "" ? null : +q("#rm", bg).value, rabat_usluge: q("#ru", bg).value === "" ? null : +q("#ru", bg).value, rok_kupca: q("#rk", bg).value || null, prioritet: q("#pr", bg).value || null, napomena: q("#nap", bg).value } }); render(); } }] });
   }
   function uvozDatoteke(d) {
-    dlg({ naslov: "Uvoz datoteke u nalog", tijelo: '<div class="field"><span class="lbl">CPW (kupčev PPW, Corpus), PNL (PanelWizard nalog) ili PPNEST CSV</span><input type="file" id="dat" accept=".cpw,.CPW,.pnl,.PNL,.csv,.CSV"></div><div class="field"><span class="lbl">Izvor</span><select id="izvor"><option value="kupac_ppw">kupčev PPW (.cpw)</option><option value="cpw">PanelWizard (.pnl / .cpw)</option><option value="csv">PPNEST CSV</option></select></div><div class="note">Materijali i trake prolaze kroz šifrarnik; nesigurno ide „za potvrdu“.</div>',
-      gumbi: [{ txt: "Uvezi", pri: true, on: async function (bg) { var f = q("#dat", bg).files[0]; if (!f) { toast("odaberi datoteku", true); return false; } var fd = new FormData(); fd.append("datoteka", f); var r = await api("/api/nalog/" + d.id + "/uvoz?izvor=" + q("#izvor", bg).value + "&tko=" + S.korisnik, { body: fd }); toast("Uvezeno: " + (r.elementi || 0) + " el, za potvrdu " + ((r.za_potvrdu_materijal || 0) + (r.za_potvrdu_rub || 0))); S.nm = null; render(); } }] });
+    /* više datoteka odjednom (Igor, 17. 9.: kupci pošalju 5–7 CPW-ova, jedan po jedan je naporno): odabir s Ctrl / Shift ili povlačenje u okvir,
+       Hub ih uvozi redom u isti nalog i uz svaku javi što je ušlo; ista datoteka drugi put se preskače (hash), greška jedne ne zaustavlja ostale. */
+    var ODB = /\.(cpw|pnl|csv)$/i, lista = [], radi = false;
+    function vel(b) { return b > 1048576 ? n(b / 1048576, 1) + " MB" : Math.max(1, Math.round(b / 1024)) + " kB"; }
+    var h = dlg({ naslov: "Uvoz datoteka u nalog", tijelo:
+      '<label class="drop" id="drop"><input type="file" id="dat" multiple accept=".cpw,.CPW,.pnl,.PNL,.csv,.CSV"><b>Odaberi datoteke</b> ili ih povuci ovamo<span class="note">CPW (kupčev PPW, Corpus), PNL (PanelWizard nalog), PPNEST CSV — više odjednom (Ctrl / Shift)</span></label>' +
+      '<div class="uvoz-lista" id="ulista"></div>' +
+      '<div class="field"><span class="lbl">Izvor za .CPW datoteke</span><select id="izvor"><option value="kupac_ppw">kupčev PPW (.cpw)</option><option value="cpw">PanelWizard (.pnl / .cpw)</option></select></div>' +
+      '<div class="note">Sve datoteke idu u ovaj nalog; materijali i trake prolaze kroz šifrarnik, nesigurno ide „za potvrdu“. Ista datoteka drugi put se preskače.</div>',
+      gumbi: [{ txt: "Uvezi", pri: true, on: async function (bg) { await uvezi(bg); return false; } }],
+      nakon: function (bg) {
+        var inp = q("#dat", bg), drop = q("#drop", bg);
+        inp.onchange = function () { dodaj(bg, inp.files); inp.value = ""; };
+        ["dragenter", "dragover"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("on"); }); });
+        ["dragleave", "drop"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("on"); }); });
+        drop.addEventListener("drop", function (e) { dodaj(bg, e.dataTransfer.files); });
+        prikazi(bg);
+      } });
+    function dodaj(bg, files) {
+      Array.prototype.forEach.call(files || [], function (f) {
+        if (lista.some(function (x) { return x.f.name === f.name && x.f.size === f.size; })) return;
+        lista.push({ f: f, st: ODB.test(f.name) ? "ceka" : "krivo", poruka: ODB.test(f.name) ? "" : "nije .CPW / .PNL / .CSV — preskače se" });
+      });
+      prikazi(bg);
+    }
+    function prikazi(bg) {
+      var ikona = { ceka: "·", radi: "…", ok: "✓", presk: "=", greska: "✕", krivo: "✕" };
+      q("#ulista", bg).innerHTML = lista.map(function (x, i) {
+        return '<div class="uf ' + x.st + '"><span class="ik">' + ikona[x.st] + '</span><span class="grow ime" title="' + esc(x.f.name) + '">' + esc(x.f.name) + '</span><span class="note">' + (x.poruka ? esc(x.poruka) : vel(x.f.size)) + '</span>' +
+          (!radi && (x.st === "ceka" || x.st === "krivo") ? '<button class="x" data-ukloni="' + i + '" title="makni s popisa">×</button>' : "") + '</div>';
+      }).join("");
+      qa("[data-ukloni]", bg).forEach(function (b) { b.onclick = function (e) { e.preventDefault(); lista.splice(+b.dataset.ukloni, 1); prikazi(bg); }; });
+      var cekaju = lista.filter(function (x) { return x.st === "ceka"; }).length, gb = q('[data-g="0"]', bg);
+      q("#drop", bg).classList.toggle("mali", lista.length > 0);
+      if (!gb) return;
+      if (radi) { var gotovo = lista.filter(function (x) { return x.st === "ok" || x.st === "presk" || x.st === "greska"; }).length, ukupno = gotovo + lista.filter(function (x) { return x.st === "ceka" || x.st === "radi"; }).length; gb.textContent = "Uvozim " + Math.min(gotovo + 1, ukupno) + " / " + ukupno + "…"; gb.disabled = true; return; }
+      gb.textContent = cekaju > 1 ? "Uvezi " + cekaju + (cekaju % 10 >= 2 && cekaju % 10 <= 4 && (cekaju % 100 < 12 || cekaju % 100 > 14) ? " datoteke" : " datoteka") : "Uvezi"; gb.disabled = !cekaju;
+    }
+    async function uvezi(bg) {
+      var za = lista.filter(function (x) { return x.st === "ceka"; });
+      if (!za.length) { toast(lista.length ? "nema datoteka za uvoz" : "odaberi datoteke", true); return; }
+      radi = true;
+      var el = 0, pot = 0, ok = 0, greske = 0;
+      for (var i = 0; i < za.length; i++) {
+        var x = za[i]; x.st = "radi"; x.poruka = "uvozim…"; prikazi(bg);
+        try {
+          var fd = new FormData(); fd.append("datoteka", x.f);
+          var r = await api("/api/nalog/" + d.id + "/uvoz?izvor=" + q("#izvor", bg).value + "&tko=" + S.korisnik, { body: fd, tiho: true });
+          if (r.preskoceno) { x.st = "presk"; x.poruka = "već uvezena — preskočeno"; }
+          else { var zp = (r.za_potvrdu_materijal || 0) + (r.za_potvrdu_rub || 0); x.st = "ok"; ok++; el += r.elementi || 0; pot += zp; x.poruka = (r.elementi || 0) + " el / " + (r.komada || 0) + " kom" + (zp ? " · za potvrdu " + zp : ""); }
+        } catch (e) { if (e && e.message === "prijava") { radi = false; return; } x.st = "greska"; x.poruka = e.message || "greška"; greske++; }
+        prikazi(bg);
+      }
+      radi = false; S.nm = null;
+      toast("Uvezeno " + ok + " od " + za.length + (za.length % 10 >= 2 && za.length % 10 <= 4 && (za.length % 100 < 12 || za.length % 100 > 14) || za.length % 10 === 1 && za.length % 100 !== 11 ? " datoteke" : " datoteka") + ": " + el + " el" + (pot ? ", za potvrdu " + pot : "") + (greske ? " · greška u " + greske : ""), greske > 0);
+      if (!greske) { h.zatvori(); render(); return; }
+      q(".ft", bg).innerHTML = '<span class="note grow" style="align-self:center">Neke datoteke nisu uvezene — ostale su u nalogu.</span><button class="btn pri" id="uGotovo">Zatvori</button>';
+      q("#uGotovo", bg).onclick = function () { h.zatvori(); render(); };
+    }
   }
   function potvrdi(d, z, ident) {
     var traka = z.vrsta === "traka";

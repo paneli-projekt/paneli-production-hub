@@ -32,13 +32,71 @@ class PonudaGreska(ValueError):
 
 
 def verzije(conn, nalog_id):
-    out = []
+    out, pret = [], None
     for v in conn.execute("SELECT v.*, k.oznaka AS poslao FROM ponuda_verzija v LEFT JOIN korisnik k ON k.id = v.poslao_id WHERE v.nalog_id = ? ORDER BY v.verzija",
                           (nalog_id,)).fetchall():
         d = dict(v)
         d["stavki"] = conn.execute("SELECT COUNT(*) FROM obracun_stavka WHERE ponuda_verzija_id = ?", (v["id"],)).fetchone()[0]
+        d["promjene"] = promjene(conn, pret, v) if pret is not None else None     # sažetak ispod novije verzije (Igor, 17. 9.)
+        pret = v
         out.append(d)
     return out
+
+
+def _kljuc_stavke(s):
+    """Ista stavka u dvije verzije: isti ident na istom materijalu naloga; stavke bez materijala (usluge, ručne) i po nazivu."""
+    return (s["pantheon_ident"] or "", s.get("nalog_materijal_id") or 0, "" if s.get("nalog_materijal_id") else (s["naziv"] or "").strip().upper())
+
+
+def _skupi(stavke):
+    g = {}
+    for s in stavke:
+        k = _kljuc_stavke(s)
+        if k not in g:
+            g[k] = dict(ident=s["pantheon_ident"], naziv=s["naziv"], jm=s["jm"], kolicina=0.0, iznos=0.0, cijena=s["cijena"], rabat=s["rabat"] or 0, redaka=0)
+        x = g[k]
+        x["kolicina"] += s["kolicina"] or 0
+        x["iznos"] += s["iznos"] or 0
+        x["redaka"] += 1
+    return g
+
+
+def promjene(conn, stara, nova):
+    """Što se promijenilo od verzije `stara` do `nova` (redak ponuda_verzija ili id): razlika neto / s PDV-om, dodane i uklonjene stavke,
+    promjene količine, cijene i rabata. Redoslijed: najveća razlika iznosa prva."""
+    def red(v):
+        return v if not isinstance(v, int) else conn.execute("SELECT * FROM ponuda_verzija WHERE id = ?", (v,)).fetchone()
+    stara, nova = red(stara), red(nova)
+    a = _skupi(OC.stavke(conn, stara["nalog_id"], stara["id"]))
+    b = _skupi(OC.stavke(conn, nova["nalog_id"], nova["id"]))
+    dodano, uklonjeno, promijenjeno = [], [], []
+    for k, x in b.items():
+        if k not in a:
+            dodano.append(dict(ident=x["ident"], naziv=x["naziv"], kolicina=round(x["kolicina"], 3), jm=x["jm"], razlika=round(x["iznos"], 2)))
+    for k, x in a.items():
+        if k not in b:
+            uklonjeno.append(dict(ident=x["ident"], naziv=x["naziv"], kolicina=round(x["kolicina"], 3), jm=x["jm"], razlika=round(-x["iznos"], 2)))
+    for k, y in b.items():
+        x = a.get(k)
+        if not x:
+            continue
+        polja = []
+        if abs(x["kolicina"] - y["kolicina"]) > 0.0005:
+            polja.append(dict(polje="kolicina", staro=round(x["kolicina"], 3), novo=round(y["kolicina"], 3)))
+        if x["redaka"] == 1 and y["redaka"] == 1:
+            if (x["cijena"] is None) != (y["cijena"] is None) or (x["cijena"] is not None and abs(x["cijena"] - y["cijena"]) > 0.00005):
+                polja.append(dict(polje="cijena", staro=x["cijena"], novo=y["cijena"]))
+            if abs((x["rabat"] or 0) - (y["rabat"] or 0)) > 0.0005:
+                polja.append(dict(polje="rabat", staro=x["rabat"], novo=y["rabat"]))
+        raz = round(y["iznos"] - x["iznos"], 2)
+        if polja or abs(raz) >= 0.01:
+            promijenjeno.append(dict(ident=y["ident"], naziv=y["naziv"], jm=y["jm"], polja=polja, razlika=raz))
+    po_iznosu = lambda z: -abs(z["razlika"])
+    neto = round((nova["iznos_neto"] or 0) - (stara["iznos_neto"] or 0), 2)
+    ukupno = round(((nova["iznos_neto"] or 0) + (nova["iznos_pdv"] or 0)) - ((stara["iznos_neto"] or 0) + (stara["iznos_pdv"] or 0)), 2)
+    return dict(prema=stara["verzija"], neto_razlika=neto, ukupno_razlika=ukupno,
+                dodano=sorted(dodano, key=po_iznosu), uklonjeno=sorted(uklonjeno, key=po_iznosu), promijenjeno=sorted(promijenjeno, key=po_iznosu),
+                bez_promjene=not (dodano or uklonjeno or promijenjeno) and abs(neto) < 0.01)
 
 
 def verzija(conn, verzija_id):

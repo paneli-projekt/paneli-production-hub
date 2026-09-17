@@ -6,17 +6,17 @@ Prvi dokument u novoj sesiji. **Drži se kratkim:** na kraju sesije zamijeniti o
 
 ## Ukratko
 
-Hub pokriva cijeli tok **unos → slaganje → ponuda → skladište → pila / nesting → nabava**, s web ekranima. Radi na VM-u. Sljedeći korak je Igorov prolaz pravog naloga kroz sve ekrane.
+Hub pokriva cijeli tok **unos → slaganje → ponuda → skladište → proizvodnja (pila / nesting) → nabava**, s web ekranima. Radi na VM-u; Igor prolazi prave naloge kroz ekrane i javlja napomene.
 
 ## Brojke
 
 | | |
 |---|---|
-| Kod | `30_NOVI_PROGRAM\` (Git repo). Zadnji commit `9bbb532` (17. 9. 13:40) sadrži sve do D-91; poslije njega samo ovo skraćivanje STANJA u `docs\` |
+| Kod | `30_NOVI_PROGRAM\` (Git repo). Zadnji commit `26a4a88` (17. 9.) sadrži sve do D-91 i skraćeni STANJE; **dopuna 8 (uvoz više datoteka, promjene verzija, Proizvodnja) čeka `GIT_POSALJI.cmd`** |
 | Shema | **v16** — migracija ide sama pri pokretanju |
-| Testovi | **161**, uvijek s `HUB_TEST_DATA` (README; bez toga se testovi na stvarnim nalozima preskaču) |
+| Testovi | **159** (izbrojano 17. 9. popodne), uvijek s `HUB_TEST_DATA` (README; bez toga se testovi na stvarnim nalozima preskaču) |
 | Hub na VM-u | `C:\Paneli\Hub` → `http://192.168.5.201:8766/` (8765 = Knjiga, 8080 = Regal traka); upute `deploy\README_DEPLOY_HUB.md` |
-| Zadnji dokument | **32** — Igorove napomene na ekrane, dopune 1–7 |
+| Zadnji dokument | **32** — Igorove napomene na ekrane, dopune 1–8 |
 
 ## Što je gotovo
 
@@ -31,12 +31,12 @@ Hub pokriva cijeli tok **unos → slaganje → ponuda → skladište → pila / 
 | Warehouse: ploče (Winstore), restlovi (Hub), trake (Regal traka), rezervacije, provjera naloga, restl iz sheme, QR naljepnice | `skladiste/`, `ispis/naljepnica_restl.py` | 27, 27a, 28, 30 |
 | Nabava: potrebe, narudžbenica (PDF + mail), primka iz eSlog-a | `nabava/` | 30 |
 | Krojni nacrt PDF (statistika s identima i pretincima) | `ispis/krojni.py` | 25 |
-| Web ekrani: popis naloga, 1 Unos → 2 Slaganje → 3 Ponuda → 4 Skladište → 5 Pila, nabava, šifrarnik, postavke; prijava s lozinkom | `web/`, `api/`, `korisnici.py` | 31, 32 |
+| Web ekrani: popis naloga, 1 Unos → 2 Slaganje → 3 Ponuda → 4 Skladište → 5 Proizvodnja, nabava, šifrarnik, postavke; prijava s lozinkom; uvoz više datoteka; promjene između verzija ponude | `web/`, `api/`, `korisnici.py` | 31, 32 |
 
 ## Čeka Igora
 
 **Na VM-u (prvo):**
-1. Ponovno kopirati Hub na VM (`deploy\1_KOPIRAJ_HUB_NA_VM.bat`, na VM-u `2_VM_HUB_POSTAVI.bat`) i provući pravi nalog kroz sve ekrane. Na nalogu s više materijala pogledati koliko se „Realno za pilu“ razlikuje od „Hub rezerve“ (D-91).
+1. Prvi prolaz na VM-u 17. 9. — „sve je ok“, napomene provedene (32 dopuna 8). Kopirati Hub na VM (`deploy\1_KOPIRAJ_HUB_NA_VM.bat`, na VM-u `2_VM_HUB_POSTAVI.bat`) i nastaviti prolaz; javiti što još smeta.
 2. Postavke: upisati `tvrtka_oib`, `tvrtka_iban`, `tvrtka_tel`; postaviti prvu lozinku (IGOR, admin) — od tada je prijava obavezna za sve (D-88).
 3. Prije stvarnog rada obrisati probne naloge iz baze na VM-u.
 
@@ -55,7 +55,7 @@ Hub pokriva cijeli tok **unos → slaganje → ponuda → skladište → pila / 
 
 ## Sljedeće (redom)
 
-1. Popraviti ono što Igor javi s prolaza na VM-u (nova dopuna dokumenta 32 ili dokument 33).
+1. Nastaviti s Igorovim napomenama s prolaza na VM-u (sljedeće u dokument 33).
 2. Na VM-u: Task Scheduler „Paneli - Hub Server“ (`deploy\HUB_SERVER.bat`, at startup, restart on failure) i **noćna kopija `hub.db`** na drugi disk (dokument 24).
 3. Ispisi na `hub/ispis/`: radni nalog, pick-lista traka uz krojni nacrt (D-63), izdatnica.
 4. Okov: uvoz s prijedlogom identa (D-32); do tada ide kroz ručne stavke ponude (D-87).

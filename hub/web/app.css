@@ -165,3 +165,31 @@ tr.korig td{background:#FFF8EA} tr.korig input.inl{border-color:var(--mel)}
 .dvo{grid-template-columns:minmax(0,1fr) 380px}
 .dvo .pane,.dvo .pane .bd{overflow:visible}   /* zbroj ponude lijepi se za dno prozora dok tablica skrola */
 .ponuda-t thead th{position:sticky;top:0;background:var(--surf);z-index:2}
+/* uvoz više datoteka odjednom (Igor, 17. 9.) */
+.drop{display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 14px;border:2px dashed var(--line);border-radius:10px;background:var(--field);cursor:pointer;text-align:center}
+.drop:hover,.drop.on{border-color:var(--acc);background:var(--acc-soft)} .drop input{display:none} .drop b{font-size:14px;color:var(--acc)}
+.uvoz-lista{display:flex;flex-direction:column;gap:3px;max-height:260px;overflow:auto} .uvoz-lista:empty{display:none}
+.uf{display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid var(--line2);border-radius:6px;font-size:13px;min-width:0}
+.uf .ime{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0} .uf .note{white-space:nowrap}
+.uf .ik{width:16px;text-align:center;font-weight:800;color:var(--muted)} .uf .x{border:0;background:none;color:var(--muted);font-size:16px;line-height:1;padding:0 4px;cursor:pointer}
+.uf.ok{background:var(--acc-soft);border-color:#BFDCCB} .uf.ok .ik{color:var(--acc)} .uf.presk .ik{color:var(--muted)}
+.uf.greska,.uf.krivo{background:var(--crit-soft);border-color:#E7B8AE} .uf.greska .ik,.uf.krivo .ik,.uf.greska .note,.uf.krivo .note{color:var(--crit)}
+.uf.radi{border-color:var(--acc)} .btn:disabled{opacity:.5;cursor:default}
+/* verzije ponude: gumbi u jednom redu (Pošalji kupcu svijetlo žuto, Kupac potvrdio svijetlo plavo) i sažetak promjena prema prethodnoj verziji (Igor, 17. 9.) */
+.ver-gumbi{display:flex;flex-wrap:nowrap;gap:5px;margin-top:6px} .ver-gumbi .btn.sm{padding:4px 8px}
+.btn.zuti{background:#FFF3C4;border-color:#E9D27E;color:#5E4708} .btn.zuti:hover{background:#FFEBA3;border-color:#D9BD5A}
+.btn.plavi{background:#DDEBFA;border-color:#A8C7EA;color:#1F4B78} .btn.plavi:hover{background:#CCE0F7;border-color:#86B0E0}
+.ver-prom{margin-top:8px;padding-top:7px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:2px;font-size:12px}
+.vp-hd{font-size:12.5px;margin-bottom:2px} .vp-hd>span:first-child{color:var(--muted)}
+.vp{display:flex;gap:6px;align-items:baseline;min-width:0} .vp .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vp .d{color:var(--muted);white-space:nowrap;max-width:45%;overflow:hidden;text-overflow:ellipsis} .vp .r{white-space:nowrap;min-width:64px;text-align:right;font-weight:600}
+.vp.dod .t{color:var(--acc)} .vp.ukl .t{color:var(--crit)} .vp-tr.dod td:nth-child(2){color:var(--acc)} .vp-tr.ukl td:nth-child(2){color:var(--crit)}
+.vp-ft{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:2px}
+.lnk{border:0;background:none;padding:0;color:var(--acc);font-weight:600;font-size:12px;cursor:pointer;text-decoration:underline}
+/* ekran Proizvodnja: materijali u punoj visini (ekran skrola kao cjelina), izvoz na stroj ostaje vidljiv desno (Igor, 17. 9.) */
+.content.ima-alat.proizv,.content.proizv{grid-template-rows:auto auto;align-content:start;align-items:start}
+.content.proizv .col{min-height:auto} .content.proizv .col>.pane{flex:none} .content.proizv .pane .bd{overflow:visible}
+.content.proizv>.col:last-child{position:sticky;top:0}
+.drop.mali{flex-direction:row;justify-content:center;gap:8px;padding:9px 12px} .drop.mali .note{display:none}
+.ver-gumbi .btn.sm{flex:1 1 auto;text-align:center}
+@media (min-width:1500px){.dvo{grid-template-columns:minmax(0,1fr) 420px}}

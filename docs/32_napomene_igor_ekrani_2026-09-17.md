@@ -115,6 +115,29 @@ dodaje redak kao u Pantheonu, povlači artikle i cijene iz Pantheona, pretraga p
 - Gumbi preimenovani da se ne miješa „Hub prijedlog“ s „Hub rezerva“: „Izračunaj slaganje“, „Potvrdi zadano slaganje“ / „Potvrdi sva zadana
   slaganja (n)“.
 
+## Dopuna 8 (17. 9., popodne) — Igorov prolaz na VM-u: uvoz više datoteka, promjene između verzija, Proizvodnja
+
+Igor je prošao nalog na VM-u („sve je ok“) i javio četiri stvari. Sve je napravljeno i provjereno u Chromiumu na HUMER-ovih 5 kupčevih CPW-ova.
+
+- **Uvoz više datoteka kupca odjednom.** „Uvoz datoteke“ na ekranu unosa sada prima više datoteka: odabir s Ctrl / Shift ili povlačenje u
+  okvir. Popis prije uvoza (s × za micanje), zatim Hub uvozi jednu po jednu u isti nalog i uz svaku piše rezultat (`53 el / 174 kom · za potvrdu 2`).
+  Ista datoteka drugi put → „već uvezena — preskočeno“ (hash, kao dosad); datoteka koja nije .CPW / .PNL / .CSV odmah je označena i ne šalje se;
+  greška jedne ne zaustavlja ostale — dijalog tada ostane otvoren s popisom, uvezene su u nalogu. Izbor „izvor“ vrijedi za .CPW (kupčev PPW /
+  PanelWizard); .PNL i .CSV prepoznaju se po nastavku. Proba: 5 datoteka → 121 el / 278 kom u jednom koraku. Slika `docs/ekrani_proba/17b_uvoz_vise_datoteka.png`.
+- **Sažetak promjena ispod novije verzije ponude.** Uz svaku verziju koja ima prethodnu: „prema v2 **+184,80 €** s PDV-om (neto +147,84)“,
+  do 4 najveće promjene (zeleno `+` dodano, crveno `−` uklonjeno, inače `24 → 36 KOM`, `cijena 2,04 → 1,80`, `rabat 0 → 30 %`) s razlikom iznosa,
+  brojevi „1 dodano · 2 promijenjeno“ i, kad ih je više, „sve promjene (n)“ → tablica svih. Ista stavka u dvije verzije = isti ident na istom
+  materijalu naloga (usluge i ručne stavke bez materijala i po nazivu). Nepromijenjena verzija: „bez promjena u odnosu na v2“. Računa server
+  (`ponuda.promjene()`, polje `promjene` u `GET /api/nalog/{id}/ponude`). Slika `docs/ekrani_proba/17b_verzije_promjene.png`.
+- **Gumbi verzije u jednom redu:** PDF · Stavke · **Pošalji kupcu** (svijetlo žuto) · **Kupac potvrdio** (svijetlo plavo); eSlog na potvrđenoj
+  verziji u istom redu. Stupac verzija na širokom ekranu (≥ 1500 px) 420 px.
+- **Korak 5 „Pila / nesting“ → „Proizvodnja“.** Pilula, naslov i gumb na skladištu („→ Proizvodnja“); adresa `#/nalog/N/proizvodnja` (stara
+  `/pila` i dalje radi). Kartice materijala su u **punoj visini** (sheme i gumbi uvijek cijeli, bez skrolanja unutar kartice) i složene kao na
+  ekranu slaganja (sličica lijevo, podaci desno); skrola cijeli ekran, a „Izvoz na stroj“ i „Spajanje“ ostaju vidljivi desno. Status naloga
+  `pila_nesting` na popisu naloga i dalje se zove „Pila / nesting“ (nalog je na stroju). Slika `docs/ekrani_proba/17b_proizvodnja.png`.
+- Testovi: novi `tests/test_ekrani_2026_09_17b.py` (promjene između verzija: dodano / uklonjeno / količina / rabat / bez promjena, zbroj razlika =
+  razlika neto; uvoz tri CPW-a redom u isti nalog, ponovljena datoteka preskočena, krivi tip 400). **159 testova prolazi** sa stvarnim podacima.
+
 ## Kako to izgleda Igoru nakon kopiranja
 
 1. Na PC-u `deploy\1_KOPIRAJ_HUB_NA_VM.bat` (lozinka VM korisnika Igor), na VM-u zatvoriti prozor Huba (Ctrl+C) i ponovno `C:\Paneli\Hub\deploy\2_VM_HUB_POSTAVI.bat` — `hub.db` se sam podigne na zadnju shemu (nove postavke pile dodaju se same).
