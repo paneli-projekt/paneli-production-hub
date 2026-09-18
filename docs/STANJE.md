@@ -1,6 +1,6 @@
 # Paneli Production Hub — STANJE
 
-**Ažurirano: 17. 9. 2026.** · Odluke: `DECISIONS.md` (D-01 … D-95) · Ideje: `IDEJE_KASNIJE.md` (I-01 … I-20) · Povijest do 17. 9.: `STANJE_POVIJEST.md`
+**Ažurirano: 17. 9. 2026.** · Odluke: `DECISIONS.md` (D-01 … D-96) · Ideje: `IDEJE_KASNIJE.md` (I-01 … I-20) · Povijest do 17. 9.: `STANJE_POVIJEST.md`
 
 Prvi dokument u novoj sesiji. **Drži se kratkim:** na kraju sesije zamijeniti odlomke „Brojke“, „Čeka Igora“ i „Sljedeće“ — ne dopisivati dnevnik. Što je i zašto napravljeno ide u `DECISIONS.md` i u dokument teme.
 
@@ -12,11 +12,11 @@ Hub pokriva cijeli tok **unos → optimizacija → ponuda → skladište → pro
 
 | | |
 |---|---|
-| Kod | `30_NOVI_PROGRAM\` (Git repo). Zadnji commit `504ac2b` (17. 9.): D-94 izgled ekrana 1A + 2A + 3A i Postavke. **Nije još u Gitu:** D-95 prag restla (0,35 m²), skladištarev ekran s QR-om i izdavanje (18. 9.) — Igor pusha `GIT_POSALJI.cmd` |
-| Shema | **v17** — migracija ide sama pri pokretanju |
-| Testovi | **175** (izbrojano 18. 9.), uvijek s `HUB_TEST_DATA` (README; bez toga se testovi na stvarnim nalozima preskaču) |
+| Kod | `30_NOVI_PROGRAM\` (Git repo). Zadnji commit `504ac2b` (17. 9.): D-94 izgled ekrana 1A + 2A + 3A i Postavke. **Nije još u Gitu:** D-95 (prag restla, skladištarev ekran, izdavanje) i D-96 (slike dekora iz kataloga dobavljača) — Igor pusha `GIT_POSALJI.cmd` |
+| Shema | **v18** — migracija ide sama pri pokretanju |
+| Testovi | **180** (izbrojano 18. 9.), uvijek s `HUB_TEST_DATA` (README; bez toga se testovi na stvarnim nalozima preskaču) |
 | Hub na VM-u | `C:\Paneli\Hub` → `http://192.168.5.201:8766/` (8765 = Knjiga, 8080 = Regal traka); upute `deploy\README_DEPLOY_HUB.md` |
-| Zadnji dokument | **35** — skladište i restlovi do kraja definirani (D-95); u izradi po tom dokumentu: prag restla ✓, skladištarev ekran ✓ |
+| Zadnji dokument | **36** — katalozi dobavljača i slike dekora (D-96, ugrađeno); 35 — skladište i restlovi (D-95): prag restla ✓, skladištarev ekran ✓ |
 
 ## Što je gotovo
 
@@ -37,6 +37,7 @@ Hub pokriva cijeli tok **unos → optimizacija → ponuda → skladište → pro
 ## Čeka Igora
 
 **Na VM-u (prvo):**
+0. Kopirati mapu `CLAUDE_COWORK\dekori` na VM (npr. `C:\Paneli\dekori`) i pokrenuti `deploy\3_UVEZI_DEKORE.bat` — slike dekora u Hubu; zatim ured prolazi „Šifrarnik → Slike dekora“.
 1. Kopirati na VM i proći **novi izgled ekrana i Postavke (D-94, dokument 34)**. Prolaz 17. 9. (uvoz više datoteka, radne ploče na pili, obrub, Optimizacija) — „sada je ok“. Nakon svakog kopiranja na VM nastaviti prolaz s pravim nalozima.
 2. Postavke → **Podaci tvrtke**: upisati OIB, IBAN, telefon (sada na ekranu); postaviti prvu lozinku (IGOR, admin) — od tada je prijava obavezna za sve (D-88).
 3. Prije stvarnog rada obrisati probne naloge iz baze na VM-u.
@@ -89,6 +90,6 @@ Hub pokriva cijeli tok **unos → optimizacija → ponuda → skladište → pro
 
 ## Karta dokumenata (čitati samo kad zadatak traži)
 
-Audit i temelji 00–06 · mockup 07 · Corpus put 08, 14 · checklista 09 · temelji praćenja i nabave 10 · šifrarnik 11, 13 · nalog 12 · izvozi 15, 16 · pregled koda 17 · uvoz Corpusa 18 · rezultati natrag 19 · spajanje naloga 20 · obračun i ponuda 21, 21a · optimizator 22, 22a · niz goda 23 · rizici „što ako“ 24 · optimizacija s potvrdom i krojni nacrt 25 · mjera za rezanje 26 · restlovi 27, 27a · Warehouse pogled 28 · CNC obrade 29 · nabava i QR 30 · web ekrani 31 · napomene na ekrane 32 · radne ploče na pili, obrub 33 · izgled ekrana 1A + 2A + 3A i Postavke 34
+Audit i temelji 00–06 · mockup 07 · Corpus put 08, 14 · checklista 09 · temelji praćenja i nabave 10 · šifrarnik 11, 13 · nalog 12 · izvozi 15, 16 · pregled koda 17 · uvoz Corpusa 18 · rezultati natrag 19 · spajanje naloga 20 · obračun i ponuda 21, 21a · optimizator 22, 22a · niz goda 23 · rizici „što ako“ 24 · optimizacija s potvrdom i krojni nacrt 25 · mjera za rezanje 26 · restlovi 27, 27a · Warehouse pogled 28 · CNC obrade 29 · nabava i QR 30 · web ekrani 31 · napomene na ekrane 32 · radne ploče na pili, obrub 33 · izgled ekrana 1A + 2A + 3A i Postavke 34 · skladište i restlovi 35 · katalozi dobavljača i slike dekora 36
 
 Zasebno: `20_web_katalog_korpusa_2026-09-15.md` — prijedlog javnog web kataloga korpusa (15. 9.), nije ušao u DECISIONS; nije dio trenutnog posla.

@@ -134,6 +134,109 @@ def materijal(ident: str):
         return dict(_red(m), aliasi=aliasi, zadane_trake=trake, winstore=winstore)
 
 
+# ---------------------------------------------------------------- slike dekora (katalozi dobavljača, dokument 36)
+from ..sifrarnici import dekori as DEK                                    # noqa: E402
+
+
+@app.get("/api/dekor/slika/{ident}", include_in_schema=False)
+def dekor_slika(ident: str):
+    """Slika dekora materijala za interne ekrane (šifrarnik, nalog, restlovi, skladištarev ekran). 404 kad je nema."""
+    with _brava:
+        c = veza()
+        d = DEK.slika(c, ident)
+    if not d or not os.path.isfile(d["putanja"]):
+        raise HTTPException(404, "nema slike")
+    return FileResponse(d["putanja"], media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/api/dekor/katalog/slika/{katalog_id}", include_in_schema=False)
+def dekor_slika_kataloga(katalog_id: str):
+    """Slika iz kataloga (ponuđeni kandidat na ekranu potvrde)."""
+    with _brava:
+        c = veza()
+        r = c.execute("SELECT datoteka FROM dekor_katalog WHERE katalog_id = ?", (katalog_id,)).fetchone()
+        put = os.path.join(DEK.mapa_slika(c), r["datoteka"]) if r and r["datoteka"] else None
+    if not put or not os.path.isfile(put):
+        raise HTTPException(404, "nema slike")
+    return FileResponse(put, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/api/dekor/{ident}")
+def dekor(ident: str):
+    """Što Hub zna o dekoru materijala: aktivna slika (s poveznicom na dobavljača), kandidati koje ured još nije potvrdio,
+    te podaci iz kataloga — proizvođač ploče, dostupne debljine i predložena ABS traka."""
+    with _brava:
+        c = veza()
+        return dict(ident=ident.upper(), slika=DEK.slika(c, ident), kandidati=DEK.kandidati(c, ident))
+
+
+@app.get("/api/dekori/za-potvrdu")
+def dekori_za_potvrdu(q: str = "", limit: int = Query(60, le=300)):
+    """Materijali bez slike koji imaju ponuđene kandidate — ekran ureda."""
+    with _brava:
+        c = veza()
+        lst = DEK.za_potvrdu(c, limit=limit, q=q or None)
+        return dict(broj=len(lst), materijali=lst, sazetak=DEK.sazetak(c))
+
+
+@app.get("/api/dekori/katalog")
+def dekori_katalog(q: str = "", limit: int = Query(40, le=200)):
+    """Pretraga kataloga dobavljača (kad ured želi sam odabrati sliku koju Hub nije ponudio)."""
+    with _brava:
+        c = veza()
+        a, sql = [], "SELECT katalog_id, dobavljac, kategorija, naziv, kod_dekora, proizvodac, debljina, datoteka, url_proizvoda FROM dekor_katalog WHERE datoteka IS NOT NULL"
+        for rij in (q or "").split():
+            sql += " AND (UPPER(naziv) LIKE ? OR UPPER(kod_dekora) LIKE ?)"; a += ["%" + rij.upper() + "%"] * 2
+        sql += " ORDER BY dobavljac, naziv LIMIT ?"; a.append(limit)
+        return dict(dekori=[_red(r) for r in c.execute(sql, a)])
+
+
+class DekorPotvrda(BaseModel):
+    ident: str
+    katalog_id: Optional[str] = None
+    tko: str = "web"
+
+
+@app.post("/api/dekor/potvrdi")
+def dekor_potvrdi(p: DekorPotvrda):
+    with _brava:
+        c = veza()
+        try:
+            return DEK.potvrdi(c, p.ident, p.katalog_id, p.tko)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+
+
+@app.post("/api/dekor/odbij")
+def dekor_odbij(p: DekorPotvrda):
+    """Ponuđena slika ne valja (bez katalog_id: nijedna od ponuđenih) — više se ne nudi."""
+    with _brava:
+        c = veza()
+        try:
+            DEK.odbij(c, p.ident, p.katalog_id, p.tko)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        return dict(ok=True, kandidati=DEK.kandidati(c, p.ident))
+
+
+class DekorUvoz(BaseModel):
+    mapa: str
+    tko: str = "web"
+
+
+@app.post("/api/dekori/uvoz")
+def dekori_uvoz(p: DekorUvoz):
+    """Uvoz kataloga dobavljača iz mape (CSV + slike) i vezanje na materijale; ponavljanje je bezopasno."""
+    with _brava:
+        c = veza()
+        try:
+            iz = DEK.uvezi_katalog(c, p.mapa, p.tko)
+        except (ValueError, OSError) as e:
+            raise HTTPException(400, str(e))
+        iz.update(DEK.spoji(c, p.tko))
+        return iz
+
+
 # ---------------------------------------------------------------- trake
 @app.get("/api/sifrarnik/trake")
 def trake(q: str = "", klasa: Optional[str] = None, aktivni: int = 1, limit: int = Query(50, le=500)):

@@ -44,6 +44,10 @@
     return '<div class="brojke"><div><div class="bl">Količina</div><div class="bv">' + (x.broj_ploca || 0) + '<small>' + ploca(x.broj_ploca) + '</small></div></div>' +
       '<div><div class="bl">Iskorištenje</div><div class="bv">' + pct(x.iskoristenje) + '</div></div><div><div class="bl">Za naplatu</div><div class="bv">' + nap + '</div></div></div>';
   }
+  function dslika(ident, vel) {
+    if (!ident) return "";
+    return '<img class="dslika' + (vel ? " " + vel : "") + '" src="/api/dekor/slika/' + encodeURIComponent(ident) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+  }
   function optBlok(d, opt) {
     function pdf(o, x) { return '/api/nalog/' + d.id + '/ispis/krojni.pdf?materijal=' + o.nalog_materijal_id + (x ? '&oid=' + x.id : ""); }
     var IMENA = { auto: "Realno za pilu", hub: "Hub rezerva (najmanje m²)", uzduzno: "Uzdužno", poprecno: "Poprečno", trake: "Trake" };
@@ -433,6 +437,36 @@
     var t2; q("#q").oninput = function () { clearTimeout(t2); S.stanjeQ = this.value; t2 = setTimeout(render, 250); };
   };
 
+  // ---------------------------------------------------------------- slike dekora: ekran ureda za potvrdu ponuđenih slika
+  E.dekori = async function () {
+    var d = await api("/api/dekori/za-potvrdu?limit=60&q=" + encodeURIComponent(S.dekQ || ""));
+    var sz = d.sazetak || {};
+    var kartice = d.materijali.map(function (m) {
+      return '<section class="pane pk dek-kart"><div class="hd"><b>' + esc(m.naziv_pantheon) + '</b><span class="note mono">' + esc(m.pantheon_ident) + '</span>' +
+        (m.debljina ? '<span class="note">' + m.debljina + ' mm</span>' : "") + '<span class="grow"></span>' +
+        '<button class="btn sm" data-nema="' + esc(m.pantheon_ident) + '">Nijedna ne odgovara</button></div>' +
+        '<div class="bd dek-red">' + m.kandidati.map(function (k) {
+          return '<button class="dek-izbor" data-pot="' + esc(m.pantheon_ident) + '" data-kat="' + esc(k.katalog_id) + '">' +
+            '<img src="/api/dekor/katalog/slika/' + encodeURIComponent(k.katalog_id) + '" alt="" loading="lazy">' +
+            '<span class="naz">' + esc(k.naziv) + '</span><span class="note">' + esc(k.dobavljac) + (k.proizvodac ? ' · ' + esc(k.proizvodac) : "") + '</span></button>';
+        }).join("") + '</div></section>';
+    }).join("") || '<div class="sazetak ok"><span class="ik">✓</span><div class="txt"><b>Nema dekora koji čekaju potvrdu.</b> <span class="note">Nove slike dolaze kad se katalog dobavljača ponovno uveze.</span></div></div>';
+    ljuska({ crumb: "<b>Šifrarnik</b> · slike dekora", rail: "sifr", cls: "c1 puna dek",
+      akcije: '<a class="tbtn" href="#/sifrarnik">Materijali i trake</a><a class="tbtn on" href="#/dekori">Slike dekora</a><span class="grow"></span><input id="q" class="tbtn" style="min-width:220px" placeholder="traži dekor…" value="' + esc(S.dekQ || "") + '">',
+      sadrzaj: '<div class="post-omot"><div class="sazetak info"><span class="ik">i</span><div class="txt"><b>' + (sz.sa_slikom || 0) + '</b> materijala ima sliku · <b>' + (sz.za_potvrdu || 0) + '</b> čeka potvrdu · katalog ' + (sz.katalog || 0) + ' dekora ' +
+        '<span class="note">(' + (sz.dobavljaci || []).map(function (x) { return esc(x.dobavljac) + " " + x.n; }).join(" · ") + ')</span><br><span class="note">Klik na sliku koja odgovara dekoru upisuje je uz materijal; slike se koriste samo na internim ekranima.</span></div></div>' +
+        kartice + '</div>' });
+    var t; q("#q").oninput = function () { clearTimeout(t); S.dekQ = this.value; t = setTimeout(render, 300); };
+    qa("[data-pot]").forEach(function (b) { b.onclick = async function () {
+      b.disabled = true;
+      await api("/api/dekor/potvrdi", { body: { ident: b.dataset.pot, katalog_id: b.dataset.kat } });
+      toast("Slika je spremljena"); render();
+    }; });
+    qa("[data-nema]").forEach(function (b) { b.onclick = async function () {
+      await api("/api/dekor/odbij", { body: { ident: b.dataset.nema } }); render();
+    }; });
+  };
+
   // ---------------------------------------------------------------- ekran skladištara: QR restla, potvrde, izdavanje
   function restlRed(x) {
     return '<div class="mjera">' + mm(x.L) + ' × ' + mm(x.W) + '</div>' + (x.lokacija ? '<span class="tag">' + esc(x.lokacija) + '</span>' : '<span class="note">bez lokacije</span>');
@@ -460,7 +494,7 @@
     var izdRedovi = izd.map(function (x) {
       var sto = x.restlovi.length ? x.restlovi.map(function (r) { return '<b>' + esc(r.oznaka) + '</b> ' + mm(r.L) + ' × ' + mm(r.W) + (r.lokacija ? ' <span class="tag">' + esc(r.lokacija) + '</span>' : ""); }).join("<br>")
         : '<b>' + n(x.kom, 0) + '</b> ploč' + (x.kom === 1 ? "a" : "e") + ' <span class="note">iz regala (nije u Winstoreu)</span>';
-      return '<div class="skl-red"><div class="grow"><div class="naslov">' + esc(x.naziv || x.ident || "") + '</div><div class="note">' + esc(x.ident || "") + ' · nalog ' + esc(x.nalog) + ' · ' + H.statusNaziv(x.status) + '</div><div class="sto">' + sto + '</div></div>' +
+      return '<div class="skl-red">' + dslika(x.ident) + '<div class="grow"><div class="naslov">' + esc(x.naziv || x.ident || "") + '</div><div class="note">' + esc(x.ident || "") + ' · nalog ' + esc(x.nalog) + ' · ' + H.statusNaziv(x.status) + '</div><div class="sto">' + sto + '</div></div>' +
         '<button class="btn pri lg" data-izdaj="' + x.nalog_materijal_id + '">Izdano</button></div>';
     }).join("") || '<div class="note" style="padding:12px 16px">Nema ničega za izdavanje.</div>';
     var priRedovi = pri.map(function (x) {
@@ -512,7 +546,7 @@
       akcije: '<a class="tbtn" href="#/skladistar">← Skladištar</a><span class="grow"></span><a class="tbtn" href="/api/skladiste/restlovi/naljepnice.pdf?oznake=' + esc(x.oznaka) + '" target="_blank">Naljepnica</a>',
       sadrzaj: '<div class="post-omot"><section class="pane pk"><div class="hd"><b class="restl-oz">' + esc(x.oznaka) + '</b><span class="stat ' + st[0] + '">' + esc(st[1]) + '</span><span class="grow"></span>' +
         (x.provjeri ? '<span class="stat warn sm">dekor za potvrdu</span>' : "") + '</div><div class="bd">' +
-        red("Materijal", (x.ident ? '<span class="mono">' + esc(x.ident) + '</span> ' : "") + esc(x.naziv_kratki || x.naziv || x.dekor_ulaz || "—")) +
+        red("Materijal", dslika(x.ident, "uz-red") + (x.ident ? '<span class="mono">' + esc(x.ident) + '</span> ' : "") + esc(x.naziv_kratki || x.naziv || x.dekor_ulaz || "—")) +
         red("Mjere", '<b>' + mm(x.L) + ' × ' + mm(x.W) + '</b> mm' + (x.kom > 1 ? ' × ' + x.kom + ' kom' : "") + ' <span class="note">' + n(x.m2, 2) + ' m²</span>') +
         red("Debljina", x.debljina ? x.debljina + " mm" : '<span class="note">—</span>') +
         red("Lokacija", x.lokacija ? '<b>' + esc(x.lokacija) + '</b>' : '<span class="note">—</span>') +
@@ -584,10 +618,10 @@
     var s = S.sifQ || "", vr = S.sifVrsta || "materijali";
     var r = s ? await api((vr === "trake" ? "/api/sifrarnik/trake?q=" : "/api/sifrarnik/materijali?q=") + encodeURIComponent(s) + "&limit=100") : { materijali: [], trake: [] };
     var lst = r.materijali || r.trake || r;
-    var rows = lst.map(function (x) { return '<tr><td class="mono">' + esc(x.ident) + '</td><td>' + esc(x.naziv) + '</td><td>' + esc(x.naziv_kratki || x.klasa || "") + '</td><td class="r">' + (x.debljina ? x.debljina + " mm" : "") + '</td><td>' + esc(x.winstore_kod || x.dekor || "") + '</td><td class="r">' + (x.stanje_kom != null ? x.stanje_kom : "") + '</td><td>' + (x.pogodak ? '<span class="tag info">' + esc(x.pogodak) + '</span>' : "") + '</td></tr>'; }).join("");
+    var rows = lst.map(function (x) { return '<tr><td class="dst">' + (vr === "trake" ? "" : dslika(x.ident)) + '</td><td class="mono">' + esc(x.ident) + '</td><td>' + esc(x.naziv) + '</td><td>' + esc(x.naziv_kratki || x.klasa || "") + '</td><td class="r">' + (x.debljina ? x.debljina + " mm" : "") + '</td><td>' + esc(x.winstore_kod || x.dekor || "") + '</td><td class="r">' + (x.stanje_kom != null ? x.stanje_kom : "") + '</td><td>' + (x.pogodak ? '<span class="tag info">' + esc(x.pogodak) + '</span>' : "") + '</td></tr>'; }).join("");
     ljuska({ crumb: "<b>Šifrarnik</b>", rail: "sifr", cls: "c1",
-      sadrzaj: '<div class="pane"><div class="hd"><span class="chip' + (vr === "materijali" ? " on" : "") + '" data-v="materijali">Materijali</span><span class="chip' + (vr === "trake" ? " on" : "") + '" data-v="trake">Trake</span><span class="grow"></span><input id="q" placeholder="naziv, ident, Winstore kod, tekst iz naloga…" value="' + esc(s) + '" style="width:340px"></div>' +
-        '<div class="bd tight"><table><thead><tr><th>Ident</th><th>Naziv</th><th>Kratki / klasa</th><th class="r">Debljina</th><th>Winstore / dekor</th><th class="r">Stanje</th><th></th></tr></thead><tbody>' + (rows || '<tr><td colspan="7" class="note">upiši pojam za pretragu</td></tr>') + '</tbody></table></div></div>', foot: kpi(lst.length, "pogodaka") + '<span class="note">Šifrarnik se puni dnevnim uvozom iz Pantheona i Winstorea; ispravci ureda (debljina, „ne koristi se“, veza koda) žive u Hubu.</span>' });
+      sadrzaj: '<div class="pane"><div class="hd"><span class="chip' + (vr === "materijali" ? " on" : "") + '" data-v="materijali">Materijali</span><span class="chip' + (vr === "trake" ? " on" : "") + '" data-v="trake">Trake</span><a class="chip" href="#/dekori">Slike dekora</a><span class="grow"></span><input id="q" placeholder="naziv, ident, Winstore kod, tekst iz naloga…" value="' + esc(s) + '" style="width:340px"></div>' +
+        '<div class="bd tight"><table><thead><tr><th></th><th>Ident</th><th>Naziv</th><th>Kratki / klasa</th><th class="r">Debljina</th><th>Winstore / dekor</th><th class="r">Stanje</th><th></th></tr></thead><tbody>' + (rows || '<tr><td colspan="8" class="note">upiši pojam za pretragu</td></tr>') + '</tbody></table></div></div>', foot: kpi(lst.length, "pogodaka") + '<span class="note">Šifrarnik se puni dnevnim uvozom iz Pantheona i Winstorea; ispravci ureda (debljina, „ne koristi se“, veza koda) žive u Hubu.</span>' });
     qa("[data-v]").forEach(function (c) { c.onclick = function () { S.sifVrsta = c.dataset.v; render(); }; });
     var t; q("#q").oninput = function () { clearTimeout(t); S.sifQ = this.value; t = setTimeout(render, 250); }; q("#q").focus();
   };

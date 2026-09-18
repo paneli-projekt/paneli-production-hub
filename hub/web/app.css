@@ -346,3 +346,16 @@ tr.korig td{background:#FFFAEC}
 .content.skl .kart-akcije{padding:14px 18px}
 @media (max-width:640px){.skl-red{padding:12px} .skl-red .btn.lg{flex:1}}
 @media (max-width:640px){.content.skl .alatna{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;padding-bottom:4px} .content.skl .alatna .grow{min-width:6px} .skener input{min-width:100%}}
+
+/* slike dekora: sličica uz materijal i ekran ureda za potvrdu */
+.dslika{width:34px;height:34px;object-fit:cover;border-radius:6px;border:1px solid var(--line2);display:block;background:#F2F1EC}
+.dslika.uz-red{display:inline-block;vertical-align:middle;margin-right:8px;width:28px;height:28px}
+td.dst{width:44px;padding-left:12px;padding-right:0}
+.skl-red>.dslika{width:52px;height:52px;flex:none}
+.dek-kart .hd{flex-wrap:wrap;gap:8px} .dek-kart .bd{padding-bottom:16px}
+.pane .bd.dek-red{flex-direction:row;flex-wrap:wrap;gap:14px;align-items:flex-start}
+.dek-izbor{display:flex;flex-direction:column;gap:4px;width:180px;padding:8px;border:1px solid var(--line2);border-radius:10px;background:var(--surf);cursor:pointer;text-align:left;font:inherit}
+.dek-izbor:hover{border-color:var(--btn);box-shadow:0 0 0 3px var(--sel)}
+.dek-izbor img{width:100%;height:120px;object-fit:cover;border-radius:6px;background:#F2F1EC}
+.dek-izbor .naz{font-size:13px;font-weight:600;line-height:1.25} .dek-izbor .note{font-size:12px}
+.dek-izbor:disabled{opacity:.5}

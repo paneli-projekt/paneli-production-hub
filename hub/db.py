@@ -11,7 +11,7 @@ import os
 import sqlite3
 from datetime import datetime
 
-SHEMA_VERZIJA = 17
+SHEMA_VERZIJA = 18
 
 # Migracije starijih baza (verzija → popis SQL naredbi); 'duplicate column' se preskače (svježa baza već ima stupce iz schema.sql).
 MIGRACIJE = {
@@ -73,6 +73,7 @@ MIGRACIJE = {
     17: [                               # obrub (rubljenje) ploče po materijalu naloga (Igor, 17. 9.); NULL = zadano
         "ALTER TABLE nalog_materijal ADD COLUMN obrub REAL",
     ],
+    18: [],                             # katalozi dobavljača i slike dekora (dokument 36) — tablice dolaze iz schema.sql
 }
 OVDJE = os.path.dirname(os.path.abspath(__file__))
 

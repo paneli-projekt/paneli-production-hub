@@ -432,6 +432,47 @@ CREATE TABLE IF NOT EXISTS restl (                    -- jedan redak = jedan res
 );
 CREATE INDEX IF NOT EXISTS ix_restl_materijal ON restl (materijal_id, status);
 
+-- katalozi dobavljača (Iverpan, Elgrad, Frischeis + Blažić trake): slika dekora i podaci kojih u Pantheonu nema (dokument 36)
+CREATE TABLE IF NOT EXISTS dekor_katalog (
+    id              INTEGER PRIMARY KEY,
+    katalog_id      TEXT NOT NULL UNIQUE,              -- jedinstveni_id iz CSV-a (IVERPAN-IV-0001)
+    dobavljac       TEXT NOT NULL,                     -- Iverpan | Elgrad | Frischeis
+    kategorija      TEXT,                              -- Oplemenjena iverica, Radne ploče i obloge, Compact…
+    naziv           TEXT NOT NULL,                     -- naziv dekora kod dobavljača
+    sifra           TEXT,                              -- šifra artikla kod dobavljača
+    kod_dekora      TEXT,                              -- kod dekora izvučen iz naziva / Blažića (25727, K2737, U504ST9)
+    proizvodac      TEXT,                              -- KAINDL | EGGER | KRONOSPAN | FUNDERMAX …
+    debljina        REAL,
+    dostupne_debljine TEXT,
+    duzina          REAL, sirina REAL,
+    url_proizvoda   TEXT,
+    datoteka        TEXT,                              -- naziv slike u mapi slika Huba (katalog_id.jpg)
+    izvor_slike     TEXT,                              -- putanja u paketu iz kojeg je slika uzeta
+    traka_sifra     TEXT,                              -- Blažić: šifra ABS trake (A616C)
+    traka_naziv     TEXT,
+    traka_debljine  TEXT,
+    traka_ocjena    TEXT,                              -- odlično / vrlo dobro / dobro / približno ujemanje
+    traka_datoteka  TEXT,                              -- slika trake u mapi slika Huba
+    kljuc_pretrage  TEXT,
+    datum           TEXT,                              -- datum prikupljanja kataloga
+    kada            TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_dekor_katalog_kod ON dekor_katalog (kod_dekora);
+
+CREATE TABLE IF NOT EXISTS dekor_slika (              -- veza materijal → slika iz kataloga (ili ručno dodana), s potvrdom ureda
+    id              INTEGER PRIMARY KEY,
+    materijal_id    INTEGER NOT NULL REFERENCES materijal (id),
+    katalog_id      TEXT REFERENCES dekor_katalog (katalog_id),
+    datoteka        TEXT NOT NULL,                     -- naziv datoteke u mapi slika Huba
+    status          TEXT NOT NULL DEFAULT 'kandidat',  -- aktivna (prikazuje se) | kandidat (čeka ured) | odbijena
+    razina          TEXT,                              -- kod (siguran pogodak po kodu dekora) | naziv | potvrda (ured) | rucno
+    bodovi          REAL,
+    potvrdio        TEXT, potvrdjeno TEXT,
+    kada            TEXT NOT NULL,
+    UNIQUE (materijal_id, katalog_id)
+);
+CREATE INDEX IF NOT EXISTS ix_dekor_slika_mat ON dekor_slika (materijal_id, status);
+
 CREATE TABLE IF NOT EXISTS rezervacija (              -- raspoloživo = fizičko − rezervirano + naručeno (D-42)
     id                 INTEGER PRIMARY KEY,
     nalog_materijal_id INTEGER NOT NULL REFERENCES nalog_materijal (id),
@@ -508,6 +549,7 @@ INSERT OR IGNORE INTO postavke (kljuc, vrijednost, opis) VALUES
     ('pila_min_komad_4', '0', 'ograničenje pile (D-91): najmanji komad 4. razine u mm (0 = bez ograničenja)'),
     ('pila_mijesana_orijentacija', '0', 'ograničenje pile (D-91): 1 = smije miješati orijentaciju (smjer po ploči, isti element u obje orijentacije)'),
     ('nadmjera_trake', '10', 'nadmjera trake u % iznad Σ stranica (PW 10 %, D-20/D-77)'),
+    ('mapa_dekori', '', 'mapa sa slikama dekora (prazno = mapa „dekori“ pokraj baze); slike dobavljača idu samo na interne ekrane'),
     ('restl_min_m2', '0.35', 'restl se čuva od ove površine u m² (D-95); naplata kupcu ostaje na 1 m²'),
     ('restl_min_mm', '150', 'najmanja kraća stranica restla u mm (D-95)'),
     ('restl_traka_mm', '2000', 'traka duža od ovoga čuva se kao restl i ispod najmanje površine (D-95)'),
