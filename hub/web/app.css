@@ -359,3 +359,7 @@ td.dst{width:44px;padding-left:12px;padding-right:0}
 .dek-izbor img{width:100%;height:120px;object-fit:cover;border-radius:6px;background:#F2F1EC}
 .dek-izbor .naz{font-size:13px;font-weight:600;line-height:1.25} .dek-izbor .note{font-size:12px}
 .dek-izbor:disabled{opacity:.5}
+.dslika.mat-sl{float:left;margin:2px 10px 2px 0;width:38px;height:38px}
+.mat .row{overflow:hidden} .mat .m{clear:both}
+.dslika.kart-sl{width:44px;height:44px;flex:none}
+.pane .hd>.dslika{width:30px;height:30px;flex:none}
