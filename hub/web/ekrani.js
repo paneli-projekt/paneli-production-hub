@@ -450,13 +450,28 @@
             '<img src="/api/dekor/katalog/slika/' + encodeURIComponent(k.katalog_id) + '" alt="" loading="lazy">' +
             '<span class="naz">' + esc(k.naziv) + '</span><span class="note">' + esc(k.dobavljac) + (k.proizvodac ? ' · ' + esc(k.proizvodac) : "") + '</span></button>';
         }).join("") + '</div></section>';
-    }).join("") || '<div class="sazetak ok"><span class="ik">✓</span><div class="txt"><b>Nema dekora koji čekaju potvrdu.</b> <span class="note">Nove slike dolaze kad se katalog dobavljača ponovno uveze.</span></div></div>';
+    }).join("") || (sz.katalog ? '<div class="sazetak ok"><span class="ik">✓</span><div class="txt"><b>Nema dekora koji čekaju potvrdu.</b> <span class="note">Nove slike dolaze kad se katalog dobavljača ponovno uveze.</span></div></div>'
+      : '<div class="sazetak"><span class="ik">!</span><div class="txt"><b>Katalog dobavljača još nije uvezen.</b> Kopiraj mapu <span class="mono">dekori</span> na poslužitelj Huba (npr. <span class="mono">C:\\Paneli\\dekori</span>) pa klikni <b>Uvezi katalog</b>. <span class="note">Uvoz traje nekoliko minuta: slike se umanjuju i spremaju uz bazu, a dekori se vežu na naše identе.</span></div></div>');
     ljuska({ crumb: "<b>Šifrarnik</b> · slike dekora", rail: "sifr", cls: "c1 puna dek",
-      akcije: '<a class="tbtn" href="#/sifrarnik">Materijali i trake</a><a class="tbtn on" href="#/dekori">Slike dekora</a><span class="grow"></span><input id="q" class="tbtn" style="min-width:220px" placeholder="traži dekor…" value="' + esc(S.dekQ || "") + '">',
+      akcije: '<a class="tbtn" href="#/sifrarnik">Materijali i trake</a><a class="tbtn on" href="#/dekori">Slike dekora</a><span class="grow"></span><input id="q" class="tbtn" style="min-width:220px" placeholder="traži dekor…" value="' + esc(S.dekQ || "") + '"><button class="tbtn' + (sz.katalog ? '' : ' pri') + '" id="btnUvoz">Uvezi katalog…</button>',
       sadrzaj: '<div class="post-omot"><div class="sazetak info"><span class="ik">i</span><div class="txt"><b>' + (sz.sa_slikom || 0) + '</b> materijala ima sliku · <b>' + (sz.za_potvrdu || 0) + '</b> čeka potvrdu · katalog ' + (sz.katalog || 0) + ' dekora ' +
         '<span class="note">(' + (sz.dobavljaci || []).map(function (x) { return esc(x.dobavljac) + " " + x.n; }).join(" · ") + ')</span><br><span class="note">Klik na sliku koja odgovara dekoru upisuje je uz materijal; slike se koriste samo na internim ekranima.</span></div></div>' +
         kartice + '</div>' });
     var t; q("#q").oninput = function () { clearTimeout(t); S.dekQ = this.value; t = setTimeout(render, 300); };
+    q("#btnUvoz").onclick = function () {
+      dlg({ naslov: "Uvoz kataloga dobavljača", tijelo: '<div class="field"><span class="lbl">Mapa na poslužitelju Huba</span><input id="mp" value="' + esc(S.dekMapa || "C:\\Paneli\\dekori") + '"></div>' +
+        '<div class="note">Mapa s katalozima (Iverpan, Elgrad, Frischeis, Blažić) i zbirnim CSV-om. Uvoz kopira slike umanjene na 640 px uz bazu Huba i veže dekore na naše identе; ponavljanje je bezopasno i ne dira potvrde ureda.</div>',
+        gumbi: [{ txt: "Uvezi", pri: true, on: async function (bg, zatvori) {
+          var mapa = q("#mp", bg).value.trim();
+          if (!mapa) { toast("upiši mapu", true); return false; }
+          S.dekMapa = mapa;
+          var gumb = q(".dlg .ft .btn.pri", bg.ownerDocument || document);
+          if (gumb) { gumb.disabled = true; gumb.textContent = "Uvozim…"; }
+          var r = await api("/api/dekori/uvoz", { body: { mapa: mapa } });
+          toast("Katalog: " + r.redaka + " dekora, " + r.slika + " slika; sa slikom odmah " + r.po_kodu + ", čeka potvrdu " + r.s_kandidatima);
+          render();
+        } }], nakon: function (bg) { q("#mp", bg).focus(); } });
+    };
     qa("[data-pot]").forEach(function (b) { b.onclick = async function () {
       b.disabled = true;
       await api("/api/dekor/potvrdi", { body: { ident: b.dataset.pot, katalog_id: b.dataset.kat } });
