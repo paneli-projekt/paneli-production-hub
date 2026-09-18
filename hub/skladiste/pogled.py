@@ -14,7 +14,7 @@ Trake Hub ne rezervira ni ne oduzima (D-63): samo uspoređuje potrebu s metrima 
 """
 import math
 
-from ..db import postavka, dnevnik
+from ..db import postavka, dnevnik, sada
 from . import ploce as PL, restlovi as RS, trake as TR
 
 STATUSI_POTREBE = ("potvrdjeno", "skladiste", "pila_nesting")     # nalozi koji troše skladište, a još nisu rezani
@@ -171,16 +171,75 @@ def oslobodi_nalog(conn, nalog_id, tko):
     return n
 
 
+def u_winstoreu(conn, materijal_id, vrsta=None):
+    """Drži li materijal automatsko skladište Winstore (D-95). Winstore ga poslužuje sam, pa Hub za njega ne vodi izdavanje.
+    Radne ploče, ploče stola i zidne obloge nikad nisu u Winstoreu; za ostalo odlučuje zadnji izvoz (materijal se u njemu pojavljuje,
+    makar s količinom 0)."""
+    if (vrsta or "") in ("RP", "ZO"):
+        return False
+    if not materijal_id:
+        return False
+    r = conn.execute("SELECT COUNT(*) FROM winstore_ploca WHERE materijal_id = ? AND ambalaza = 0", (materijal_id,)).fetchone()
+    return bool(r[0])
+
+
 def izdaj_nalog(conn, nalog_id, tko):
-    """Nalog otišao na stroj: rezervacije ploča → izdano, rezervirani restlovi → potrošeni."""
-    from ..nalozi import nalozi as N
-    n = N.nalog(conn, nalog_id)
+    """Nalog otišao na stroj. Ploče koje drži Winstore izdaje sam automat, pa im rezervacija odmah ide u 'izdano' (stanje se ionako
+    ispravlja idućim Winstore izvozom). Restlovi i materijali kojih Winstore nema ČEKAJU skladištara (D-95) — on ih izdaje na svom
+    ekranu (`izdaj_materijal`). Vraća broj automatski izdanih rezervacija."""
     k = 0
-    for nm in conn.execute("SELECT id FROM nalog_materijal WHERE nalog_id = ?", (nalog_id,)).fetchall():
-        cur = conn.execute("UPDATE rezervacija SET status = 'izdano', izdano_kada = datetime('now') WHERE nalog_materijal_id = ? AND restl_id IS NULL AND status = 'rezervirano'", (nm["id"],))
-        k += cur.rowcount + RS.izdaj(conn, nm["id"], tko, n["naziv"], commit=False)
+    for nm in conn.execute("SELECT nm.id, nm.materijal_id, m.vrsta FROM nalog_materijal nm LEFT JOIN materijal m ON m.id = nm.materijal_id "
+                           "WHERE nm.nalog_id = ?", (nalog_id,)).fetchall():
+        if not u_winstoreu(conn, nm["materijal_id"], nm["vrsta"]):
+            continue
+        cur = conn.execute("UPDATE rezervacija SET status = 'izdano', izdano_kada = ? WHERE nalog_materijal_id = ? AND restl_id IS NULL AND status = 'rezervirano'",
+                           (sada(), nm["id"]))
+        k += cur.rowcount
     conn.commit()
     return k
+
+
+def izdaj_materijal(conn, nm_id, tko, commit=True):
+    """Skladištar je iznio materijal iz regala (D-95): rezervacije ploča → izdano, rezervirani restl → potrošen (s nazivom naloga).
+    Vraća broj zatvorenih rezervacija."""
+    from ..nalozi import nalozi as N
+    r = conn.execute("SELECT nm.nalog_id, n.naziv FROM nalog_materijal nm JOIN nalog n ON n.id = nm.nalog_id WHERE nm.id = ?", (nm_id,)).fetchone()
+    k = conn.execute("UPDATE rezervacija SET status = 'izdano', izdano_kada = ? WHERE nalog_materijal_id = ? AND restl_id IS NULL AND status = 'rezervirano'",
+                     (sada(), nm_id)).rowcount
+    k += RS.izdaj(conn, nm_id, tko, r["naziv"] if r else None, commit=False)
+    if k:
+        dnevnik(conn, tko, "nalog_materijal", nm_id, "izdano", "skladištar izdao materijal")
+    if commit:
+        conn.commit()
+    return k
+
+
+def ceka_izdavanje(conn, nalog_id=None, statusi=("skladiste", "pila_nesting", "proizvodnja")):
+    """Što skladištar treba iznijeti iz regala (D-95): rezervirani restlovi i materijali kojih Winstore ne drži, po nalozima u radu.
+    [{nalog_id, nalog, status, nalog_materijal_id, ident, naziv, vrsta, kom, restlovi:[{oznaka, L, W, lokacija}], dana}]"""
+    st = ", ".join("'%s'" % x for x in statusi)
+    sql = ("SELECT r.id AS rid, r.nalog_materijal_id AS nm, r.restl_id, r.kom, r.datum, nm.materijal_id, n.id AS nalog_id, n.naziv AS nalog, n.status, "
+           "m.pantheon_ident AS ident, m.naziv_pantheon AS naziv, m.naziv_kratki, m.vrsta, x.oznaka, x.L AS rL, x.W AS rW, x.lokacija "
+           "FROM rezervacija r JOIN nalog_materijal nm ON nm.id = r.nalog_materijal_id JOIN nalog n ON n.id = nm.nalog_id "
+           "LEFT JOIN materijal m ON m.id = nm.materijal_id LEFT JOIN restl x ON x.id = r.restl_id "
+           "WHERE r.status = 'rezervirano' AND n.status IN (%s)" % st)
+    a = []
+    if nalog_id:
+        sql += " AND n.id = ?"; a.append(nalog_id)
+    out = {}
+    for r in conn.execute(sql + " ORDER BY n.id, m.pantheon_ident", a):
+        if not r["restl_id"] and u_winstoreu(conn, r["materijal_id"], r["vrsta"]):
+            continue                                                       # ploče iz Winstorea poslužuje automat
+        o = out.setdefault(r["nm"], dict(nalog_id=r["nalog_id"], nalog=r["nalog"], status=r["status"], nalog_materijal_id=r["nm"],
+                                         ident=r["ident"], naziv=r["naziv_kratki"] or r["naziv"], vrsta=r["vrsta"], kom=0, restlovi=[],
+                                         datum=r["datum"], u_winstoreu=False))
+        if r["restl_id"]:
+            o["restlovi"].append(dict(oznaka=r["oznaka"], L=r["rL"], W=r["rW"], lokacija=r["lokacija"]))
+        else:
+            o["kom"] += r["kom"]
+        if r["datum"] and (not o["datum"] or r["datum"] < o["datum"]):
+            o["datum"] = r["datum"]
+    return sorted(out.values(), key=lambda x: (x["nalog_id"], x["ident"] or ""))
 
 
 def zatvori_nalog(conn, nalog_id, tko):

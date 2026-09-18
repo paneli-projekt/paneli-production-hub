@@ -15,13 +15,16 @@ from hub.formati import cpo_rw
 
 OBRUB = 10.0
 KERF_OBRACUN = 16.0
-OSTATAK_MIN_MM = 400.0
-OSTATAK_MIN_M2 = 1.0
+OSTATAK_MIN_MM = 400.0            # pravilo NAPLATE (PW): ostatak koji se ne naplaćuje kupcu — obje mjere
+OSTATAK_MIN_M2 = 1.0              # … i površina (D-19); D-95 ovo NE mijenja
+RESTL_MIN_M2 = 0.35               # pravilo ČUVANJA restla u regalu (D-95, Igor 18. 9.) — niže od naplate
+RESTL_MIN_MM = 150.0              # kraća stranica ispod koje se komad ne čuva
+RESTL_TRAKA_MM = 2000.0           # traka duža od ovoga čuva se i kad je ispod RESTL_MIN_M2
 KANT_FAKTOR_PW = 1.10
 
-def ostatak_ploce(dir_, l1, ploca, trim=OBRUB, kerf=KERF_OBRACUN):
-    """dir_ 'L' (trake uz duljinu, ostatak = L × preostala širina) ili 'S' (trake poprijeko, ostatak = preostala duljina × W).
-    l1 = širine traka razine 1. Vraća (dim1, dim2, m2) ili None ako ostatak nije koristan."""
+def ostatak_dims(dir_, l1, ploca, trim=OBRUB, kerf=KERF_OBRACUN):
+    """Geometrijski ostatak ploče, bez ikakvog praga: (dim1, dim2, m2). dir_ 'L' (trake uz duljinu, ostatak = L × preostala širina)
+    ili 'S' (trake poprijeko, ostatak = preostala duljina × W); l1 = širine traka razine 1."""
     L, W = ploca
     n = len(l1)
     if dir_ == 'L':
@@ -30,9 +33,19 @@ def ostatak_ploce(dir_, l1, ploca, trim=OBRUB, kerf=KERF_OBRACUN):
     else:
         rest = L - trim - sum(l1) - kerf * n
         dims = (rest, W)
-    m2 = dims[0] * dims[1] / 1e6
-    if min(dims) >= OSTATAK_MIN_MM and m2 >= OSTATAK_MIN_M2:
-        return (round(dims[0]), round(dims[1]), m2)
+    return (round(dims[0]), round(dims[1]), dims[0] * dims[1] / 1e6)
+
+def je_restl(L, W, min_m2=RESTL_MIN_M2, min_mm=RESTL_MIN_MM, traka_mm=RESTL_TRAKA_MM):
+    """Čuva li se ostatak kao restl (D-95): kraća stranica ≥ min_mm i (površina ≥ min_m2 ILI duža stranica ≥ traka_mm).
+    Pravilo naplate je zasebno i ostaje ≥ 400 mm i ≥ 1 m² — komad između ta dva praga kupac plaća, a mi ga zadržimo."""
+    d, k = max(float(L), float(W)), min(float(L), float(W))
+    return k >= min_mm - 1e-6 and (d * k / 1e6 >= min_m2 - 1e-9 or d >= traka_mm - 1e-6)
+
+def ostatak_ploce(dir_, l1, ploca, trim=OBRUB, kerf=KERF_OBRACUN):
+    """Ostatak koji se NE NAPLAĆUJE kupcu (PW pravilo): (dim1, dim2, m2) ili None."""
+    d1, d2, m2 = ostatak_dims(dir_, l1, ploca, trim, kerf)
+    if min(d1, d2) >= OSTATAK_MIN_MM and m2 >= OSTATAK_MIN_M2:
+        return (d1, d2, m2)
     return None
 
 def naplata(sheme, ploca, trim=OBRUB, kerf=KERF_OBRACUN):

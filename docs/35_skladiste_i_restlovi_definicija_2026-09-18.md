@@ -1,125 +1,89 @@
-# 35 — Skladište i restlovi: potpuna definicija (prijedlog za potvrdu)
+# 35 — Skladište i restlovi: definicija (odgovoreno 18. 9. 2026.)
 
-**Datum:** 18. 9. 2026. · **Spaja i dovršava:** D-82 (pravila restlova), D-83 (rezervacije i tok), D-85 (nabava) · **Novo:** slike dekora
-**Kod se ne dira dok ovo ne potvrdiš.** Svaka točka ima moj prijedlog; ti odgovaraš „da“ ili kako treba biti. Popis svih odluka na jednom mjestu je u §8.
+**Odluka:** D-95 · **Zamjenjuje prijedloge:** D-82 (restlovi), D-83 (rezervacije i tok), dopunjuje D-85 (nabava)
+Igor je 18. 9. odgovorio na sva pitanja; ovdje je dogovoreno stanje. Kod se piše po ovome.
 
-Mape `06_SKLADISTE_I_RESTLOVI\pravila`, `lokacije_ploca` i `fotografije_oznaka` su prazne — u njima piše upravo ono što ovdje treba odlučiti: „od koje dimenzije se restl čuva, tko odlučuje, što se baca, kako se vodi ulaz ploča“. Zato ovaj dokument.
+## 1. Analiza evidencije (1 363 restla, 1 535 komada, 1 735 m²)
 
-## 0. Što već radi (da se zna razlika između „postoji“ i „nije dogovoreno“)
+Mjereno na `RESTLOVI_V7.xlsm` da se prag ne pogađa:
 
-| Radi | Ne postoji ili nije dogovoreno |
+| | |
 |---|---|
-| Uvoz evidencije restlova (1 363 restla, 90 % vezano na idente), dekori za potvrdu | Prag od kojeg se ostatak uopće čuva; što s ostacima radnih ploča |
-| Prijedlog restla iz potvrđene optimizacije (≥ 400 × 400 i ≥ 1 m²), potvrda / odbacivanje | Rok za potvrdu prijedloga; ručni unos restla s ekrana |
-| Rezervacija ploča i restla u statusu Skladište, izdavanje na stroj, oslobađanje | Što sa zaboravljenim rezervacijama; razlika plan / stvarno iz `.mno` |
-| QR naljepnice restlova (A4, 2 × 5), adresa `/r/R1364` | Ekran koji se otvori na tom QR-u (skladištarev ekran na mobitelu) |
-| Stanje punih ploča iz Winstorea, trake iz Regal trake | Stanje ploča koje Winstore ne vodi (radne ploče, ploče stola, zidne obloge) |
-| Potrebe za nabavu preko svih naloga, narudžbenica, primka iz eSloga | Tko odobrava narudžbu; e-mailovi dobavljača |
-| — | Slike dekora (Egger, Kaindl, Kronospan, Fundermax, Cleaf) |
+| medijan restla | **0,90 m²** — polovica stanja je ispod 1 m² |
+| najmanji | 430 × 100 mm (0,04 m²) |
+| kraća stranica | medijan 545 mm; četvrtina restlova uža od 388 mm |
+| trake ≥ 2 400 mm i uže od 400 mm | **127 komada** (medijan širine 300 mm) |
+| compact i akril | medijan 0,49 / 0,78 m²; 81 % compacta ispod 1 m² |
 
-## 1. Što je restl i kad nastaje
+Staro pravilo Huba (kraća ≥ 400 mm i ≥ 1 m²) otvorilo bi samo **41 %** onoga što stvarno stoji u regalu (70 % m²). Zato novi prag:
 
-**1.1 Prag — od koje mjere se ostatak čuva.** Sada: ≥ 400 × 400 mm **i** ≥ 1 m² (D-19), isti prag po kojem se ostatak ne naplaćuje kupcu.
-*Prijedlog:* prag ostaje zadani, ali se upisuje u Postavke i može biti **manji za skupe materijale** — compact, akril, HPL, furnir ≥ 0,5 m², iveral i MDF ≥ 1 m². Napiši brojke ako su drukčije; ovo je jedina točka koju ne mogu pogoditi iz podataka.
-
-**1.2 Ostatak radne ploče, ploče stola i zidne obloge.** Optimizacija ih već računa (ostatak uz duljinu, najmanje 400 mm), npr. 1 200 × 600.
-*Prijedlog:* vode se kao obični restl s QR-om, mjera `duljina × 600 / 900 / 640`, samo kad ploča nije naplaćena kupcu kao cijela.
-
-**1.3 Tko odlučuje da restl postoji.** Hub predloži iz potvrđene optimizacije; **na stanju je tek kad ga skladištar potvrdi** (zalijepi QR, po potrebi ispravi mjeru). Neodgovoreno stanje = nema restla. Ovo ostaje kako je predloženo (D-64/3).
-
-**1.4 Rok za prijedlog.** Sada prijedlog stoji zauvijek.
-*Prijedlog:* prijedlog koji nitko ne potvrdi **14 dana** ide u „nije potvrđen“ s napomenom i ne broji se — inače stanje laže, a nitko to ne primijeti.
-
-**1.5 Restl koji ne dolazi iz sheme** (ručni rez, povrat s montaže, ostatak od ranije): skladištar ili ured ga upisuje na ekranu (ident, mjere, lokacija) i odmah dobije QR. API već postoji, treba ekran.
-
-**1.6 Škart.** Sve ispod praga se ne evidentira; taj m² je ionako naplaćen kupcu. *Pitanje:* želiš li mjerenje škarta po nalogu (koliko m² je bačeno) ili to ne trebaš?
-
-## 2. Rezervacije i izdavanje
-
-**2.1 Rezervacija** nastaje kad nalog uđe u status **Skladište**, iz **potvrđene** optimizacije (bez potvrde Hub ne zna količinu i javlja upozorenje). Restl za nalog bira čovjek iz ponuđenih kandidata — Hub ne pogađa.
-
-**2.2 Izdano** = kad nalog ode **na stroj** (pila / nesting): rezervacija → izdano, rezervirani restl → potrošen. Alternativa je čekati povratak `.mno`, ali tada ploče danima stoje „rezervirane“. *Prijedlog: ostaje na slanju na stroj.*
-
-**2.3 Razlika plan / stvarno.** Kad se vrati `.mno` s pile ili nestinga, Hub usporedi planirane i stvarno potrošene ploče i **javi razliku**. Pune ploče se ispravljaju u **Winstoreu** (on je istina), restlove Hub ispravlja sam. Hub nikad ne piše u Winstore.
-
-**2.4 Djelomično izdavanje** (nalog se reže u dva navrata) *prijedlog:* ne vodimo — izdaje se cijeli materijal naloga. Ako se to kod vas događa često, reci pa ćemo dodati „izdaj N ploča“.
-
-**2.5 Zaboravljene rezervacije.** Popis rezervacija starijih od **14 dana** na ekranu Skladište, s gumbom Oslobodi. Oslobađa ured ili voditelj.
-
-## 3. Inventura, potvrde i tko što smije
-
-**3.1 Prvi obilazak.** Ispis naljepnica po regalima (A001…, SATOR B), skladištar prolazi policu po policu: **Potvrdi** / **Ispravi mjeru** / **Otpiši**. Hub pokazuje napredak (npr. 420 / 1 363). Realno 2–3 poludana, radi se po regalu, ne odjednom.
-
-**3.2 Uređaj.** Skladištarev ekran radi u pregledniku na mobitelu ili tabletu, ali Hub je na lokalnoj mreži (`192.168.5.201:8766`). *Pitanje:* ima li skladištar mobitel / tablet i doseže li Wi-Fi u skladište? Ako ne, Hub ispisuje papirnati popis po regalu, a ured naknadno upisuje — sporije, ali radi.
-
-**3.3 Tko što smije:** skladištar potvrđuje restl, ispravlja mjeru i otpisuje; **ured** potvrđuje dekor (koji je ident); voditelj / administrator briše i oslobađa rezervacije. *Pitanje:* smije li skladištar otpisati restl sam ili to mora voditelj?
-
-**3.4 Restlovi s oznakom PROVJERI** (137 iz evidencije: izgrebano, više mjera). *Prijedlog:* broje se na stanju i nude se za naloge, ali s vidljivom oznakom „provjeriti prije rezanja“.
-
-**3.5 Dekori za potvrdu:** 57 dekora (140 restlova) čeka jedan prolaz ureda, 8 dekora nema ident u Pantheonu (`(FRANJIC)`, `IV U775`, `SKUPIII`, `H 1345`…, 21 restl). *Pitanje:* otvaraju li se ti identi u Pantheonu ili ostaju „bez identa“ (vide se u skladištu, ne ulaze u obračun)?
-
-**3.6 Redovna inventura:** jednom u tri mjeseca izvještaj „nije viđeno od…“. Nije obavezno, reci želiš li.
-
-## 4. Winstore, radne ploče i nabava
-
-**4.1 Winstore je istina za pune ploče** koje vodi (nesting regal). Hub ga samo čita i, kad se ne slažu, javi razliku.
-
-**4.2 Ploče koje Winstore ne vodi** — radne ploče, ploče stola, zidne obloge (a možda i compact / furnir; reci koje sve). Danas im nitko ne vodi stanje.
-*Prijedlog:* Hub vodi vlastito stanje za te skupine: **ulaz** iz eSlog primke (već imamo), **izlaz** kad nalog ode na stroj, **inventura** ručno kao kod restlova. Posao je oko jednog dana. Alternativa je da se ne vodi stanje nego se naručuje po nalogu — jednostavnije, ali onda Hub ne može reći „imamo li“.
-
-**4.3 Ulaz robe.** *Pitanje:* kako se danas vodi ulaz ploča — samo primkom u Pantheonu ili netko još upisuje u Winstore? Od toga ovisi hoće li Hub uzimati ulaz iz primke ili iz Winstorea.
-
-**4.4 Nabava (D-85).** Dobavljač stavke = dobavljač identa u Pantheonu; ident bez dobavljača ide u nacrt „NEPOZNAT DOBAVLJAČ“. E-mailove dobavljača upisuje Sanela jednom. Naručeno u raspoloživo ulazi tek kad je narudžbenica **poslana**. Primka iz Knjige zatvara narudžbenicu.
-*Pitanje:* odobrava li narudžbu netko prije slanja (ti ili voditelj) ili je Sanela šalje sama?
-
-**4.5 Nesting ostaci** ostaju u Winstoreu kao Drop; Hub ih pokazuje uz materijal, ali ih ne vodi kao svoje restlove.
-
-## 5. Ekran skladištara (ono što QR otvori)
-
-Jedna stranica, veliki gumbi, radi na mobitelu: dekor i **slika dekora**, ident, mjere, lokacija, status; gumbi **Potvrdi**, **Ispravi mjeru**, **Otpiši**, **Rezerviraj za nalog**. Ista stranica služi za inventuru (skeniraj → potvrdi) i za svakodnevno traženje („gdje je ovaj restl“).
-
-## 6. Slike dekora (Egger, Kaindl, Kronospan, Fundermax, Cleaf)
-
-**Zašto:** skladištar i ured dekor prepoznaju okom, ne po šifri. Slika uz restl i uz materijal naloga skraćuje traženje i sprječava krivi rez.
-
-**Na što se veže:** na ident, preko `dekor_kod` koji Hub već ima (`W908 ST2`, `K2665 AI`, `27045 OF`, `VSM-06`). Jedna slika vrijedi za sve debljine istog dekora.
-
-**Izvori — provjerio sam što imamo:** u `01_PANELWIZARD` nema nijedne slike dekora, dakle gotovog izvora kod nas nema. Ostaje troje:
-
-1. **Ručno dodavanje s ekrana** — u Šifrarniku povučeš sliku na dekor (ili slikaš uzorak mobitelom). Hub je sprema u `C:\Paneli\Hub\dekori\` (izvan koda, ne ide u Git). Najbrže za dekore koje stvarno koristite.
-2. **Skupni uvoz iz mape** — ako Sanela ili dobavljač daju paket slika nazvanih po kodu (`H1277ST9.jpg`), Hub ih poveže sam, a što ne prepozna javi.
-3. **Automatsko skidanje s dobavljačevih stranica** po kodu. Izvedivo za Egger i Kronospan, lomljivo (promjena stranice = prestane raditi) i treba provjeriti smijemo li slike koristiti. Ne bih time počinjao.
-
-*Prijedlog:* koraci 1 i 2 odmah (oko jednog dana), korak 3 samo ako se pokaže da vrijedi.
-
-**Gdje se slika vidi:** šifrarnik (sličica u popisu), materijal na nalogu i u dijalogu materijala, popis restlova, skladištarev ekran. *Pitanje:* i na ponudi kupcu? Tehnički lako, ali slike dobavljača na vlastitom dokumentu traže njihovo dopuštenje — za interne ekrane to nije sporno.
-
-## 7. Redoslijed rada nakon tvoje potvrde
-
-1. **Skladištarev ekran + QR + potvrde** — bez toga inventura ne može početi.
-2. **Pravila restlova**: pragovi u Postavkama, ostaci radnih ploča, rok prijedloga, ručni unos.
-3. **Rezervacije**: zaboravljene rezervacije, razlika plan / stvarno iz `.mno`.
-4. **Stanje ploča koje Winstore ne vodi** (radne ploče, zidne obloge).
-5. **Slike dekora** — koraci 1 i 2.
-6. **Nabava**: dobavljači, odobrenje, zatvaranje primkom.
-
-## 8. Popis odluka koje trebam
-
-| # | Pitanje | Moj prijedlog |
+| Pravilo | Restlova | m² |
 |---|---|---|
-| 1 | Od koje mjere se restl čuva? | ≥ 400 × 400 mm i ≥ 1 m²; skupi materijali ≥ 0,5 m² |
-| 2 | Ostatak radne ploče je restl? | Da, s QR-om, kad ploča nije naplaćena cijela |
-| 3 | Prijedlog restla bez potvrde 14 dana | Sam se gasi uz napomenu |
-| 4 | Mjerenje škarta po nalogu | Ne vodimo |
-| 5 | „Izdano“ pri slanju na stroj | Da |
-| 6 | Djelomično izdavanje naloga | Ne vodimo |
-| 7 | Zaboravljene rezervacije | Popis nakon 14 dana, oslobađa ured ili voditelj |
-| 8 | Tko smije otpisati restl | Skladištar |
-| 9 | Restlovi PROVJERI | Na stanju, s oznakom „provjeriti prije rezanja“ |
-| 10 | 8 dekora bez identa u Pantheonu | Otvoriti idente (ili reci da ostaju bez identa) |
-| 11 | Mobitel / tablet i Wi-Fi u skladištu | Treba; ako nema — papirnati popis |
-| 12 | Stanje ploča koje Winstore ne vodi | Hub ih vodi sam (ulaz iz primke, izlaz s naloga) |
-| 13 | Kako se danas vodi ulaz ploča | (trebam odgovor) |
-| 14 | Odobrenje narudžbe prije slanja | (trebam odgovor) |
-| 15 | Slike dekora: ručno + skupni uvoz | Da; automatsko skidanje zasad ne |
-| 16 | Slike dekora i na ponudi kupcu | Zasad samo interno |
+| **≥ 0,35 m² ili traka ≥ 2 000 × 150 mm** | **1 174 (86 %)** | **1 676 (97 %)** |
+
+## 2. Restl — što je i kad nastaje
+
+1. **Prag (ispravak Igor, 18. 9.):** restl je ostatak **≥ 0,35 m²**, ili traka **duža od 2 000 mm i šira od 150 mm** (npr. 2800 × 195 iz evidencije). Prag je u Postavkama.
+2. **Obračun se ne mijenja:** kupcu se i dalje ne naplaćuje samo ostatak ≥ 400 × 400 mm i ≥ 1 m². Komade između tog i novog praga zadržavamo u regalu iako ih je kupac platio — kako radi i danas.
+3. **Radne ploče, ploče stola i zidne obloge:** njihovi ostaci vode se kao i svi drugi restlovi (QR, stanje), mjera duljina × 600 / 900 / 640. Ako je ploča naplaćena kupcu cijela, ostatak je kupčev i vodi se samo ako ga ostavi nama.
+4. **Restl od kupca:** kupac ponekad ostavi svoje komade nama — skladištar ih upisuje ručno na svom ekranu, s oznakom da su došli od kupca. Ista mogućnost pokriva i ostatke ručnog reza i povrate s montaže.
+5. **Prijedlog iz sheme:** Hub nakon potvrđene optimizacije predloži restl; na stanju je tek kad ga skladištar potvrdi (QR, po potrebi ispravljena mjera). **Prijedlog se ne gasi sam** — stoji dok ga netko ne potvrdi ili odbaci, uz popis „čeka potvrdu N dana“.
+6. **Škart se ne mjeri.**
+
+## 3. Rezervacije i izdavanje
+
+1. Rezervacija nastaje u statusu **Skladište**, iz **potvrđene** optimizacije. Restl za nalog bira čovjek iz kandidata.
+2. **Winstore je automatsko skladište i sam poslužuje ploče.** Za materijale u Winstoreu Hub ne vodi izdavanje: smanjenje stanja dolazi iz **novog XML izvoza**, a Hubova rezervacija se zatvara kad nalog ode na stroj. Hub u Winstore ne piše.
+3. **Skladištar izdaje samo restlove i materijale kojih nema u Winstoreu** — jedan klik po materijalu naloga, cijela količina.
+4. **Zaboravljene rezervacije:** popis rezervacija starijih od **14 dana** na ekranu Skladište, s gumbom Oslobodi (ured ili voditelj). Ništa se ne oslobađa samo.
+5. Razlika plan / stvarno iz `.mno` javlja se kao upozorenje; pune ploče ispravlja Winstore, restlove Hub.
+
+## 4. Što Winstore ne drži (Hub vodi sam)
+
+Provjereno na izvozu 11. 9.: nema nijedne ploče duže od 3 050 mm, unutra su iveral, MDF, akril i PVC (2800 × 2070 i slično).
+
+Izvan Winstorea, i Hub im vodi stanje: **radne ploče i ploče stola · zidne obloge · compact i HPL · lesonit, šper, OSB i sirove ploče.**
+
+* **Ulaz:** skladištar upiše prijem odmah kad roba stigne, a kad dođe **eSlog primka** Hub usporedi količine i javi razliku.
+* **Izlaz:** skladištar potvrdi izdavanje.
+* **Inventura:** ručno, kao kod restlova.
+
+## 5. Winstore izvoz — svježina stanja
+
+Danas izvoz pokreće operater ručno, po potrebi. Dogovoreno:
+
+1. Na VM-u se svakih **30 minuta** vrti uvoz: uzme najnoviji XML iz dogovorene mape, uveze ga i zapiše rezultat; ekran piše koliko je stanje staro i upozorava kad prijeđe zadani broj sati.
+2. Skripta `20_ANALIZA\skripte\WINSTORE_PREGLED.bat` (samo čita) pokreće se na Winstore računalu — iz nje se vidi ima li **WINSTORE store manager 1.2.1.0** vlastitu bazu koju možemo čitati, postoji li automatski izvoz i gdje XML završava. Prema nalazu se odlučuje ide li se na izravno čitanje (stanje uvijek svježe) ili ostaje uvoz iz mape.
+
+## 6. Inventura, uloge i uređaji
+
+1. **Prvi obilazak** s QR naljepnicama po regalima; Hub pokazuje napredak. Restlovi s oznakom **PROVJERI** (137) ostaju na stanju i nude se za naloge, uz vidljivo „provjeriti prije rezanja“.
+2. **Otpis** smije skladištar, uz zapis imena i razloga.
+3. **Ured** potvrđuje dekor (koji je ident); potvrda vrijedi za sve restlove tog dekora i postaje alias.
+4. **8 dekora bez identa u Pantheonu** (21 restl) ostaje bez identa i dobiva poveznicu naknadno, kad se utvrdi koji su to dekori.
+5. **Uređaj:** u skladištu je računalo, Wi-Fi postoji, a skladištar po potrebi dobiva mobitel ili tablet. Ekran se radi tako da radi na oboje: na računalu popis s tražilicom, na mobitelu QR i veliki gumbi.
+
+## 7. Nabava
+
+Dobavljač stavke = dobavljač identa u Pantheonu; ident bez dobavljača ide u nacrt „NEPOZNAT DOBAVLJAČ“. **Sanela šalje narudžbenice sama**, bez odobrenja. Naručeno ulazi u raspoloživo tek kad je narudžbenica poslana. Primka iz Knjige zatvara narudžbenicu i potvrđuje ulaz.
+
+## 8. Slike dekora (Egger, Kaindl, Kronospan, Fundermax, Cleaf)
+
+Veže se na ident preko `dekor_kod` (W908 ST2, K2665 AI, 27045 OF…); jedna slika vrijedi za sve debljine istog dekora. U `01_PANELWIZARD` nema nijedne slike, pa gotovog izvora kod nas nema.
+
+1. **Ručno dodavanje s ekrana** (povuci sliku ili slikaj uzorak mobitelom) — sprema se izvan koda, u `C:\Paneli\Hub\dekori\`.
+2. **Skupni uvoz iz mape** kad dobavljač ili Sanela daju paket slika nazvanih po kodu.
+3. Automatsko skidanje s dobavljačevih stranica zasad **ne**.
+
+Slike se prikazuju **samo na internim ekranima**: šifrarnik, materijal naloga, restlovi, skladištarev ekran. Na ponudi kupcu ne.
+
+## 9. Redoslijed rada
+
+**Napravljeno 18. 9.:** prag restla u Postavkama (kartica Restlovi) i prijedlozi restlova po novom pravilu; skladištarev ekran `#/skladistar` (QR → stranica restla, potvrda s lokacijom, ispravak mjere, otpis, ručni restl uključujući „kupac ga je ostavio nama“) i izdavanje: Winstore svoje ploče izdaje sam, a skladištar potvrđuje restlove i materijale kojih Winstore nema. 175 testova.
+
+1. **Skladištarev ekran**: QR / oznaka restla, potvrda restla, ispravak mjere, otpis, ručni unos (uključujući restl od kupca), izdavanje restlova i materijala izvan Winstorea.
+2. **Pravila restlova**: novi prag u Postavkama, ostaci radnih ploča, popis „čeka potvrdu“.
+3. **Uvoz Winstore XML-a svakih 30 minuta** + starost stanja na ekranu; pregled Winstore računala kad stigne ispis skripte.
+4. **Stanje ploča izvan Winstorea**: ulaz (upis + primka), izlaz, inventura.
+5. **Zaboravljene rezervacije** (14 dana) i razlika plan / stvarno iz `.mno`.
+6. **Slike dekora**: ručno dodavanje i skupni uvoz.

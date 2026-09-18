@@ -11,6 +11,9 @@
     POST /api/skladiste/restlovi/{id}/odbaci         {tko, razlog}  prijedloga nema / restl bačen → otpisan
     POST /api/skladiste/restlovi/potvrdi-dekor       {dekor, ident, tko}  dekor iz evidencije → ident (svi restlovi tog dekora + alias)
     GET  /api/skladiste/prijedlozi?nalog=            restlovi predloženi iz potvrđenih shema, čekaju skladištara (D-64/3)
+    GET  /api/skladiste/restl/{oznaka}              jedan restl za skladištarev ekran (QR)
+    GET  /api/skladiste/izdavanje?nalog=            što skladištar treba iznijeti: restlovi i materijali kojih Winstore nema (D-95)
+    POST /api/skladiste/izdaj                       {nm, tko} skladištar potvrdio izdavanje jednog materijala naloga (D-95)
     GET  /api/skladiste/trake?ident=                 metri i pretinac iz Regal trake (čitanje, D-63)
     GET  /api/nalog/{id}/skladiste                   provjera naloga (D-35): potrebno / raspoloživo / manjak po materijalu, restl kandidati, trake, za nabavu
     POST /api/nalog/{id}/skladiste/rezerviraj        {restlovi: {nm_id: restl_id}, tko}  rezervacija ploča i restla + prijedlozi restlova
@@ -118,13 +121,20 @@ class NoviRestl(BaseModel):
     kom: int = 1
     lokacija: Optional[str] = None
     napomena: Optional[str] = None
+    izvor: str = "rucno"                 # rucno | kupac (komad koji je kupac ostavio nama, D-95)
     tko: str = "web"
 
 
 @router.post("/api/skladiste/restlovi")
 def restl_novi(p: NoviRestl):
+    """Ručno otvoren restl (skladištar): ostatak ručnog reza, povrat s montaže ili komad koji je KUPAC ostavio nama (izvor 'kupac', D-95)."""
+    if p.izvor not in ("rucno", "kupac"):
+        raise HTTPException(400, "izvor: rucno | kupac")
+    nap = p.napomena
+    if p.izvor == "kupac":
+        nap = ("kupac ostavio nama" + ("; " + nap if nap else ""))
     with _brava():
-        return _greska(RS.novi_restl, _c(), p.ident, p.L, p.W, p.tko, kom=p.kom, lokacija=p.lokacija, napomena=p.napomena, potvrdio=p.tko)
+        return _greska(RS.novi_restl, _c(), p.ident, p.L, p.W, p.tko, kom=p.kom, lokacija=p.lokacija, napomena=nap, potvrdio=p.tko, izvor=p.izvor)
 
 
 class Potvrda(BaseModel):
@@ -242,22 +252,56 @@ def restl_naljepnice(oznake: Optional[str] = None, nalog: Optional[int] = None, 
     return NA.pdf_inline(put)
 
 
+@router.get("/api/skladiste/restl/{oznaka}")
+def restl_jedan(oznaka: str):
+    """Jedan restl za skladištarev ekran (QR): mjere, dekor, lokacija, status, napomena."""
+    with _ctx["brava"]:
+        r = RS.restl(_c(), oznaka.upper() if not oznaka.isdigit() else int(oznaka))
+    if not r:
+        raise HTTPException(404, "nema restla %s" % oznaka)
+    return r
+
+
+@router.get("/api/skladiste/izdavanje")
+def izdavanje(nalog: Optional[int] = None):
+    """Što skladištar treba iznijeti iz regala (D-95): rezervirani restlovi i materijali kojih Winstore ne drži."""
+    with _ctx["brava"]:
+        return SK.ceka_izdavanje(_c(), nalog)
+
+
+class Izdaj(BaseModel):
+    nm: int
+    tko: str = "web"
+
+
+@router.post("/api/skladiste/izdaj")
+def izdaj(p: Izdaj):
+    """Skladištar potvrdio izdavanje jednog materijala naloga: rezervacije → izdano, rezervirani restl → potrošen."""
+    with _brava():
+        n = _greska(SK.izdaj_materijal, _c(), p.nm, p.tko)
+        return dict(izdano=n)
+
+
 @router.get("/r/{oznaka}", response_class=HTMLResponse)
 def restl_stranica(oznaka: str):
-    """Što skladištar vidi kad skenira QR: restl s identom, mjerama, lokacijom i statusom (kao Regal traka /t/IDENT)."""
+    """Što skladištar vidi kad skenira QR: otvara se skladištarev ekran tog restla u aplikaciji (potvrdi, ispravi mjeru, otpiši).
+    Bez JavaScripta ostaje čitljiv ispis, pa QR radi i na starom čitaču."""
+    o = _esc(oznaka.upper())
     with _brava():
         r = RS.restl(_c(), oznaka.upper())
     if not r:
-        return HTMLResponse("<h1>%s</h1><p>Nema takvog restla.</p>" % _esc(oznaka), status_code=404)
+        return HTMLResponse("<h1>%s</h1><p>Nema takvog restla.</p>" % o, status_code=404)
     redovi = [("Materijal", "%s %s" % (r["ident"] or "—", r.get("naziv_kratki") or r.get("naziv") or r.get("dekor_ulaz") or "")),
               ("Mjere", "%g × %g mm%s" % (r["L"], r["W"], (" × %d kom" % r["kom"]) if r["kom"] > 1 else "")), ("Debljina", "%s mm" % (r.get("debljina") or "?")),
               ("Lokacija", r.get("lokacija") or "—"), ("Status", r["status"] + (" (dekor za potvrdu)" if r["provjeri"] else "")),
-              ("Napomena", r.get("napomena") or ""), ("Potvrdio", "%s %s" % (r.get("potvrdio") or "—", (r.get("potvrdjeno") or "")[:10]))]
+              ("Napomena", r.get("napomena") or "")]
     body = "".join("<tr><th>%s</th><td>%s</td></tr>" % (_esc(k), _esc(str(v))) for k, v in redovi)
     return HTMLResponse('<!doctype html><html lang="hr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-                        '<title>%s</title><style>body{font-family:Inter,system-ui,sans-serif;margin:16px;color:#222}h1{font-size:2.2em;margin:0 0 8px}'
-                        'table{border-collapse:collapse}th{text-align:left;padding:6px 12px 6px 0;color:#5A5F64}td{padding:6px 0}</style></head>'
-                        '<body><h1>%s</h1><table>%s</table></body></html>' % (_esc(r["oznaka"]), _esc(r["oznaka"]), body))
+                        '<title>%s</title><script>location.replace("/#/restl/%s")</script>'
+                        '<style>body{font-family:Inter,system-ui,sans-serif;margin:16px;color:#222}h1{font-size:2.2em;margin:0 0 8px}'
+                        'table{border-collapse:collapse}th{text-align:left;padding:6px 12px 6px 0;color:#5A5F64}td{padding:6px 0}'
+                        'a{display:inline-block;margin-top:14px;font-weight:700}</style></head>'
+                        '<body><h1>%s</h1><table>%s</table><a href="/#/restl/%s">Otvori u Hubu</a></body></html>' % (o, o, o, body, o))
 
 
 # ---------------------------------------------------------------- nabava (D-42/5)

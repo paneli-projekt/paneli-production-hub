@@ -24,8 +24,13 @@ Restl koji Hub PREDLOŽI iz potvrđene sheme (D-64/3) ima status 'prijedlog' i n
 
 Rezervacija (D-42/4): `rezerviraj(nm_id, restl_id)` veže restl na materijal naloga (status restla → rezerviran), `oslobodi` ga vraća,
 `izdaj` ga troši (nalog otišao na stroj: status potrošen + nalog izlaz). Restl kao PRIJEDLOG (D-64/3): `predlozi_iz_sheme(nm_id)` iz
-potvrđenog slaganja (korisni ostaci ≥ 400 × 400 i ≥ 1 m², isti koje obračun ne naplaćuje) otvori restlove sa statusom `prijedlog` i oznakom
-R…; skladištar ih `potvrdi_restl` (zalijepi QR, upiše lokaciju) → `slobodan`, ili `odbaci_restl` → `otpisan`.
+potvrđenog slaganja otvori restlove sa statusom `prijedlog` i oznakom R…; skladištar ih `potvrdi_restl` (zalijepi QR, upiše lokaciju) →
+`slobodan`, ili `odbaci_restl` → `otpisan`.
+
+PRAG ČUVANJA (D-95, Igor 18. 9., mjereno na 1 363 restla iz evidencije): restl je ostatak **≥ 0,35 m²**, ili traka **duža od 2 000 mm**,
+uz kraću stranicu najmanje 150 mm — postavke `restl_min_m2`, `restl_traka_mm`, `restl_min_mm`. Pravilo NAPLATE se ne mijenja (≥ 400 mm i
+≥ 1 m², D-19): komad između ta dva praga kupac plaća, a mi ga ipak zadržimo u regalu. Restl koji kupac ostavi nama upisuje se ručno
+(`novi_restl(..., izvor='kupac')`).
 """
 import argparse
 import hashlib
@@ -34,6 +39,7 @@ import os
 import sys
 
 from ..db import sada, dnevnik, postavi, postavka
+from ..optimizacija import obracun as OBR
 from ..sifrarnici import prepoznaj as P
 
 STATUSI_EXCEL = {"NA SKLADIŠTU": "slobodan", "NA SKLADISTU": "slobodan", "REZERVIRAN": "rezerviran", "PROVJERI": "provjeri",
@@ -293,6 +299,22 @@ def sazetak(conn):
 
 
 # ---------------------------------------------------------------- oznake, ručni restl
+def prag(conn):
+    """Prag čuvanja restla iz Postavki (D-95) → (min_m2, min_mm, traka_mm)."""
+    def f(k, zadano):
+        try:
+            return float(str(postavka(conn, k, zadano)).replace(",", "."))
+        except (TypeError, ValueError):
+            return float(zadano)
+    return (f("restl_min_m2", OBR.RESTL_MIN_M2), f("restl_min_mm", OBR.RESTL_MIN_MM), f("restl_traka_mm", OBR.RESTL_TRAKA_MM))
+
+
+def je_restl(conn, L, W):
+    """Čuva li se ostatak mjere L × W kao restl (prag iz Postavki)."""
+    m2, mm, tr = prag(conn)
+    return OBR.je_restl(L, W, m2, mm, tr)
+
+
 def nova_oznaka(conn):
     """Sljedeća oznaka u nizu R0001… (nastavlja Excelov niz; oznaka se nikad ne vraća)."""
     r = conn.execute("SELECT MAX(CAST(SUBSTR(oznaka, 2) AS INTEGER)) FROM restl WHERE oznaka GLOB 'R[0-9]*'").fetchone()[0]
@@ -357,10 +379,39 @@ def popis(conn, ident=None, status=None, za_potvrdu=None, q=None, limit=500):
 
 
 # ---------------------------------------------------------------- prijedlog iz potvrđene sheme (D-64/3) + potvrda skladištara
+def kandidati_iz_sheme(conn, snimka):
+    """Ostaci potvrđene sheme koji prolaze prag čuvanja (D-95) → [(L, W, m2, naplacen_kupcu)].
+    Za radne ploče / zidne obloge ostatak dolazi iz `rp` (uz duljinu ploče), inače je to traka koja preostane na ploči."""
+    ploca = snimka.get("ploca") or []
+    trim = float(snimka.get("trim") or OBR.OBRUB)
+    kerf = float(snimka.get("kerf") or OBR.KERF_OBRACUN)
+    naplata = {(round(float(o[0])), round(float(o[1]))) for o in (snimka.get("ostaci") or [])}      # ostaci koje kupac NE plaća (D-19)
+    sirovi = []
+    rp = snimka.get("rp")
+    if rp:
+        for li in rp.get("listovi", []):
+            o = li.get("ostatak")
+            if o:
+                sirovi.append((float(o[0]), float(o[1])))
+    else:
+        for sh in (snimka.get("sheets") or []):
+            l1 = [st["w"] for st in sh.get("strips", [])]
+            d1, d2, _ = OBR.ostatak_dims(sh.get("dir", "L"), l1, (float(ploca[0]), float(ploca[1])), trim, kerf)
+            sirovi.append((float(d1), float(d2)))
+    out = []
+    for d1, d2 in sirovi:
+        if d1 <= 0 or d2 <= 0 or not je_restl(conn, d1, d2):
+            continue
+        L, W = max(d1, d2), min(d1, d2)
+        out.append((round(L), round(W), round(L * W / 1e6, 3), (round(d1), round(d2)) not in naplata and (round(d2), round(d1)) not in naplata))
+    return out
+
+
 def predlozi_iz_sheme(conn, nm_id, tko="hub", commit=True):
-    """Iz POTVRĐENOG slaganja materijala naloga (D-75) otvori restlove-prijedloge za korisne ostatke (≥ 400 × 400 i ≥ 1 m², isti koje
-    obračun ne naplaćuje). Idempotentno: raniji prijedlozi istog materijala naloga koji još nisu potvrđeni se otpišu i naprave iznova.
-    Samo za materijal koji ide na PILU (nesting ostatke vodi Winstore kao Drop). Vraća popis restlova (dict)."""
+    """Iz POTVRĐENOG slaganja materijala naloga (D-75) otvori restlove-prijedloge za ostatke koji prolaze prag čuvanja (D-95:
+    ≥ 0,35 m² ili traka ≥ 2 000 mm, kraća stranica ≥ 150 mm — postavke). Komad koji je ispod praga naplate kupac je platio, a mi ga
+    ipak zadržimo — to piše u napomeni. Idempotentno: raniji prijedlozi istog materijala naloga koji još nisu potvrđeni se otpišu i
+    naprave iznova. Samo za materijal koji ide na PILU (nesting ostatke vodi Winstore kao Drop). Vraća popis restlova (dict)."""
     from ..nalozi import optimiziraj as OP
     m = conn.execute("SELECT nm.*, m.pantheon_ident AS ident FROM nalog_materijal nm LEFT JOIN materijal m ON m.id = nm.materijal_id WHERE nm.id = ?", (nm_id,)).fetchone()
     if not m or not m["materijal_id"]:
@@ -370,8 +421,8 @@ def predlozi_iz_sheme(conn, nm_id, tko="hub", commit=True):
     r = OP.potvrdjena(conn, nm_id)
     if not r or not r["slaganje_json"]:
         return []
-    ostaci = (json.loads(r["slaganje_json"]).get("ostaci") or [])
-    mjere = sorted((max(float(o[0]), float(o[1])), min(float(o[0]), float(o[1]))) for o in ostaci)
+    kand = kandidati_iz_sheme(conn, json.loads(r["slaganje_json"]))
+    mjere = sorted((float(k[0]), float(k[1])) for k in kand)
     postojeci = conn.execute("SELECT id, L, W FROM restl WHERE nalog_materijal_id = ? AND status = 'prijedlog' ORDER BY id", (nm_id,)).fetchall()
     if postojeci and sorted((x["L"], x["W"]) for x in postojeci) == mjere:
         return [restl(conn, x["id"]) for x in postojeci]                   # isto slaganje, isti prijedlozi — ništa ne diraj
@@ -379,10 +430,12 @@ def predlozi_iz_sheme(conn, nm_id, tko="hub", commit=True):
                  "WHERE nalog_materijal_id = ? AND status = 'prijedlog'", (nm_id,))
     out = []
     n = conn.execute("SELECT naziv FROM nalog WHERE id = ?", (m["nalog_id"],)).fetchone()
-    for i, o in enumerate(ostaci, 1):
-        L, W = float(o[0]), float(o[1])
-        out.append(novi_restl(conn, m["materijal_id"], max(L, W), min(L, W), tko, status="prijedlog", izvor="prijedlog", nalog_materijal_id=nm_id,
-                              napomena="ostatak %d/%d iz sheme %s (opt. %d)" % (i, len(ostaci), n["naziv"] if n else m["nalog_id"], r["id"]), commit=False))
+    for i, (L, W, _m2, placen) in enumerate(kand, 1):
+        nap = "ostatak %d/%d iz sheme %s (opt. %d)" % (i, len(kand), n["naziv"] if n else m["nalog_id"], r["id"])
+        if placen:
+            nap += "; kupac ga je platio (ispod praga naplate)"
+        out.append(novi_restl(conn, m["materijal_id"], L, W, tko, status="prijedlog", izvor="prijedlog", nalog_materijal_id=nm_id,
+                              napomena=nap, commit=False))
     if commit:
         conn.commit()
     return out

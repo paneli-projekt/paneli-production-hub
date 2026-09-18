@@ -1,6 +1,6 @@
 # Paneli Production Hub — STANJE
 
-**Ažurirano: 17. 9. 2026.** · Odluke: `DECISIONS.md` (D-01 … D-94) · Ideje: `IDEJE_KASNIJE.md` (I-01 … I-20) · Povijest do 17. 9.: `STANJE_POVIJEST.md`
+**Ažurirano: 17. 9. 2026.** · Odluke: `DECISIONS.md` (D-01 … D-95) · Ideje: `IDEJE_KASNIJE.md` (I-01 … I-20) · Povijest do 17. 9.: `STANJE_POVIJEST.md`
 
 Prvi dokument u novoj sesiji. **Drži se kratkim:** na kraju sesije zamijeniti odlomke „Brojke“, „Čeka Igora“ i „Sljedeće“ — ne dopisivati dnevnik. Što je i zašto napravljeno ide u `DECISIONS.md` i u dokument teme.
 
@@ -12,11 +12,11 @@ Hub pokriva cijeli tok **unos → optimizacija → ponuda → skladište → pro
 
 | | |
 |---|---|
-| Kod | `30_NOVI_PROGRAM\` (Git repo). Zadnji commit `2163d03` (17. 9. 15:59): D-92 radne ploče na pili s ispravkom orijentacije, D-93 obrub / Optimizacija / boja gumba. **Nije još u Gitu:** D-94 izgled ekrana 1A + 2A + 3A i Postavke (17. 9. navečer) — Igor pusha `GIT_POSALJI.cmd` |
+| Kod | `30_NOVI_PROGRAM\` (Git repo). Zadnji commit `504ac2b` (17. 9.): D-94 izgled ekrana 1A + 2A + 3A i Postavke. **Nije još u Gitu:** D-95 prag restla (0,35 m²), skladištarev ekran s QR-om i izdavanje (18. 9.) — Igor pusha `GIT_POSALJI.cmd` |
 | Shema | **v17** — migracija ide sama pri pokretanju |
-| Testovi | **166** (izbrojano 17. 9. navečer), uvijek s `HUB_TEST_DATA` (README; bez toga se testovi na stvarnim nalozima preskaču) |
+| Testovi | **175** (izbrojano 18. 9.), uvijek s `HUB_TEST_DATA` (README; bez toga se testovi na stvarnim nalozima preskaču) |
 | Hub na VM-u | `C:\Paneli\Hub` → `http://192.168.5.201:8766/` (8765 = Knjiga, 8080 = Regal traka); upute `deploy\README_DEPLOY_HUB.md` |
-| Zadnji dokument | **34** — izgled ekrana 1A + 2A + 3A i nova stranica Postavke (D-94); prije toga 33 (radne ploče na pili, obrub) |
+| Zadnji dokument | **35** — skladište i restlovi do kraja definirani (D-95); u izradi po tom dokumentu: prag restla ✓, skladištarev ekran ✓ |
 
 ## Što je gotovo
 
@@ -42,7 +42,8 @@ Hub pokriva cijeli tok **unos → optimizacija → ponuda → skladište → pro
 3. Prije stvarnog rada obrisati probne naloge iz baze na VM-u.
 
 **Prijedlozi koji čekaju „da“ ili ispravak:**
-- **D-82** pravila restlova (27) · **D-83** rezervacije i tok skladišta (28) · **D-85** pravila nabave (30)
+- Pokrenuti `20_ANALIZA\skripte\WINSTORE_PREGLED.bat` na Winstore računalu i vratiti ispis (dokument 35 §5)
+- **D-85** pravila nabave (30) — ostatak; D-82 i D-83 su zamijenjeni odlukom D-95 (dokument 35)
 - **D-84** CNC obrade iz Huba — Igor šalje popis obrada i zadane parametre (29 §4)
 - 57 dekora restlova za potvrdu (27a) — Igor: „naknadno“
 - Iz 33 §Otvoreno: radna ili stol iz PW naziva „RP …“ (prijedlog: komad širi od 600 → stol); identi radnih ploča s jedinicom KOM
@@ -68,7 +69,7 @@ Hub pokriva cijeli tok **unos → optimizacija → ponuda → skladište → pro
 5. Ispisi za pogon: **radni nalog**, **pick-lista traka** uz krojni nacrt (D-63), izdatnica.
 6. **Okov**: uvoz s prijedlogom identa (D-32); do tada ručne stavke ponude.
 7. Radna ploča ili ploča stola iz PW naziva „RP …“ (33 §Otvoreno 1) i identi s jedinicom KOM (33 §2) — kad Igor odluči.
-8. Igor potvrdi ili ispravi **D-82 / D-83 / D-85** → skladište (rezervacije, restlovi) i nabava (narudžbenice, primka) u stvarnom radu; 57 dekora restlova.
+8. Skladište i restlovi po D-95 (dokument 35): **gotovo** — prag restla u Postavkama i prijedlozi po novom pravilu, skladištarev ekran (QR, potvrda, ispravak mjere, otpis, ručni restl, izdavanje); **slijedi** — uvoz Winstorea svakih 30 min, stanje ploča izvan Winstorea (RP/ZO, compact, lesonit), zaboravljene rezervacije, slike dekora; 57 dekora restlova za potvrdu.
 
 **C. Kasnije**
 9. CNC obrade iz Huba (D-84) — kad Igor pošalje katalog obrada i parametre.

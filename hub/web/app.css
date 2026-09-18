@@ -334,3 +334,15 @@ tr.korig td{background:#FFFAEC}
 @media (max-width:760px){.kart-red .kart-shema{max-width:100%}}
 .content.puna{grid-template-columns:minmax(0,1fr)} .content.puna .pane .bd.tight{overflow-x:auto}
 .content.puna td.trake-c{white-space:normal;min-width:260px}
+
+/* skladištarev ekran: radi i na računalu i na mobitelu — krupno, malo klikova */
+.skener{display:flex;gap:10px;align-items:center;flex-wrap:wrap} .skener input{flex:1;min-width:220px;font-size:16px;min-height:46px}
+.skl-red{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--line2)}
+.skl-red:last-child{border-bottom:0} .skl-red .grow{flex:1;min-width:220px}
+.skl-red .naslov{font-size:15px;font-weight:700} .skl-red .sto{margin-top:4px;font-size:13.5px}
+.skl-red .tag{background:var(--info-soft);color:var(--info-ink)}
+.btn.lg{min-height:46px;padding:10px 18px;font-size:14.5px}
+.restl-oz{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:22px !important;letter-spacing:.02em}
+.content.skl .kart-akcije{padding:14px 18px}
+@media (max-width:640px){.skl-red{padding:12px} .skl-red .btn.lg{flex:1}}
+@media (max-width:640px){.content.skl .alatna{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;padding-bottom:4px} .content.skl .alatna .grow{min-width:6px} .skener input{min-width:100%}}

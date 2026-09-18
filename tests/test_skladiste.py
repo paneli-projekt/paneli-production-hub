@@ -138,6 +138,10 @@ def test_restl_za_nalog_na_restlu(skl):
     assert SK.oslobodi_nalog(skl, nid, "IVANA") == 1 and RS.restl(skl, "R0001")["status"] == "slobodan"
     SK.rezerviraj_nalog(skl, nid, "IVANA", restlovi={nm: r1["id"]})
     N.postavi_status(skl, nid, "skladiste", "IVANA"); N.postavi_status(skl, nid, "pila_nesting", "IVANA")
+    assert RS.restl(skl, "R0001")["status"] == "rezerviran"                                  # restl izdaje skladištar, ne automat (D-95)
+    ceka = SK.ceka_izdavanje(skl, nid)
+    assert len(ceka) == 1 and [x["oznaka"] for x in ceka[0]["restlovi"]] == ["R0001"]
+    assert SK.izdaj_materijal(skl, nm, "SKLADISTAR") == 1
     r = RS.restl(skl, "R0001")
     assert r["status"] == "potrosen" and r["nalog_izlaz"] and RS.stanje(skl, ident="IV000090")[0]["kom"] == 1        # ostaje R0002
     with pytest.raises(ValueError, match="je potrosen"):
@@ -217,7 +221,7 @@ def test_stvarni_humer_skladiste(stvarna_baza):
     d = N.postavi_status(b, nid, "skladiste", "TEST")
     assert d["skladiste"]["materijali"][0]["rezervirano_ovaj"] == mats[d["skladiste"]["materijali"][0]["ident"]]["ploce"]
     pri = RS.prijedlozi(b, nid)
-    assert all(p["m2"] >= 1.0 and min(p["L"], p["W"]) >= 400 for p in pri)      # korisni ostaci po D-19
+    assert all(min(p["L"], p["W"]) >= 150 and (p["m2"] >= 0.35 or max(p["L"], p["W"]) >= 2000) for p in pri)   # prag čuvanja restla (D-95)
     u = SK.potrebe_ukupno(b)
     assert u["materijali"] and sum(m["potrebno"] for m in u["materijali"]) == sum(m["ploce"] or 0 for m in mats.values())
     assert u["trake"] and all(t["potrebno"] > 0 for t in u["trake"])

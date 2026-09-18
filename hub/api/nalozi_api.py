@@ -785,7 +785,8 @@ def optimizacija_potvrdi(oid: int, p: TkoP):
 
 
 POSTAVKE_OPT = ("kerf", "kerf_pile", "nadmjera_trake", "obracun_rezanja", "ident_rezanje_rez", "ident_rezanje_m", "mapa_nesting", "mapa_pila",
-                "pila_max_razina", "pila_max_sirina_u_traci", "pila_min_komad_4", "pila_mijesana_orijentacija")
+                "pila_max_razina", "pila_max_sirina_u_traci", "pila_min_komad_4", "pila_mijesana_orijentacija",
+                "restl_min_m2", "restl_min_mm", "restl_traka_mm")
 
 
 def _postavke_opt(c):
@@ -807,7 +808,7 @@ def postavke_optimizacija_upisi(p: dict):
         for k, v in p.items():
             if k not in POSTAVKE_OPT:
                 raise HTTPException(400, "nepoznata postavka %s" % k)
-            if k in ("kerf", "kerf_pile", "nadmjera_trake", "pila_min_komad_4"):
+            if k in ("kerf", "kerf_pile", "nadmjera_trake", "pila_min_komad_4", "restl_min_m2", "restl_min_mm", "restl_traka_mm"):
                 try:
                     float(str(v).replace(",", "."))
                 except ValueError:
