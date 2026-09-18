@@ -62,6 +62,11 @@ def test_potrebe_provjera_rezervacija_i_prijedlog_restla(skl):
     tr = list(m["trake"].values())[0]
     assert tr["na_roli"] == 2.0 and tr["pretinac"] == "R2-04-B" and tr["manjak"] == 1.0               # treba 3 m, na roli 2
     assert any("traka TR000168" in u for u in pr["upozorenja"]) and pr["za_nabavu"][0]["jm"] == "M" and not pr["ok"]
+    # trake naloga zbrojene po identu — vlastiti redak kao i ploče (Igor, 18. 9.)
+    t0 = pr["trake"][0]
+    assert len(pr["trake"]) == 1 and t0["ident"] == "TR000168" and t0["potrebno"] == 3 and t0["na_roli"] == 2.0
+    assert t0["manjak"] == 1.0 and t0["pretinac"] == "R2-04-B" and t0["materijali"] == [pr["materijali"][0]["naziv"]]
+    assert [(z["ident"], z["jm"]) for z in pr["za_nabavu"]] == [("TR000168", "M")]      # traka se u nabavu upisuje jednom, ne po materijalu
     # status Skladište (D-35): Hub rezervira ploču, predloži restl iz sheme i vrati provjeru
     d = N.postavi_status(skl, nid, "skladiste", "IVANA")
     assert d["skladiste"]["materijali"][0]["rezervirano_ovaj"] == 1

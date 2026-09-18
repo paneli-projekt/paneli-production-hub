@@ -1,6 +1,6 @@
 # Paneli Production Hub — STANJE
 
-**Ažurirano: 17. 9. 2026.** · Odluke: `DECISIONS.md` (D-01 … D-96) · Ideje: `IDEJE_KASNIJE.md` (I-01 … I-20) · Povijest do 17. 9.: `STANJE_POVIJEST.md`
+**Ažurirano: 18. 9. 2026.** · Odluke: `DECISIONS.md` (D-01 … D-98) · Ideje: `IDEJE_KASNIJE.md` (I-01 … I-21) · Povijest do 17. 9.: `STANJE_POVIJEST.md`
 
 Prvi dokument u novoj sesiji. **Drži se kratkim:** na kraju sesije zamijeniti odlomke „Brojke“, „Čeka Igora“ i „Sljedeće“ — ne dopisivati dnevnik. Što je i zašto napravljeno ide u `DECISIONS.md` i u dokument teme.
 
@@ -12,11 +12,11 @@ Hub pokriva cijeli tok **unos → optimizacija → ponuda → skladište → pro
 
 | | |
 |---|---|
-| Kod | `30_NOVI_PROGRAM\` (Git repo). Zadnji commit `504ac2b` (17. 9.): D-94 izgled ekrana 1A + 2A + 3A i Postavke. **Nije još u Gitu:** D-95 (prag restla, skladištarev ekran, izdavanje) i D-96 (slike dekora iz kataloga dobavljača) — Igor pusha `GIT_POSALJI.cmd` |
-| Shema | **v18** — migracija ide sama pri pokretanju |
-| Testovi | **180** (izbrojano 18. 9.), uvijek s `HUB_TEST_DATA` (README; bez toga se testovi na stvarnim nalozima preskaču) |
+| Kod | `30_NOVI_PROGRAM\` (Git repo). Zadnji commit `504ac2b` (17. 9.): D-94 izgled ekrana 1A + 2A + 3A i Postavke. **Nije još u Gitu:** D-95 (prag restla, izdavanje), D-96 (slike dekora), D-97 (bočni izbornik Skladište / Restlovi, radnje lijevo, trake naloga) i D-98 (živo stanje iz Winstorea) — Igor pusha `GIT_POSALJI.cmd` |
+| Shema | **v19** — migracija ide sama pri pokretanju |
+| Testovi | **190** (izbrojano 18. 9.), uvijek s `HUB_TEST_DATA` (README; bez toga se testovi na stvarnim nalozima preskaču) |
 | Hub na VM-u | `C:\Paneli\Hub` → `http://192.168.5.201:8766/` (8765 = Knjiga, 8080 = Regal traka); upute `deploy\README_DEPLOY_HUB.md` |
-| Zadnji dokument | **36** — katalozi dobavljača i slike dekora (D-96, ugrađeno); 35 — skladište i restlovi (D-95): prag restla ✓, skladištarev ekran ✓ |
+| Zadnji dokument | **38** — Winstoreovo sučelje `WINSTORE_EXCHANGE` (D-98, UGRAĐENO: živo stanje ploča); 37 — bočni izbornik Skladište / Restlovi, radnje lijevo, trake na skladištu naloga (D-97, ugrađeno); 36 — slike dekora (D-96) ✓; 35 — skladište i restlovi (D-95): prag restla ✓, izdavanje ✓ |
 
 ## Što je gotovo
 
@@ -43,12 +43,15 @@ Hub pokriva cijeli tok **unos → optimizacija → ponuda → skladište → pro
 3. Prije stvarnog rada obrisati probne naloge iz baze na VM-u.
 
 **Prijedlozi koji čekaju „da“ ili ispravak:**
-- Pokrenuti `20_ANALIZA\skripte\WINSTORE_PREGLED.bat` na Winstore računalu i vratiti ispis (dokument 35 §5)
+- **Na VM-u pokrenuti `deploy\4_WINSTORE_PRIPREMI.bat`**, pa u Postavke → Winstore upisati lozinku i uključiti prekidač — od tada je stanje ploča živo (D-98)
+- Nakon toga: dogovoriti s Biesseom pristup i pisanje (rezervacije, vanjski restlovi) — dira sustav koji upravlja strojem
+- Dogovoriti s operaterom da izvoz Winstorea od sada sprema u `C:\SPV\Shared` (već dijeljeno) umjesto na Desktop
 - **D-85** pravila nabave (30) — ostatak; D-82 i D-83 su zamijenjeni odlukom D-95 (dokument 35)
 - **D-84** CNC obrade iz Huba — Igor šalje popis obrada i zadane parametre (29 §4)
 - 57 dekora restlova za potvrdu (27a) — Igor: „naknadno“
 - Iz 33 §Otvoreno: radna ili stol iz PW naziva „RP …“ (prijedlog: komad širi od 600 → stol); identi radnih ploča s jedinicom KOM
 - Iz 34 §Otvoreno: dva zelena gumba „pošalji“ na Proizvodnji i „Potvrdi (QR)“ u svakom redu restla — ostaviti ili neutralno?
+- Iz 37 §3: gumbi na kraju retka (*Potvrdi / Odbaci / Izdano*) i *Otpiši* u kartici ostali su desno uz svoj redak — premjestiti i njih lijevo?
 - Iz 32 §Otvoreno: prazan rabat ručne stavke = rabat naloga po grupi?; treba li HTML tijelo maila izgledati kao PDF?; prava po ulogama (zasad samo admin uređuje korisnike)
 
 **Ured / Pantheon (ne blokira Hub):**
@@ -70,7 +73,7 @@ Hub pokriva cijeli tok **unos → optimizacija → ponuda → skladište → pro
 5. Ispisi za pogon: **radni nalog**, **pick-lista traka** uz krojni nacrt (D-63), izdatnica.
 6. **Okov**: uvoz s prijedlogom identa (D-32); do tada ručne stavke ponude.
 7. Radna ploča ili ploča stola iz PW naziva „RP …“ (33 §Otvoreno 1) i identi s jedinicom KOM (33 §2) — kad Igor odluči.
-8. Skladište i restlovi po D-95 (dokument 35): **gotovo** — prag restla u Postavkama i prijedlozi po novom pravilu, skladištarev ekran (QR, potvrda, ispravak mjere, otpis, ručni restl, izdavanje); **slijedi** — uvoz Winstorea svakih 30 min, stanje ploča izvan Winstorea (RP/ZO, compact, lesonit), zaboravljene rezervacije, slike dekora; 57 dekora restlova za potvrdu.
+8. Skladište i restlovi po D-95 (dokument 35): **gotovo** — prag restla u Postavkama i prijedlozi po novom pravilu, ekrani Skladište (Stanje, Izdavanje) i Restlovi (Popis, Za potvrdu, Dekori) po D-97 — QR, potvrda, ispravak mjere, otpis, ručni restl, izdavanje; **slijedi** — uvoz Winstorea svakih 30 min, stanje ploča izvan Winstorea (RP/ZO, compact, lesonit), zaboravljene rezervacije, slike dekora; 57 dekora restlova za potvrdu.
 
 **C. Kasnije**
 9. CNC obrade iz Huba (D-84) — kad Igor pošalje katalog obrada i parametre.
@@ -90,6 +93,6 @@ Hub pokriva cijeli tok **unos → optimizacija → ponuda → skladište → pro
 
 ## Karta dokumenata (čitati samo kad zadatak traži)
 
-Audit i temelji 00–06 · mockup 07 · Corpus put 08, 14 · checklista 09 · temelji praćenja i nabave 10 · šifrarnik 11, 13 · nalog 12 · izvozi 15, 16 · pregled koda 17 · uvoz Corpusa 18 · rezultati natrag 19 · spajanje naloga 20 · obračun i ponuda 21, 21a · optimizator 22, 22a · niz goda 23 · rizici „što ako“ 24 · optimizacija s potvrdom i krojni nacrt 25 · mjera za rezanje 26 · restlovi 27, 27a · Warehouse pogled 28 · CNC obrade 29 · nabava i QR 30 · web ekrani 31 · napomene na ekrane 32 · radne ploče na pili, obrub 33 · izgled ekrana 1A + 2A + 3A i Postavke 34 · skladište i restlovi 35 · katalozi dobavljača i slike dekora 36
+Audit i temelji 00–06 · mockup 07 · Corpus put 08, 14 · checklista 09 · temelji praćenja i nabave 10 · šifrarnik 11, 13 · nalog 12 · izvozi 15, 16 · pregled koda 17 · uvoz Corpusa 18 · rezultati natrag 19 · spajanje naloga 20 · obračun i ponuda 21, 21a · optimizator 22, 22a · niz goda 23 · rizici „što ako“ 24 · optimizacija s potvrdom i krojni nacrt 25 · mjera za rezanje 26 · restlovi 27, 27a · Warehouse pogled 28 · CNC obrade 29 · nabava i QR 30 · web ekrani 31 · napomene na ekrane 32 · radne ploče na pili, obrub 33 · izgled ekrana 1A + 2A + 3A i Postavke 34 · skladište i restlovi 35 · katalozi dobavljača i slike dekora 36 · bočni izbornik, radnje lijevo i trake naloga 37 · Winstoreovo sučelje WINSTORE_EXCHANGE 38
 
 Zasebno: `20_web_katalog_korpusa_2026-09-15.md` — prijedlog javnog web kataloga korpusa (15. 9.), nije ušao u DECISIONS; nije dio trenutnog posla.

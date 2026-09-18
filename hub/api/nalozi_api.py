@@ -861,6 +861,70 @@ def postavke_tvrtka_upisi(p: dict):
     return postavke_tvrtka()
 
 
+# ---------------------------------------------------------------- Winstore: čitanje stanja iz baze razmjene (D-98, dokument 38)
+POSTAVKE_WINSTORE = ("winstore_sql_ukljucen", "winstore_sql_server", "winstore_sql_baza", "winstore_sql_korisnik", "winstore_sql_minuta")
+
+
+def _winstore_stanje(c):
+    from ..sifrarnici import winstore_sql as WSQ
+    z = WSQ.zadnje_stanje(c)
+    d = {k: db.postavka(c, k, "") or "" for k in POSTAVKE_WINSTORE}
+    d["winstore_sql_lozinka_upisana"] = bool(db.postavka(c, "winstore_sql_lozinka", ""))   # sama lozinka se nikad ne šalje na ekran
+    d["zadnje"] = z
+    d["starost_min"] = WSQ.starost_minuta(c)
+    d["ploca"] = c.execute("SELECT COUNT(*) FROM winstore_ploca WHERE ambalaza = 0").fetchone()[0]
+    return d
+
+
+@router.get("/api/postavke/winstore")
+def postavke_winstore():
+    with _ctx["brava"]:
+        return _winstore_stanje(_c())
+
+
+@router.post("/api/postavke/winstore")
+def postavke_winstore_upisi(p: dict):
+    """{winstore_sql_…: vrijednost} — lozinka se upisuje, ali se natrag ne šalje."""
+    with _brava():
+        c = _c()
+        tko = p.pop("tko", "web")
+        for k, v in p.items():
+            if k != "winstore_sql_lozinka" and k not in POSTAVKE_WINSTORE:
+                raise HTTPException(400, "nepoznata postavka %s" % k)
+            v = ("" if v is None else str(v)).strip()
+            if k == "winstore_sql_ukljucen" and v not in ("0", "1"):
+                raise HTTPException(400, "winstore_sql_ukljucen: 0 | 1")
+            if k == "winstore_sql_minuta" and (not v.isdigit() or int(v) < 1):
+                raise HTTPException(400, "osvježavanje mora biti cijeli broj minuta, najmanje 1")
+            db.postavi(c, k, v)
+            db.dnevnik(c, tko, "postavke", k, "promjena", "•••" if k == "winstore_sql_lozinka" else v)
+        c.commit()
+        return _winstore_stanje(c)
+
+
+@router.post("/api/winstore/provjeri")
+def winstore_provjeri():
+    """Proba veze na bazu Winstorea — samo čita, ništa ne upisuje ni u Hub ni u Winstore."""
+    from ..sifrarnici import winstore_sql as WSQ
+    with _ctx["brava"]:
+        return WSQ.provjeri(_c())
+
+
+@router.post("/api/winstore/osvjezi")
+def winstore_osvjezi(p: dict = None):
+    """Preuzmi stanje ploča iz baze Winstorea u `winstore_ploca` (zamjenjuje prethodno, kao i XML uvoz)."""
+    from ..sifrarnici import winstore_sql as WSQ
+    p = p or {}
+    with _brava():
+        c = _c()
+        try:
+            st = WSQ.osvjezi(c, tko=p.get("tko", "web"))
+        except WSQ.NemaVeze as e:
+            raise HTTPException(400, str(e))
+        return dict(stavke=st["stavke"], kodova=st["kodova"], povezano=st["povezano"], vec_povezano=st["vec_povezano"],
+                    nepovezano=len(st["nepovezano"]), ambalaza=st["ambalaza"], zadnje=WSQ.zadnje_stanje(c))
+
+
 @router.get("/api/ponuda/{vid}")
 def ponuda_verzija(vid: int):
     with _ctx["brava"]:

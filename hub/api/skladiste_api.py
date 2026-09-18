@@ -61,9 +61,17 @@ def _greska(fn, *a, **kw):
         raise HTTPException(400, str(e))
 
 
+def _osvjezi_winstore(c):
+    """Stanje ploča je živo iz baze Winstorea (D-98): ako je čitanje uključeno i zadnje je starije od zadanog
+    broja minuta, preuzmi novo. Neuspjeh ne ruši ekran — ostaje zadnje poznato stanje."""
+    from ..sifrarnici import winstore_sql as WSQ
+    return WSQ.osvjezi_ako_treba(c)
+
+
 @router.get("/api/skladiste/stanje")
 def stanje(ident: Optional[str] = None, q: Optional[str] = None, limit: int = 300):
     c = _c()
+    _osvjezi_winstore(c)
     sql = "SELECT id FROM materijal WHERE aktivan = 1 AND ne_koristi_se = 0"
     a = []
     if ident:

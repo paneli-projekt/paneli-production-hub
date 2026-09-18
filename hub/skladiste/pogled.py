@@ -130,17 +130,39 @@ def provjera_naloga(conn, nalog_id):
                         nabava.append(dict(ident=p["ident"], naziv=p["naziv"], kom=d["manjak"], jm="PLOČA", winstore_kod=p["winstore_kod"], nalog_materijal_id=p["nalog_materijal_id"]))
                 else:
                     d["manjak"] = None
-        # trake: potreba vs Regal traka (Hub ne oduzima, D-63)
+        # trake: potreba vs Regal traka (Hub ne oduzima, D-63) — stanje uz svaku traku materijala
         for t in d["trake"].values():
             s = TR.stanje(conn, t["ident"])
             t.update(pretinac=s["pretinac"], na_roli=s["metri"], regal_traka=s["dostupno"])
             if s["metri"] is not None and s["metri"] < t["metri"]:
                 t["manjak"] = round(t["metri"] - s["metri"], 1)
-                upoz.append("traka %s %s: treba %d m, na roli %g m" % (t["ident"], t["naziv"] or "", t["metri"], s["metri"]))
-                nabava.append(dict(ident=t["ident"], naziv=t["naziv"], kom=t["manjak"], jm="M", nalog_materijal_id=p["nalog_materijal_id"]))
         mats.append(d)
-    return dict(nalog_id=nalog_id, naziv=n["naziv"], status=n["status"], materijali=mats, upozorenja=upoz, za_nabavu=nabava,
-                ok=not any(x.get("manjak") for x in mats) and not any(t.get("manjak") for x in mats for t in x["trake"].values()))
+    trake = trake_naloga(conn, mats)                      # jedan redak po traci (zbroj preko materijala), kao i kod ploča
+    for t in trake:
+        if t["manjak"]:
+            upoz.append("traka %s %s: treba %d m, na roli %g m" % (t["ident"], t["naziv"] or "", t["potrebno"], t["na_roli"]))
+            nabava.append(dict(ident=t["ident"], naziv=t["naziv"], kom=t["manjak"], jm="M", klasa=t["klasa"]))
+    return dict(nalog_id=nalog_id, naziv=n["naziv"], status=n["status"], materijali=mats, trake=trake, upozorenja=upoz, za_nabavu=nabava,
+                ok=not any(x.get("manjak") for x in mats) and not any(t["manjak"] for t in trake))
+
+
+def trake_naloga(conn, mats):
+    """Trake naloga zbrojene po identu (isti redak kao ploče): potrebno (m), raspoloživo na roli, pretinac u Regal traki, manjak.
+
+    Metri se zbrajaju TOČNO pa se zaokružuju jednom na kraju — inače bi se ista traka na tri materijala zaokružila tri puta."""
+    out = {}
+    for m in mats:
+        for t in m["trake"].values():
+            x = out.setdefault(t["ident"], dict(traka_id=t["traka_id"], ident=t["ident"], naziv=t["naziv"], klasa=t["klasa"],
+                                                metri_tocno=0.0, potrebno=0, na_roli=t.get("na_roli"), pretinac=t.get("pretinac"),
+                                                regal_traka=t.get("regal_traka", False), materijali=[], manjak=None))
+            x["metri_tocno"] += float(t["metri_tocno"])
+            x["materijali"].append(m["naziv"])
+    for x in out.values():
+        x["metri_tocno"] = round(x["metri_tocno"], 2)
+        x["potrebno"] = int(math.ceil(x["metri_tocno"] - 1e-9))
+        x["manjak"] = round(max(0.0, x["potrebno"] - x["na_roli"]), 1) if x["na_roli"] is not None else None
+    return sorted(out.values(), key=lambda x: (-(x["manjak"] or 0), x["ident"]))
 
 
 def rezerviraj_nalog(conn, nalog_id, tko, restlovi=None, tko_potvrda=None):

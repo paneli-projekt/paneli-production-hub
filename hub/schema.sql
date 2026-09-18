@@ -139,7 +139,8 @@ CREATE TABLE IF NOT EXISTS winstore_ploca (           -- Winstore inventar (XML 
     drop_ploca     INTEGER NOT NULL DEFAULT 0,         -- Drop = ostatak (restl u Winstoreu)
     izvoz          TEXT NOT NULL,                      -- naziv/datum izvoza (11092026.XML)
     materijal_id   INTEGER REFERENCES materijal (id),  -- veza na Pantheon materijal (NULL = nije povezano)
-    ambalaza       INTEGER NOT NULL DEFAULT 0          -- podloga na koju se slažu ploče (AMBALAZA …) — ne vodi se na stanju (D-49)
+    ambalaza       INTEGER NOT NULL DEFAULT 0,         -- podloga na koju se slažu ploče (AMBALAZA …) — ne vodi se na stanju (D-49)
+    rezervirano    INTEGER NOT NULL DEFAULT 0          -- Booked: koliko je Winstore sam rezervirao za svoje picking liste (samo iz baze, XML to nema)
 );
 CREATE INDEX IF NOT EXISTS ix_winstore_kod ON winstore_ploca (materijal_kod);
 
@@ -549,6 +550,12 @@ INSERT OR IGNORE INTO postavke (kljuc, vrijednost, opis) VALUES
     ('pila_min_komad_4', '0', 'ograničenje pile (D-91): najmanji komad 4. razine u mm (0 = bez ograničenja)'),
     ('pila_mijesana_orijentacija', '0', 'ograničenje pile (D-91): 1 = smije miješati orijentaciju (smjer po ploči, isti element u obje orijentacije)'),
     ('nadmjera_trake', '10', 'nadmjera trake u % iznad Σ stranica (PW 10 %, D-20/D-77)'),
+    ('winstore_sql_ukljucen', '0', 'Hub čita stanje ploča izravno iz baze Winstorea (0 = samo ručni XML uvoz)'),
+    ('winstore_sql_server', '192.168.5.212\THMI', 'SQL poslužitelj i instanca Winstorea'),
+    ('winstore_sql_baza', 'WINSTORE_EXCHANGE', 'baza za razmjenu s vanjskim softverom'),
+    ('winstore_sql_korisnik', 'external', 'prijava za čitanje baze razmjene'),
+    ('winstore_sql_lozinka', '', 'lozinka te prijave (čuva se u bazi Huba, ne prikazuje se na ekranu)'),
+    ('winstore_sql_minuta', '30', 'koliko minuta stanje smije biti staro prije nego ga Hub sam osvježi'),
     ('mapa_dekori', '', 'mapa sa slikama dekora (prazno = mapa „dekori“ pokraj baze); slike dobavljača idu samo na interne ekrane'),
     ('restl_min_m2', '0.35', 'restl se čuva od ove površine u m² (D-95); naplata kupcu ostaje na 1 m²'),
     ('restl_min_mm', '150', 'najmanja kraća stranica restla u mm (D-95)'),

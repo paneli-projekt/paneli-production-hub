@@ -51,10 +51,16 @@ def _f(x):
 
 
 def uvezi_winstore(conn, putanja, tko="uvoz", povezi=True):
-    """Novi XML je CIJELI inventar u tom trenutku (Winstore je vlasnik broja punih ploča, D-64): zamijeni sve prethodno,
-    upiši ploče, poveži s materijalima. Vraća statistiku i popis nepovezanih kodova. Veze kod ↔ ident na materijalu ostaju."""
-    stavke = ucitaj_xml(putanja)
-    izvoz = os.path.basename(putanja)
+    """Uvoz iz ručnog XML izvoza (rezerva otkad Hub čita bazu Winstorea izravno — hub.sifrarnici.winstore_sql)."""
+    return uvezi_stavke(conn, ucitaj_xml(putanja), os.path.basename(putanja), tko=tko, povezi=povezi)
+
+
+def uvezi_stavke(conn, stavke, izvoz, tko="uvoz", povezi=True):
+    """Popis stavki je CIJELI inventar u tom trenutku (Winstore je vlasnik broja punih ploča, D-64): zamijeni sve prethodno,
+    upiši ploče, poveži s materijalima. Vraća statistiku i popis nepovezanih kodova. Veze kod ↔ ident na materijalu ostaju.
+
+    Izvor stavki je XML izvoz (`ucitaj_xml`) ili pogled `vBoardsDropsStatus` u bazi Winstorea (`winstore_sql.stavke`);
+    oblik stavke je isti, pa je povezivanje, ambalaža i sve ostalo zajedničko."""
     cur = conn.cursor()
     cur.execute("DELETE FROM winstore_ploca")          # ne samo isti naziv datoteke — dnevni izvozi imaju različita imena (12092026.XML…)
     st = dict(stavke=len(stavke), kodova=len({s["materijal_kod"] for s in stavke}), povezano=0, vec_povezano=0, nepovezano=[], dodatni=[], po_razini={},
@@ -100,10 +106,11 @@ def uvezi_winstore(conn, putanja, tko="uvoz", povezi=True):
             st["povezano"] += 1
             st["po_razini"][razina] = st["po_razini"].get(razina, 0) + 1
     for s in stavke:
-        cur.execute("INSERT INTO winstore_ploca (kod, materijal_kod, opis, L, W, debljina, god, kom_ukupno, kom_interno, kom_eksterno, drop_ploca, izvoz, materijal_id, ambalaza) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        cur.execute("INSERT INTO winstore_ploca (kod, materijal_kod, opis, L, W, debljina, god, kom_ukupno, kom_interno, kom_eksterno, drop_ploca, izvoz, materijal_id, ambalaza, rezervirano) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (s["kod"], s["materijal_kod"], s["opis"], s["L"], s["W"], s["debljina"], s["god"], s["kom_ukupno"], s["kom_interno"],
-                     s["kom_eksterno"], s["drop"], izvoz, veze.get(s["materijal_kod"]), 1 if s["materijal_kod"] in ambalaza else 0))
+                     s["kom_eksterno"], s["drop"], izvoz, veze.get(s["materijal_kod"]), 1 if s["materijal_kod"] in ambalaza else 0,
+                     int(s.get("rezervirano") or 0)))
     # debljina iz Winstorea za materijale kojima je nema u Pantheon nazivu (samo ako Winstore za taj materijal zna jednu jedinu debljinu)
     for r in cur.execute("SELECT m.id, m.pantheon_ident, COUNT(DISTINCT w.debljina) n, MIN(w.debljina) d FROM materijal m JOIN winstore_ploca w ON w.materijal_id = m.id "
                          "WHERE m.debljina IS NULL AND m.ne_koristi_se = 0 AND w.debljina IS NOT NULL AND w.ambalaza = 0 GROUP BY m.id HAVING n = 1").fetchall():

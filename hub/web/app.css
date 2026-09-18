@@ -149,7 +149,7 @@ input.inl{padding:4px 6px;min-height:30px;font-size:13px;text-align:right;font-v
 .pad-wrap{position:relative} .pad{display:none;position:fixed;z-index:60;background:var(--surf);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.15);max-height:320px;overflow:auto;text-align:left}
 .pad.on{display:block} .pad .li{padding:7px 10px;cursor:pointer;display:flex;gap:8px;align-items:center;font-size:13px;font-weight:400} .pad .li:hover,.pad .li.on{background:var(--acc-soft)}
 /* alatna traka ekrana (gumbi su na ekranu, u zaglavlju samo koraci) */
-.alatna{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap;grid-column:1/-1;flex:none;min-height:36px}
+.alatna{display:flex;gap:8px;align-items:center;justify-content:flex-start;flex-wrap:wrap;grid-column:1/-1;flex:none;min-height:36px}
 .alatna .tbtn{background:var(--surf);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:7px 12px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .alatna .tbtn:hover{border-color:#B9B2A6} .alatna .tbtn.pri{background:var(--acc);border-color:var(--acc);color:#fff} .alatna .tbtn.pri:hover{background:#255846}
 .alatna select.tbtn{min-height:34px;padding:4px 8px} .alatna .note{margin-right:-2px}
@@ -333,7 +333,6 @@ tr.korig td{background:#FFFAEC}
 .kart-red .kart-shema{max-width:calc(100% - 294px)} .kart-red .kart-shema img{max-width:100%}
 @media (max-width:760px){.kart-red .kart-shema{max-width:100%}}
 .content.puna{grid-template-columns:minmax(0,1fr)} .content.puna .pane .bd.tight{overflow-x:auto}
-.content.puna td.trake-c{white-space:normal;min-width:260px}
 
 /* skladištarev ekran: radi i na računalu i na mobitelu — krupno, malo klikova */
 .skener{display:flex;gap:10px;align-items:center;flex-wrap:wrap} .skener input{flex:1;min-width:220px;font-size:16px;min-height:46px}
@@ -363,3 +362,11 @@ td.dst{width:44px;padding-left:12px;padding-right:0}
 .mat .row{overflow:hidden} .mat .m{clear:both}
 .dslika.kart-sl{width:44px;height:44px;flex:none}
 .pane .hd>.dslika{width:30px;height:30px;flex:none}
+
+/* ---- sve radnje lijevo: alatna traka ekrana i zaglavlja ploča (Igor, 18. 9.) ---- */
+.alatna .grow{flex:0 0 0;min-width:0}
+.alatna input.tbtn{font-weight:500;background:var(--surf)}
+.alatna input.tbtn::placeholder{color:var(--muted)}
+.pane .hd .grow{flex:0 0 0;min-width:0}
+.pane .hd input,.pane .hd select{margin-left:2px}
+@media (max-width:640px){.alatna input.tbtn{min-width:150px!important}}

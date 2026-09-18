@@ -115,6 +115,7 @@ var Hub = (function () {
   // ---------------------------------------------------------------- ljuska
   function ico(name) {
     var p = { nalozi: '<path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M8 12h8M8 16h8"/>', sklad: '<path d="M3 9 12 4l9 5v11H3z"/><path d="M9 20v-7h6v7"/>',
+      restl: '<path d="M3 4h18v16H3z"/><path d="M3 13h9v7"/><path d="M12 13h9"/>',
       nabava: '<path d="M4 8h16v12H4z"/><path d="M4 8l2.5-4h11L20 8M12 11v6M9 14h6"/>', sifr: '<path d="M4 6h16M4 12h16M4 18h10"/>',
       post: '<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3.9a7 7 0 0 0-1.7-1L14.5 3h-5l-.4 2.5a7 7 0 0 0-1.7 1L5.1 5.6l-2 3.4L5.1 10.5a7 7 0 0 0 0 2L3.1 14l2 3.4 2.3-.9a7 7 0 0 0 1.7 1l.4 2.5h5l.4-2.5a7 7 0 0 0 1.7-1l2.3.9 2-3.4-2-1.5c.1-.3.1-.7.1-1z"/>' }[name];
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>';
@@ -133,7 +134,7 @@ var Hub = (function () {
     var app = q("#app");
     app.innerHTML = '<div class="top"><div class="brand" onclick="location.hash=\'#/nalozi\'"><img src="/static/logo-mark.png" alt=""><b>Paneli<span class="us">_</span> Production Hub</b></div><div class="sep"></div>' +
       '<div class="crumb">' + (o.crumb || "") + '</div>' + (o.koraci || "") + '</div>' +
-      '<div class="main"><nav class="rail">' + [["nalozi", "Nalozi", "#/nalozi"], ["sklad", "Skladište", "#/skladiste"], ["nabava", "Nabava", "#/nabava"], ["sifr", "Šifrarnik", "#/sifrarnik"], ["post", "Postavke", "#/postavke"]].map(function (x) {
+      '<div class="main"><nav class="rail">' + [["nalozi", "Nalozi", "#/nalozi"], ["sklad", "Skladište", "#/skladiste"], ["restl", "Restlovi", "#/restlovi"], ["nabava", "Nabava", "#/nabava"], ["sifr", "Šifrarnik", "#/sifrarnik"], ["post", "Postavke", "#/postavke"]].map(function (x) {
         return '<a class="it' + (o.rail === x[0] ? " on" : "") + '" href="' + x[2] + '">' + ico(x[0]) + x[1] + '</a>'; }).join("") +
       '<div class="user" title="Korisnik (klik za promjenu)" id="korisnik">' + esc(S.korisnik.slice(0, 2)) + '</div></nav>' +
       '<div class="content ' + (o.cls || "c1") + (o.akcije ? " ima-alat" : "") + '" id="content">' + (o.akcije ? '<div class="alatna">' + o.akcije + '</div>' : "") + (o.sadrzaj || "") + '</div></div>' +   // gumbi ekrana su NA ekranu, u zaglavlju samo koraci (Igor, 17. 9.)

@@ -302,21 +302,30 @@
       return m.upozorenje ? '<span class="stat warn" title="' + esc(cist(m.upozorenje)) + '"><i>◷</i> ' + esc(cist(m.upozorenje).split(" — ")[0]) + '</span>' : "";
     }
     var rows = pr.materijali.map(function (m) {
-      var st = m.stanje || { ploce: {}, restlovi: {} }, tr = Object.keys(m.trake || {}).map(function (k) { return m.trake[k]; });
+      var st = m.stanje || { ploce: {}, restlovi: {} };
       return '<tr><td><b>' + esc(m.naziv) + '</b><div class="note">' + esc(m.ident || "") + ' ' + tagPut(m.put) + '</div></td>' +
         '<td class="r num">' + (m.na_restlu ? 'restl ' + m.restl_mjera.join("×") : (m.ploce == null ? '<span class="warn-t">?</span>' : m.ploce + ' pl.')) + '</td>' +
         '<td class="r num">' + n(st.ploce.fizicko, 0) + (st.ploce.lokacija ? '<div class="note">' + esc(st.ploce.lokacija) + '</div>' : "") + '</td><td class="r num">' + n(st.ploce.rezervirano, 0) + (m.rezervirano_ovaj ? '<div class="note">ovaj ' + m.rezervirano_ovaj + '</div>' : "") + '</td><td class="r num">' + n(st.ploce.naruceno, 0) + '</td><td class="r num"><b>' + n(st.ploce.raspolozivo, 0) + '</b></td>' +
         '<td>' + statusSkl(m) + '</td>' +
         '<td>' + ((st.restlovi.kom || 0) ? st.restlovi.kom + ' restl / ' + n(st.restlovi.m2, 2) + ' m²' : '—') + (m.restl_rezerviran && m.restl_rezerviran.length ? '<div class="note">rezerviran ' + m.restl_rezerviran.map(function (x) { return x.oznaka; }).join(", ") + '</div>' : "") +
         ((m.restl_kandidati || []).length ? '<div class="row" style="margin-top:4px">' + m.restl_kandidati.slice(0, 4).map(function (k) { return '<button class="btn sm" data-restl="' + m.nalog_materijal_id + ':' + k.id + '" title="' + esc(k.lokacija || "") + '">' + esc(k.oznaka) + ' ' + mm(k.L) + '×' + mm(k.W) + '</button>'; }).join("") + '</div>' : "") + '</td>' +
-        '<td class="trake-c">' + tr.map(function (t) { return '<div>' + esc(t.ident) + ' <span class="note">' + esc((t.naziv || "").slice(0, 26)) + '</span> ' + t.metri + ' m' + (t.na_roli != null ? ' <span class="' + (t.manjak ? "crit-t" : "ok-t") + '">(na roli ' + n(t.na_roli, 1) + ')</span>' : ' <span class="note">(Regal traka nedostupna)</span>') + (t.pretinac ? ' <span class="tag info">' + esc(t.pretinac) + '</span>' : "") + '</div>'; }).join("") + '</td></tr>';
+        '</tr>';
+    }).join("");
+    var trRows = (pr.trake || []).map(function (t) {
+      var poz = t.pretinac ? '<span class="tag info">' + esc(t.pretinac) + '</span>' : (t.regal_traka ? '<span class="note">nije adresirana</span>' : '<span class="note">Regal traka nedostupna</span>');
+      var stat = t.manjak ? '<span class="stat crit"><i>!</i> Manjak ' + n(t.manjak, 1) + ' m</span>'
+        : t.na_roli != null ? '<span class="stat ok"><i>✓</i> Dostupno</span>' : '<span class="stat info">Stanje nepoznato</span>';
+      return '<tr><td><b>' + esc(t.naziv || t.ident) + '</b><div class="note">' + esc(t.ident) + (t.klasa ? ' · ' + esc(t.klasa) : "") + '</div></td>' +
+        '<td class="r num"><b>' + t.potrebno + '</b> m</td>' +
+        '<td class="r num">' + (t.na_roli != null ? n(t.na_roli, 1) + ' m' : '<span class="note">?</span>') + '</td>' +
+        '<td>' + poz + '</td><td>' + stat + '</td><td class="note">' + esc((t.materijali || []).join(", ")) + '</td></tr>';
     }).join("");
     var pri = await api("/api/skladiste/prijedlozi?nalog=" + d.id);
     var sazSkl = (function () {
       /* 2A: jedna poruka iznad tablice umjesto žute trake po materijalu */
       var man = pr.materijali.filter(function (m) { return m.manjak && !m.na_restlu; }), ploca_ = man.reduce(function (a, m) { return a + (+m.manjak || 0); }, 0);
       var restl = pr.materijali.filter(function (m) { return m.manjak && m.na_restlu; }).length;
-      var trake = 0; pr.materijali.forEach(function (m) { Object.keys(m.trake || {}).forEach(function (k) { if (m.trake[k].manjak) trake++; }); });
+      var trake = (pr.trake || []).filter(function (t) { return t.manjak; }).length;
       var nepoz = pr.materijali.filter(function (m) { return m.manjak == null && m.upozorenje && m.vrsta !== "RP" && m.vrsta !== "ZO"; }).length;
       var dij = [];
       if (man.length) dij.push('<b>' + man.length + ' ' + sklonMat(man.length) + ' ' + (man.length % 10 >= 2 && man.length % 10 <= 4 && (man.length % 100 < 12 || man.length % 100 > 14) ? "imaju" : "ima") + ' manjak · ukupno ' + n(ploca_, 0) + ' ' + ploca(ploca_) + '</b>');
@@ -330,11 +339,13 @@
     ljuska({ crumb: crumb(d, "skladište"), koraci: koraci(d), rail: "nalozi", cls: "c1 puna",
       akcije: '<a class="tbtn" href="#/nalog/' + d.id + '/ponuda">← Ponuda</a><span class="grow"></span><button class="tbtn" id="btnOslobodi">Oslobodi</button><button class="tbtn' + (d.status === "skladiste" ? "" : " pri") + '" id="btnRezerviraj">' + (d.status === "skladiste" ? "Rezerviraj ponovno" : "Rezerviraj materijal") + '</button>' + (d.status === "skladiste" ? '<button class="tbtn pri" id="btnNaStroj">→ Proizvodnja</button>' : ""),
       sadrzaj: '<div class="col"><div class="pane"><div class="hd"><b>Provjera skladišta</b><span class="note">raspoloživo = fizičko (Winstore) − rezervirano (drugi nalozi) + naručeno</span></div>' +
-        '<div class="bd tight">' + sazSkl + '<table><thead><tr><th>Materijal</th><th class="r">Treba</th><th class="r">Fizičko</th><th class="r">Rezerv.</th><th class="r">Naručeno</th><th class="r">Raspoloživo</th><th>Status</th><th>Restlovi</th><th>Trake</th></tr></thead><tbody>' + (rows || '<tr><td colspan="9" class="note">nalog nema materijala</td></tr>') + '</tbody></table>' +
+        '<div class="bd tight">' + sazSkl + '<table><thead><tr><th>Materijal</th><th class="r">Treba</th><th class="r">Fizičko</th><th class="r">Rezerv.</th><th class="r">Naručeno</th><th class="r">Raspoloživo</th><th>Status</th><th>Restlovi</th></tr></thead><tbody>' + (rows || '<tr><td colspan="8" class="note">nalog nema materijala</td></tr>') + '</tbody></table>' +
         (pr.materijali.some(function (m) { return m.vrsta === "RP" || m.vrsta === "ZO"; }) ? '<div class="info-red"><span class="ik">i</span><span><b>Radne ploče i zidne obloge:</b> stanje se ne vodi u Winstoreu.</span></div>' : "") + '</div></div>' +
-        (pr.za_nabavu.length ? '<div class="pane"><div class="hd"><b>Za nabavu</b></div><div class="bd tight"><table><thead><tr><th>Ident</th><th>Naziv</th><th class="r">Količina</th><th>JM</th></tr></thead><tbody>' + pr.za_nabavu.map(function (z) { return '<tr><td class="mono">' + esc(z.ident) + '</td><td>' + esc(z.naziv || "") + '</td><td class="r num">' + n(z.kom, 1) + '</td><td>' + esc(z.jm) + '</td></tr>'; }).join("") + '</tbody></table></div></div>' : "") +
+        '<div class="pane"><div class="hd"><b>Trake</b><span class="note">potrebni metri s nadmjerom; stanje i pretinac iz Regal trake</span></div>' +
+        '<div class="bd tight"><table><thead><tr><th>Traka</th><th class="r">Potrebno</th><th class="r">Raspoloživo</th><th>Pozicija</th><th>Status</th><th>Na materijalima</th></tr></thead><tbody>' + (trRows || '<tr><td colspan="6" class="note">nalog nema traka</td></tr>') + '</tbody></table></div></div>' +
+        (pr.za_nabavu.length ? '<div class="pane"><div class="hd"><b>Za nabavu</b><span class="note">ploče i trake kojih nema dovoljno na stanju</span></div><div class="bd tight"><table><thead><tr><th>Ident</th><th>Naziv</th><th class="r">Količina</th><th>JM</th></tr></thead><tbody>' + pr.za_nabavu.map(function (z) { return '<tr><td class="mono">' + esc(z.ident) + '</td><td>' + esc(z.naziv || "") + '</td><td class="r num">' + n(z.kom, 1) + '</td><td>' + esc(z.jm) + '</td></tr>'; }).join("") + '</tbody></table></div></div>' : "") +
         '<div class="pane"><div class="hd"><b>Restlovi iz shema ovog naloga</b><span class="note">korisni ostaci ≥ 400 × 400 i ≥ 1 m² koje kupcu ne naplaćujemo — skladištar ih potvrdi kad ih izreže i zalijepi QR</span><span class="grow"></span>' + (pri.prijedlozi.length ? '<a class="btn sm" href="/api/skladiste/restlovi/naljepnice.pdf?nalog=' + d.id + '" target="_blank">Naljepnice PDF</a>' : "") + '</div><div class="bd tight"><table><thead><tr><th>Oznaka</th><th>Materijal</th><th class="r">Mjere</th><th class="r">m²</th><th>Iz sheme</th><th></th></tr></thead><tbody>' + (priHtml || '<tr><td colspan="6" class="note">nema prijedloga (nastaju kad nalog uđe u Skladište s potvrđenom optimizacijom)</td></tr>') + '</tbody></table></div></div></div>',
-      foot: kpi(pr.materijali.length, "materijala") + kpi(pr.za_nabavu.length, "za nabavu") + kpi(pri.prijedlozi.length, "restl prijedloga") + '<span class="grow"></span><span class="note">' + esc(H.statusNaziv(d.status)) + '</span>' });
+      foot: kpi(pr.materijali.length, "materijala") + kpi((pr.trake || []).length, "traka") + kpi(pr.za_nabavu.length, "za nabavu") + kpi(pri.prijedlozi.length, "restl prijedloga") + '<span class="grow"></span><span class="note">' + esc(H.statusNaziv(d.status)) + '</span>' });
     q("#btnRezerviraj").onclick = async function () {
       if (d.status === "potvrdjeno" || d.status === "ponuda") {           // prijelaz u Skladište sam rezervira — zelena točka ide na 4 Skladište
         var rs = await api("/api/nalog/" + d.id + "/status", { body: { status: "skladiste" } }); var up = (rs.skladiste && rs.skladiste.upozorenja) || [];
@@ -393,48 +404,100 @@
   E.nalog_proizvodnja = E.nalog_pila;
   E.nalog_optimizacija = E.nalog_slaganje;               // „/slaganje“ ostaje za stare poveznice (naziv „Optimizacija“, Igor 17. 9.)                 // „/pila“ ostaje za stare poveznice
 
-  // ---------------------------------------------------------------- skladište (globalno): stanje, restlovi, potvrde dekora
+  // ---------------------------------------------------------------- skladište: stanje ploča i izdavanje
+  function podizbor(ekran, pod, popis) {
+    return popis.map(function (x) { return '<a class="tbtn' + (pod === x[0] ? " on" : "") + '" href="#/' + ekran + '/' + x[0] + '">' + esc(x[1]) + '</a>'; }).join("");
+  }
+  function izdavanjeRedovi(izd) {
+    return izd.map(function (x) {
+      var sto = x.restlovi.length ? x.restlovi.map(function (r) { return '<b>' + esc(r.oznaka) + '</b> ' + mm(r.L) + ' × ' + mm(r.W) + (r.lokacija ? ' <span class="tag">' + esc(r.lokacija) + '</span>' : ""); }).join("<br>")
+        : '<b>' + n(x.kom, 0) + '</b> ploč' + (x.kom === 1 ? "a" : "e") + ' <span class="note">iz regala (nije u Winstoreu)</span>';
+      return '<div class="skl-red">' + dslika(x.ident) + '<div class="grow"><div class="naslov">' + esc(x.naziv || x.ident || "") + '</div><div class="note">' + esc(x.ident || "") + ' · nalog ' + esc(x.nalog) + ' · ' + H.statusNaziv(x.status) + '</div><div class="sto">' + sto + '</div></div>' +
+        '<button class="btn pri lg" data-izdaj="' + x.nalog_materijal_id + '">Izdano</button></div>';
+    }).join("") || '<div class="note" style="padding:12px 16px">Nema ničega za izdavanje.</div>';
+  }
   E.skladiste = async function (r) {
-    var pod = r.id || "stanje";
-    var akcije = '<a class="tbtn' + (pod === "stanje" ? " on" : "") + '" href="#/skladiste/stanje">Stanje</a><a class="tbtn' + (pod === "restlovi" ? " on" : "") + '" href="#/skladiste/restlovi">Restlovi</a><a class="tbtn' + (pod === "potvrde" ? " on" : "") + '" href="#/skladiste/potvrde">Dekori za potvrdu</a><a class="tbtn" href="#/skladistar">Skladištar</a>';
-    if (pod === "restlovi") {
-      var f = S.restlFilter || (S.restlFilter = { status: "slobodan,rezerviran,provjeri,prijedlog", q: "" });
-      var rs = await api("/api/skladiste/restlovi?status=" + encodeURIComponent(f.status) + "&q=" + encodeURIComponent(f.q) + "&limit=400"), sz = await api("/api/skladiste/restlovi/sazetak");
-      var rows = rs.restlovi.map(function (x) { return '<tr><td class="dst">' + dslika(x.ident) + '</td><td class="mono"><a href="/r/' + esc(x.oznaka) + '" target="_blank">' + esc(x.oznaka) + '</a></td><td>' + (x.ident ? esc(x.ident) + ' ' + esc(x.naziv_kratki || "") : '<span class="warn-t">' + esc(x.dekor_ulaz || "") + ' (za potvrdu)</span>') + '</td><td class="r num">' + mm(x.L) + ' × ' + mm(x.W) + (x.kom > 1 ? ' × ' + x.kom : "") + '</td><td class="r num">' + n(x.m2, 2) + '</td><td>' + esc(x.lokacija || "—") + '</td><td><span class="tag ' + (x.status === "slobodan" ? "ok" : x.status === "prijedlog" ? "warn" : x.status === "rezerviran" ? "abs" : "") + '">' + esc(x.status) + '</span></td><td class="note">' + esc(x.napomena || "") + '</td>' +
-        '<td class="r">' + (x.status === "prijedlog" || x.status === "provjeri" ? '<button class="btn sm pri" data-potvrdi-restl="' + x.id + '">Potvrdi</button> ' : "") + (x.status !== "potrosen" && x.status !== "otpisan" ? '<button class="btn sm" data-otpis="' + x.id + '">Otpiši</button>' : "") + '</td></tr>'; }).join("");
-      ljuska({ crumb: "<b>Skladište</b> · restlovi", rail: "sklad", cls: "c1", akcije: akcije + '<button class="tbtn" id="btnNoviRestl">+ Restl</button><a class="tbtn" href="/api/skladiste/restlovi/naljepnice.pdf?status=prijedlog" target="_blank">Naljepnice prijedloga</a>',
-        sadrzaj: '<div class="pane"><div class="hd"><div class="row">' + [["slobodan,rezerviran,provjeri,prijedlog", "Na stanju + prijedlozi"], ["slobodan", "Slobodni"], ["prijedlog", "Prijedlozi"], ["provjeri", "Provjeri"], ["potrosen,otpisan", "Potrošeni / otpisani"]].map(function (x) { return '<span class="chip' + (f.status === x[0] ? " on" : "") + '" data-st="' + x[0] + '">' + x[1] + '</span>'; }).join("") + '</div><span class="grow"></span><input id="q" placeholder="oznaka, dekor, lokacija…" value="' + esc(f.q) + '" style="width:240px"></div>' +
-          '<div class="bd tight"><table><thead><tr><th></th><th>Oznaka</th><th>Materijal</th><th class="r">Mjere</th><th class="r">m²</th><th>Lokacija</th><th>Status</th><th>Napomena</th><th></th></tr></thead><tbody>' + (rows || '<tr><td colspan="9" class="note">nema restlova</td></tr>') + '</tbody></table></div></div>',
-        foot: kpi(sz.ukupno, "restlova") + kpi(n(sz.m2_na_stanju, 0), "m² na stanju") + kpi(sz.dekora_za_potvrdu, "dekora za potvrdu") + kpi((sz.po_statusu || {}).prijedlog || 0, "prijedloga") + '<span class="grow"></span><span class="note">' + esc(sz.zadnji_uvoz || "") + '</span>' });
-      qa("[data-st]").forEach(function (c) { c.onclick = function () { f.status = c.dataset.st; render(); }; });
-      var t; q("#q").oninput = function () { clearTimeout(t); f.q = this.value; t = setTimeout(render, 250); };
-      qa("[data-potvrdi-restl]").forEach(function (b) { b.onclick = async function () { var lok = prompt("Lokacija (A001, SATOR B 2.1…)"); if (lok === null) return; await api("/api/skladiste/restlovi/" + b.dataset.potvrdiRestl + "/potvrdi", { body: { lokacija: lok || null } }); render(); }; });
-      qa("[data-otpis]").forEach(function (b) { b.onclick = async function () { var z = prompt("Razlog otpisa"); if (z === null) return; await api("/api/skladiste/restlovi/" + b.dataset.otpis + "/odbaci", { body: { razlog: z } }); render(); }; });
-      q("#btnNoviRestl").onclick = function () { var mat = null; dlg({ naslov: "Novi restl", tijelo: '<div class="field"><span class="lbl">Materijal</span><input placeholder="dekor, ident…"><div class="lista"></div></div><div id="odm" class="note">—</div><div class="grid3"><div class="field"><span class="lbl">L</span><input id="L"></div><div class="field"><span class="lbl">W</span><input id="W"></div><div class="field"><span class="lbl">Kom</span><input id="kom" value="1"></div></div><div class="grid2"><div class="field"><span class="lbl">Lokacija</span><input id="lok"></div><div class="field"><span class="lbl">Napomena</span><input id="nap"></div></div>',
-        gumbi: [{ txt: "Spremi", pri: true, on: async function (bg) { if (!mat) { toast("odaberi materijal", true); return false; } var rr = await api("/api/skladiste/restlovi", { body: { ident: mat.ident, L: +q("#L", bg).value, W: +q("#W", bg).value, kom: +q("#kom", bg).value || 1, lokacija: q("#lok", bg).value || null, napomena: q("#nap", bg).value || null } }); toast("Restl " + rr.oznaka); render(); } }],
-        nakon: function (bg) { H.pretragaLista(q(".field", bg), async function (s) { return (await api("/api/sifrarnik/materijali?q=" + encodeURIComponent(s) + "&limit=30")).materijali; }, function (x) { return '<span class="mono">' + esc(x.ident) + '</span> ' + esc(x.naziv); }, function (x) { mat = x; q("#odm", bg).innerHTML = "<b>" + esc(x.ident) + "</b> " + esc(x.naziv); }); } }); };
+    var pod = r.id === "izdavanje" ? "izdavanje" : "stanje";
+    var akcije = podizbor("skladiste", pod, [["stanje", "Stanje"], ["izdavanje", "Izdavanje"]]);
+    if (pod === "izdavanje") {
+      var izd = await api("/api/skladiste/izdavanje");
+      ljuska({ crumb: "<b>Skladište</b> · izdavanje", rail: "sklad", cls: "c1 puna skl", akcije: akcije,
+        sadrzaj: '<div class="post-omot"><section class="pane pk"><div class="hd"><b>Za izdavanje</b><span class="stat ' + (izd.length ? "warn" : "ok") + ' sm">' + izd.length + '</span><span class="note">restlovi i materijali kojih Winstore nema; ploče iz Winstorea idu same</span></div><div class="bd tight">' + izdavanjeRedovi(izd) + '</div></section></div>',
+        foot: kpi(izd.length, "stavki čeka izdavanje") });
+      qa("[data-izdaj]").forEach(function (b) { b.onclick = async function () { b.disabled = true; await api("/api/skladiste/izdaj", { body: { nm: +b.dataset.izdaj } }); toast("Izdano"); render(); }; });
       return;
     }
-    if (pod === "potvrde") {
+    var st = await api("/api/skladiste/stanje?q=" + encodeURIComponent(S.stanjeQ || "") + "&limit=300");
+    var rows = st.materijali.map(function (m) { return '<tr><td class="dst">' + dslika(m.ident) + '</td><td class="mono">' + esc(m.ident) + '</td><td>' + esc(m.naziv) + (m.debljina ? ' <span class="note">' + m.debljina + ' mm</span>' : "") + '</td><td>' + esc(m.ploce.lokacija || "—") + '</td><td class="r num">' + n(m.ploce.fizicko, 0) + '</td><td class="r num">' + n(m.ploce.rezervirano, 0) + '</td><td class="r num">' + n(m.ploce.naruceno, 0) + '</td><td class="r num"><b>' + n(m.ploce.raspolozivo, 0) + '</b></td><td class="r num">' + (m.ploce.drop || "") + '</td><td class="r num">' + (m.restlovi.kom ? m.restlovi.kom + ' / ' + n(m.restlovi.m2, 1) + ' m²' : "—") + '</td></tr>'; }).join("");
+    ljuska({ crumb: "<b>Skladište</b> · stanje", rail: "sklad", cls: "c1", akcije: akcije + '<input id="q" class="tbtn" placeholder="dekor, ident, Winstore kod…" value="' + esc(S.stanjeQ || "") + '" style="min-width:260px">',
+      sadrzaj: '<div class="pane"><div class="hd"><b>Ploče (Winstore) i restlovi (Hub) po materijalu</b><span class="note">trake su u Regal traki</span></div>' +
+        '<div class="bd tight"><table><thead><tr><th></th><th>Ident</th><th>Materijal</th><th>Winstore kod</th><th class="r">Fizičko</th><th class="r">Rezerv.</th><th class="r">Naručeno</th><th class="r">Raspol.</th><th class="r">Drop</th><th class="r">Restlovi</th></tr></thead><tbody>' + (rows || '<tr><td colspan="10" class="note">ništa</td></tr>') + '</tbody></table></div></div>',
+      foot: kpi(st.broj, "materijala sa stanjem") + kpi(st.materijali.reduce(function (a, m) { return a + (m.ploce.fizicko || 0); }, 0), "ploča u Winstoreu") + kpi(st.materijali.reduce(function (a, m) { return a + (m.restlovi.kom || 0); }, 0), "restlova") });
+    var t2; q("#q").oninput = function () { clearTimeout(t2); S.stanjeQ = this.value; t2 = setTimeout(render, 250); };
+  };
+
+  // ---------------------------------------------------------------- restlovi: popis, potvrda (skladištar), dekori za potvrdu
+  E.restlovi = async function (r) {
+    var pod = r.id || "popis";
+    if (["popis", "potvrda", "dekori"].indexOf(pod) < 0) pod = "popis";
+    var akcije = podizbor("restlovi", pod, [["popis", "Popis"], ["potvrda", "Za potvrdu"], ["dekori", "Dekori za potvrdu"]]);
+
+    if (pod === "potvrda") {
+      var pri = (await api("/api/skladiste/prijedlozi")).prijedlozi || [];
+      var priRedovi = pri.map(function (x) {
+        return '<div class="skl-red">' + dslika(x.ident) + '<div class="grow"><div class="naslov">' + mm(x.L) + ' × ' + mm(x.W) + ' <span class="note">' + n(x.m2, 2) + ' m²</span></div>' +
+          '<div class="note">' + esc(x.ident || "") + ' ' + esc(x.naziv_kratki || x.naziv || "") + (x.nalog ? ' · ' + esc(x.nalog) : "") + '</div>' +
+          (x.napomena ? '<div class="note">' + esc(x.napomena) + '</div>' : "") + '</div>' +
+          '<button class="btn pri lg" data-pot="' + x.id + '">Potvrdi</button><button class="btn lg" data-odb="' + x.id + '">Odbaci</button></div>';
+      }).join("") || '<div class="note" style="padding:12px 16px">Nema prijedloga koji čekaju.</div>';
+      ljuska({ crumb: "<b>Restlovi</b> · za potvrdu", rail: "restl", cls: "c1 puna skl",
+        akcije: akcije + '<button class="tbtn pri" id="btnNovi">+ Novi restl</button><a class="tbtn" href="/api/skladiste/restlovi/naljepnice.pdf?status=prijedlog" target="_blank">Naljepnice</a>',
+        sadrzaj: '<div class="post-omot"><div class="pane pk"><div class="bd"><div class="skener"><input id="skener" placeholder="Skeniraj QR ili upiši oznaku restla (R1364)" autocomplete="off"><button class="btn pri lg" id="btnTrazi">Otvori</button></div>' +
+          '<div class="note">QR s naljepnice otvara isti ekran; oznaku možeš i upisati.</div></div></div>' +
+          '<section class="pane pk"><div class="hd"><b>Restlovi koji čekaju potvrdu</b><span class="stat ' + (pri.length ? "warn" : "ok") + ' sm">' + pri.length + '</span><span class="note">izmjeri, zalijepi naljepnicu i potvrdi</span></div><div class="bd tight">' + priRedovi + '</div></section></div>',
+        foot: kpi(pri.length, "prijedloga čeka") });
+      var otvori = function () {
+        var v = (q("#skener").value || "").trim().toUpperCase().replace(/^.*\//, "").replace(/[^A-Z0-9]/g, "");
+        if (v) idi("#/restl/" + v);
+      };
+      q("#btnTrazi").onclick = otvori;
+      q("#skener").onkeydown = function (e) { if (e.key === "Enter") otvori(); };
+      q("#skener").focus();
+      q("#btnNovi").onclick = function () { noviRestlDlg(function (x) { idi("#/restl/" + x.oznaka); }); };
+      qa("[data-pot]").forEach(function (b) { b.onclick = function () { potvrdiDlg(b.dataset.pot); }; });
+      qa("[data-odb]").forEach(function (b) { b.onclick = async function () { var z = prompt("Zašto se ne čuva?"); if (z === null) return; await api("/api/skladiste/restlovi/" + b.dataset.odb + "/odbaci", { body: { razlog: z } }); render(); }; });
+      return;
+    }
+
+    if (pod === "dekori") {
       var zp = await api("/api/skladiste/restlovi?za_potvrdu=1&limit=500"), grupe = {};
       zp.restlovi.forEach(function (x) { var g = grupe[x.dekor_ulaz] || (grupe[x.dekor_ulaz] = { dekor: x.dekor_ulaz, n: 0, kandidati: x.kandidati || [], ident_ulaz: x.ident_ulaz }); g.n += 1; });
       var lst = Object.keys(grupe).map(function (k) { return grupe[k]; }).sort(function (a, b) { return b.n - a.n; });
-      ljuska({ crumb: "<b>Skladište</b> · dekori za potvrdu", rail: "sklad", cls: "c1", akcije: akcije,
+      ljuska({ crumb: "<b>Restlovi</b> · dekori za potvrdu", rail: "restl", cls: "c1", akcije: akcije,
         sadrzaj: '<div class="pane"><div class="hd"><b>Dekori iz evidencije restlova bez sigurnog identa</b><span class="note">potvrda vrijedi za sve restlove tog dekora i pamti se (alias)</span></div><div class="bd">' + (lst.map(function (g) {
-          return '<div class="upoz"><b>' + esc(g.dekor) + '</b> <span class="note">' + g.n + ' restl' + (g.n === 1 ? "" : "ova") + (g.ident_ulaz ? ' · Excel: ' + esc(g.ident_ulaz) : "") + '</span><div class="row" style="margin-top:6px">' + g.kandidati.slice(0, 4).map(function (k) { return '<button class="btn sm" data-dekor="' + esc(g.dekor) + '" data-ident="' + esc(k[0]) + '">' + esc(k[0]) + ' ' + esc((k[1] || "").slice(0, 36)) + '</button>'; }).join("") + '<button class="btn sm ghost" data-dekor="' + esc(g.dekor) + '" data-ident="">drugi…</button></div></div>'; }).join("") || '<div class="note">svi dekori su vezani</div>') + '</div></div>', foot: kpi(lst.length, "dekora za potvrdu") + kpi(zp.broj, "restlova") });
+          return '<div class="upoz"><b>' + esc(g.dekor) + '</b> <span class="note">' + g.n + ' restl' + (g.n === 1 ? "" : "ova") + (g.ident_ulaz ? ' · Excel: ' + esc(g.ident_ulaz) : "") + '</span><div class="row" style="margin-top:6px">' + g.kandidati.slice(0, 4).map(function (k) { return '<button class="btn sm" data-dekor="' + esc(g.dekor) + '" data-ident="' + esc(k[0]) + '">' + esc(k[0]) + ' ' + esc((k[1] || "").slice(0, 36)) + '</button>'; }).join("") + '<button class="btn sm ghost" data-dekor="' + esc(g.dekor) + '" data-ident="">drugi…</button></div></div>'; }).join("") || '<div class="note">svi dekori su vezani</div>') + '</div></div>',
+        foot: kpi(lst.length, "dekora za potvrdu") + kpi(zp.broj, "restlova") });
       qa("[data-dekor]").forEach(function (b) { b.onclick = function () {
         var dekor = b.dataset.dekor; async function upisi(ident) { var rr = await api("/api/skladiste/restlovi/potvrdi-dekor", { body: { dekor: dekor, ident: ident } }); toast(dekor + " → " + ident + " (" + rr.restlova + " restlova)"); render(); }
         if (b.dataset.ident) return upisi(b.dataset.ident);
         dlg({ naslov: "Materijal za „" + dekor + "“", tijelo: '<div class="field"><span class="lbl">Traži u šifrarniku</span><input><div class="lista"></div></div>', nakon: function (bg, zatvori) { H.pretragaLista(q(".field", bg), async function (s) { return (await api("/api/sifrarnik/materijali?q=" + encodeURIComponent(s) + "&limit=40")).materijali; }, function (x) { return '<span class="mono">' + esc(x.ident) + '</span> ' + esc(x.naziv); }, function (x) { zatvori(); upisi(x.ident); }); } }); }; });
       return;
     }
-    var st = await api("/api/skladiste/stanje?q=" + encodeURIComponent(S.stanjeQ || "") + "&limit=300");
-    var rows = st.materijali.map(function (m) { return '<tr><td class="dst">' + dslika(m.ident) + '</td><td class="mono">' + esc(m.ident) + '</td><td>' + esc(m.naziv) + (m.debljina ? ' <span class="note">' + m.debljina + ' mm</span>' : "") + '</td><td>' + esc(m.ploce.lokacija || "—") + '</td><td class="r num">' + n(m.ploce.fizicko, 0) + '</td><td class="r num">' + n(m.ploce.rezervirano, 0) + '</td><td class="r num">' + n(m.ploce.naruceno, 0) + '</td><td class="r num"><b>' + n(m.ploce.raspolozivo, 0) + '</b></td><td class="r num">' + (m.ploce.drop || "") + '</td><td class="r num">' + (m.restlovi.kom ? m.restlovi.kom + ' / ' + n(m.restlovi.m2, 1) + ' m²' : "—") + '</td></tr>'; }).join("");
-    ljuska({ crumb: "<b>Skladište</b> · stanje", rail: "sklad", cls: "c1", akcije: akcije,
-      sadrzaj: '<div class="pane"><div class="hd"><b>Ploče (Winstore) i restlovi (Hub) po materijalu</b><span class="note">trake su u Regal traki</span><span class="grow"></span><input id="q" placeholder="dekor, ident, Winstore kod…" value="' + esc(S.stanjeQ || "") + '" style="width:260px"></div>' +
-        '<div class="bd tight"><table><thead><tr><th></th><th>Ident</th><th>Materijal</th><th>Winstore kod</th><th class="r">Fizičko</th><th class="r">Rezerv.</th><th class="r">Naručeno</th><th class="r">Raspol.</th><th class="r">Drop</th><th class="r">Restlovi</th></tr></thead><tbody>' + (rows || '<tr><td colspan="10" class="note">ništa</td></tr>') + '</tbody></table></div></div>',
-      foot: kpi(st.broj, "materijala sa stanjem") + kpi(st.materijali.reduce(function (a, m) { return a + (m.ploce.fizicko || 0); }, 0), "ploča u Winstoreu") + kpi(st.materijali.reduce(function (a, m) { return a + (m.restlovi.kom || 0); }, 0), "restlova") });
-    var t2; q("#q").oninput = function () { clearTimeout(t2); S.stanjeQ = this.value; t2 = setTimeout(render, 250); };
+
+    var f = S.restlFilter || (S.restlFilter = { status: "slobodan,rezerviran,provjeri,prijedlog", q: "" });
+    var rs = await api("/api/skladiste/restlovi?status=" + encodeURIComponent(f.status) + "&q=" + encodeURIComponent(f.q) + "&limit=400"), sz = await api("/api/skladiste/restlovi/sazetak");
+    var rows = rs.restlovi.map(function (x) { return '<tr><td class="dst">' + dslika(x.ident) + '</td><td class="mono"><a href="/r/' + esc(x.oznaka) + '" target="_blank">' + esc(x.oznaka) + '</a></td><td>' + (x.ident ? esc(x.ident) + ' ' + esc(x.naziv_kratki || "") : '<span class="warn-t">' + esc(x.dekor_ulaz || "") + ' (za potvrdu)</span>') + '</td><td class="r num">' + mm(x.L) + ' × ' + mm(x.W) + (x.kom > 1 ? ' × ' + x.kom : "") + '</td><td class="r num">' + n(x.m2, 2) + '</td><td>' + esc(x.lokacija || "—") + '</td><td><span class="tag ' + (x.status === "slobodan" ? "ok" : x.status === "prijedlog" ? "warn" : x.status === "rezerviran" ? "abs" : "") + '">' + esc(x.status) + '</span></td><td class="note">' + esc(x.napomena || "") + '</td>' +
+      '<td class="r">' + (x.status === "prijedlog" || x.status === "provjeri" ? '<button class="btn sm pri" data-potvrdi-restl="' + x.id + '">Potvrdi</button> ' : "") + (x.status !== "potrosen" && x.status !== "otpisan" ? '<button class="btn sm" data-otpis="' + x.id + '">Otpiši</button>' : "") + '</td></tr>'; }).join("");
+    ljuska({ crumb: "<b>Restlovi</b> · popis", rail: "restl", cls: "c1",
+      akcije: akcije + '<input id="q" class="tbtn" placeholder="oznaka, dekor, lokacija…" value="' + esc(f.q) + '" style="min-width:230px"><button class="tbtn" id="btnNoviRestl">+ Restl</button><a class="tbtn" href="/api/skladiste/restlovi/naljepnice.pdf?status=prijedlog" target="_blank">Naljepnice prijedloga</a>',
+      sadrzaj: '<div class="pane"><div class="hd"><div class="row">' + [["slobodan,rezerviran,provjeri,prijedlog", "Na stanju + prijedlozi"], ["slobodan", "Slobodni"], ["prijedlog", "Prijedlozi"], ["provjeri", "Provjeri"], ["potrosen,otpisan", "Potrošeni / otpisani"]].map(function (x) { return '<span class="chip' + (f.status === x[0] ? " on" : "") + '" data-st="' + x[0] + '">' + x[1] + '</span>'; }).join("") + '</div></div>' +
+        '<div class="bd tight"><table><thead><tr><th></th><th>Oznaka</th><th>Materijal</th><th class="r">Mjere</th><th class="r">m²</th><th>Lokacija</th><th>Status</th><th>Napomena</th><th></th></tr></thead><tbody>' + (rows || '<tr><td colspan="9" class="note">nema restlova</td></tr>') + '</tbody></table></div></div>',
+      foot: kpi(sz.ukupno, "restlova") + kpi(n(sz.m2_na_stanju, 0), "m² na stanju") + kpi(sz.dekora_za_potvrdu, "dekora za potvrdu") + kpi((sz.po_statusu || {}).prijedlog || 0, "prijedloga") + '<span class="grow"></span><span class="note">' + esc(sz.zadnji_uvoz || "") + '</span>' });
+    qa("[data-st]").forEach(function (c) { c.onclick = function () { f.status = c.dataset.st; render(); }; });
+    var t; q("#q").oninput = function () { clearTimeout(t); f.q = this.value; t = setTimeout(render, 250); };
+    qa("[data-potvrdi-restl]").forEach(function (b) { b.onclick = function () { potvrdiDlg(b.dataset.potvrdiRestl); }; });
+    qa("[data-otpis]").forEach(function (b) { b.onclick = async function () { var z = prompt("Razlog otpisa"); if (z === null) return; await api("/api/skladiste/restlovi/" + b.dataset.otpis + "/odbaci", { body: { razlog: z } }); render(); }; });
+    q("#btnNoviRestl").onclick = function () { noviRestlDlg(); };
   };
 
   // ---------------------------------------------------------------- slike dekora: ekran ureda za potvrdu ponuđenih slika
@@ -504,38 +567,7 @@
       nakon: function (bg) { H.pretragaLista(q(".field", bg), async function (s) { return (await api("/api/sifrarnik/materijali?q=" + encodeURIComponent(s) + "&limit=30")).materijali; },
         function (x) { return '<span class="mono">' + esc(x.ident) + '</span> ' + esc(x.naziv); }, function (x) { mat = x; }); } });
   }
-  E.skladistar = async function () {
-    var izd = await api("/api/skladiste/izdavanje"), pri = (await api("/api/skladiste/prijedlozi")).prijedlozi || [];
-    var izdRedovi = izd.map(function (x) {
-      var sto = x.restlovi.length ? x.restlovi.map(function (r) { return '<b>' + esc(r.oznaka) + '</b> ' + mm(r.L) + ' × ' + mm(r.W) + (r.lokacija ? ' <span class="tag">' + esc(r.lokacija) + '</span>' : ""); }).join("<br>")
-        : '<b>' + n(x.kom, 0) + '</b> ploč' + (x.kom === 1 ? "a" : "e") + ' <span class="note">iz regala (nije u Winstoreu)</span>';
-      return '<div class="skl-red">' + dslika(x.ident) + '<div class="grow"><div class="naslov">' + esc(x.naziv || x.ident || "") + '</div><div class="note">' + esc(x.ident || "") + ' · nalog ' + esc(x.nalog) + ' · ' + H.statusNaziv(x.status) + '</div><div class="sto">' + sto + '</div></div>' +
-        '<button class="btn pri lg" data-izdaj="' + x.nalog_materijal_id + '">Izdano</button></div>';
-    }).join("") || '<div class="note" style="padding:12px 16px">Nema ničega za izdavanje.</div>';
-    var priRedovi = pri.map(function (x) {
-      return '<div class="skl-red"><div class="grow"><div class="naslov">' + mm(x.L) + ' × ' + mm(x.W) + ' <span class="note">' + n(x.m2, 2) + ' m²</span></div>' +
-        '<div class="note">' + esc(x.ident || "") + ' ' + esc(x.naziv_kratki || x.naziv || "") + (x.nalog ? ' · ' + esc(x.nalog) : "") + '</div>' +
-        (x.napomena ? '<div class="note">' + esc(x.napomena) + '</div>' : "") + '</div>' +
-        '<button class="btn pri lg" data-pot="' + x.id + '">Potvrdi</button><button class="btn lg" data-odb="' + x.id + '">Odbaci</button></div>';
-    }).join("") || '<div class="note" style="padding:12px 16px">Nema prijedloga koji čekaju.</div>';
-    ljuska({ crumb: "<b>Skladištar</b>", rail: "sklad", cls: "c1 puna skl",
-      akcije: '<a class="tbtn" href="#/skladiste/stanje">Stanje</a><a class="tbtn" href="#/skladiste/restlovi">Restlovi</a><a class="tbtn on" href="#/skladistar">Skladištar</a><span class="grow"></span><button class="tbtn pri" id="btnNovi">+ Novi restl</button>',
-      sadrzaj: '<div class="post-omot"><div class="pane pk"><div class="bd"><div class="skener"><input id="skener" placeholder="Skeniraj QR ili upiši oznaku restla (R1364)" autocomplete="off"><button class="btn pri lg" id="btnTrazi">Otvori</button></div>' +
-        '<div class="note">QR s naljepnice otvara isti ekran; oznaku možeš i upisati.</div></div></div>' +
-        '<section class="pane pk"><div class="hd"><b>Za izdavanje</b><span class="stat ' + (izd.length ? "warn" : "ok") + ' sm">' + izd.length + '</span><span class="grow"></span><span class="note">restlovi i materijali kojih Winstore nema</span></div><div class="bd tight">' + izdRedovi + '</div></section>' +
-        '<section class="pane pk"><div class="hd"><b>Restlovi koji čekaju potvrdu</b><span class="stat ' + (pri.length ? "warn" : "ok") + ' sm">' + pri.length + '</span><span class="grow"></span><a class="btn sm" href="/api/skladiste/restlovi/naljepnice.pdf?status=prijedlog" target="_blank">Naljepnice</a></div><div class="bd tight">' + priRedovi + '</div></section></div>' });
-    function otvori() {
-      var v = (q("#skener").value || "").trim().toUpperCase().replace(/^.*\//, "").replace(/[^A-Z0-9]/g, "");
-      if (v) idi("#/restl/" + v);
-    }
-    q("#btnTrazi").onclick = otvori;
-    q("#skener").onkeydown = function (e) { if (e.key === "Enter") otvori(); };
-    q("#skener").focus();
-    q("#btnNovi").onclick = function () { noviRestlDlg(function (r) { idi("#/restl/" + r.oznaka); }); };
-    qa("[data-izdaj]").forEach(function (b) { b.onclick = async function () { b.disabled = true; await api("/api/skladiste/izdaj", { body: { nm: +b.dataset.izdaj } }); toast("Izdano"); render(); }; });
-    qa("[data-pot]").forEach(function (b) { b.onclick = function () { potvrdiDlg(b.dataset.pot); }; });
-    qa("[data-odb]").forEach(function (b) { b.onclick = async function () { var z = prompt("Zašto se ne čuva?"); if (z === null) return; await api("/api/skladiste/restlovi/" + b.dataset.odb + "/odbaci", { body: { razlog: z } }); render(); }; });
-  };
+  E.skladistar = function () { idi("#/restlovi/potvrda"); };   // stara poveznica
   function potvrdiDlg(id, x) {
     x = x || {};
     dlg({ naslov: "Potvrdi restl" + (x.oznaka ? " " + x.oznaka : ""), tijelo: '<div class="grid3"><div class="field"><span class="lbl">Lokacija</span><input id="lok" value="' + esc(x.lokacija || "") + '" placeholder="A001, SATOR B 2.1…"></div>' +
@@ -549,7 +581,7 @@
   E.restl = async function (r) {
     var x = await api("/api/skladiste/restl/" + encodeURIComponent(r.id || "")).catch(function () { return null; });
     if (!x) {
-      ljuska({ crumb: "<b>Restl</b>", rail: "sklad", cls: "c1 puna skl", akcije: '<a class="tbtn" href="#/skladistar">← Skladištar</a>',
+      ljuska({ crumb: "<b>Restl</b>", rail: "restl", cls: "c1 puna skl", akcije: '<a class="tbtn" href="#/restlovi/potvrda">← Restlovi</a>',
         sadrzaj: '<div class="post-omot"><div class="sazetak crit"><span class="ik">!</span><div class="txt"><b>Nema restla ' + esc(r.id || "") + '</b> — provjeri oznaku na naljepnici.</div></div></div>' });
       return;
     }
@@ -557,8 +589,8 @@
     var st = STAT[x.status] || ["info", x.status];
     var zivi = x.status !== "potrosen" && x.status !== "otpisan";
     var red = function (k, v) { return '<div class="pf ro"><span class="opis"><span class="naz">' + k + '</span></span><div class="ctl"><span class="rov">' + v + '</span></div></div>'; };
-    ljuska({ crumb: '<b>Restl</b> · ' + esc(x.oznaka), rail: "sklad", cls: "c1 puna skl",
-      akcije: '<a class="tbtn" href="#/skladistar">← Skladištar</a><span class="grow"></span><a class="tbtn" href="/api/skladiste/restlovi/naljepnice.pdf?oznake=' + esc(x.oznaka) + '" target="_blank">Naljepnica</a>',
+    ljuska({ crumb: '<b>Restl</b> · ' + esc(x.oznaka), rail: "restl", cls: "c1 puna skl",
+      akcije: '<a class="tbtn" href="#/restlovi/potvrda">← Restlovi</a><a class="tbtn" href="/api/skladiste/restlovi/naljepnice.pdf?oznake=' + esc(x.oznaka) + '" target="_blank">Naljepnica</a>',
       sadrzaj: '<div class="post-omot"><section class="pane pk"><div class="hd"><b class="restl-oz">' + esc(x.oznaka) + '</b><span class="stat ' + st[0] + '">' + esc(st[1]) + '</span><span class="grow"></span>' +
         (x.provjeri ? '<span class="stat warn sm">dekor za potvrdu</span>' : "") + '</div><div class="bd">' +
         red("Materijal", dslika(x.ident, "uz-red") + (x.ident ? '<span class="mono">' + esc(x.ident) + '</span> ' : "") + esc(x.naziv_kratki || x.naziv || x.dekor_ulaz || "—")) +
@@ -576,7 +608,7 @@
       var z = prompt("Razlog otpisa (potrošen, uništen, nema ga…)");
       if (z === null) return;
       await api("/api/skladiste/restlovi/" + x.id + "/odbaci", { body: { razlog: z } });
-      toast("Otpisano"); idi("#/skladistar");
+      toast("Otpisano"); idi("#/restlovi/potvrda");
     };
   };
 
@@ -645,6 +677,7 @@
   E.postavke = async function () {
     var p0 = await api("/api/postavke/optimizacija"), m = await api("/api/mail/postavke").catch(function () { return {}; });
     var tv = await api("/api/postavke/tvrtka").catch(function () { return null; });
+    var ws = await api("/api/postavke/winstore").catch(function () { return null; });
     var p = {}; (Array.isArray(p0) ? p0 : Object.keys(p0).map(function (k) { return { kljuc: k, vrijednost: p0[k] }; })).forEach(function (x) { p[x.kljuc] = x.vrijednost; });
     var ja = (await H.ucitajJa()) || {}, admin = !ja.prijava_obavezna || (ja.korisnik && ja.korisnik.uloga === "admin");
     var korisnici = admin ? await api("/api/korisnici").catch(function () { return []; }) : (ja.korisnik ? [ja.korisnik] : []);
@@ -652,7 +685,7 @@
 
     // polje: [ključ, naziv, pomoć, vrsta, dodatno] — vrsta: broj (s jedinicom) | tekst | izbor | prekidac
     function polje(k, naziv, pomoc, vrsta, o, izvor) {
-      o = o || {}; var val = v(k, izvor), grupa = izvor === tv ? "t" : "o", ctl;
+      o = o || {}; var val = v(k, izvor), grupa = izvor === tv ? "t" : izvor === ws ? "w" : "o", ctl;
       var atr = ' data-k="' + k + '" data-g="' + grupa + '" id="pf-' + k + '"';
       if (vrsta === "izbor") {
         var opc = o.opcije.slice(); if (val && !opc.some(function (x) { return x[0] === val; })) opc.push([val, val]);
@@ -696,6 +729,25 @@
       polje("tvrtka_oib", "OIB", "11 znamenki", "tekst", { mono: true, ph: "00000000000" }, tv) + polje("tvrtka_iban", "IBAN", "", "tekst", { w: "l", mono: true, ph: "HR…" }, tv) +
       polje("tvrtka_tel", "Telefon", "", "tekst", {}, tv) + polje("tvrtka_mail", "E-mail", "", "tekst", { w: "l" }, tv) + polje("tvrtka_web", "Web", "", "tekst", {}, tv) + '</div>', "puna") : "";
 
+    var winstore = "";
+    if (ws) {
+      var star = ws.starost_min == null ? null : Math.round(ws.starost_min);
+      var stanjeOzn = ws.winstore_sql_ukljucen !== "1" ? '<span class="stat info sm">Isključeno</span>'
+        : star == null ? '<span class="stat warn sm"><i>!</i> Nikad preuzeto</span>'
+        : star > (+ws.winstore_sql_minuta || 30) ? '<span class="stat warn sm"><i>!</i> Staro ' + star + ' min</span>'
+        : '<span class="stat ok sm"><i>✓</i> Svježe</span>';
+      var lozRed = '<div class="pf" data-pf="winstore_sql_lozinka"><label class="opis" for="pf-winstore_sql_lozinka"><span class="naz">Lozinka</span>' +
+        '<span class="pom">' + (ws.winstore_sql_lozinka_upisana ? "upisana je; upiši novu samo ako se promijenila" : "nije upisana") + '</span><span class="gr" data-gr="winstore_sql_lozinka"></span></label>' +
+        '<div class="ctl"><input type="password" data-k="winstore_sql_lozinka" data-g="w" id="pf-winstore_sql_lozinka" class="w-m" value="" autocomplete="new-password" placeholder="' + (ws.winstore_sql_lozinka_upisana ? "••••••••" : "") + '"></div></div>';
+      winstore = karta("Winstore", stanjeOzn + '<button class="btn sm" id="btnWsProvjeri">Provjeri vezu</button><button class="btn sm" id="btnWsOsvjezi">Osvježi sada</button>',
+        polje("winstore_sql_ukljucen", "Čitaj stanje iz Winstorea", "kad je isključeno, vrijedi zadnji ručni uvoz XML-a", "prekidac", {}, ws) +
+        polje("winstore_sql_server", "Poslužitelj i instanca", "", "tekst", { w: "l", mono: true, ph: "192.168.5.212\\THMI" }, ws) +
+        polje("winstore_sql_baza", "Baza razmjene", "", "tekst", { w: "m", mono: true }, ws) +
+        polje("winstore_sql_korisnik", "Korisnik", "", "tekst", { mono: true }, ws) + lozRed +
+        polje("winstore_sql_minuta", "Osvježi kad je starije od", "ekran skladišta tada sam povuče novo stanje", "broj", { jed: "min" }, ws) +
+        '<div class="info-red"><span class="ik">i</span><span id="wsInfo">' + (ws.zadnje && ws.zadnje.kada ? 'Zadnje stanje: <b>' + esc(ws.zadnje.kada) + '</b> (' + esc(ws.zadnje.izvor || "") + '), ' + ws.ploca + ' ploča.' : "Stanje još nije preuzeto.") + ' Hub iz Winstorea samo čita.</span></div>', "puna");
+    }
+
     var loz0 = korisnici.some(function (k) { return k.ima_lozinku; });
     var korRed = korisnici.map(function (k) {
       var smije = admin || k.oznaka === S.korisnik;
@@ -713,7 +765,7 @@
 
     ljuska({ crumb: "<b>Postavke</b>", rail: "post", cls: "c1 puna post",
       sadrzaj: '<div class="post-omot"><div class="post-nasl"><h1>Postavke</h1><span>Optimizacija, obračun, izvoz i korisnici</span></div>' +
-        '<div class="pk-grid">' + obracun + pila + restl + mape + mail + tvrtka + '</div>' +
+        '<div class="pk-grid">' + obracun + pila + restl + mape + mail + winstore + tvrtka + '</div>' +
         '<div class="spremi-traka"><span class="stanje" id="spStanje"><span class="note">Nema nespremljenih promjena</span></span><span class="grow"></span><button class="btn" id="btnOdustani" disabled>Odustani</button><button class="btn pri" id="btnSpremi" disabled>Spremi postavke</button></div>' +
         kor + '</div>' });
 
@@ -724,6 +776,7 @@
       var k = el.dataset.k, x = vrijednost(el).trim();
       if (["kerf", "kerf_pile", "nadmjera_trake", "pila_min_komad_4"].indexOf(k) >= 0 && (x === "" || isNaN(+x.replace(",", ".")))) return "upiši broj";
       if (k === "pila_max_sirina_u_traci" && !/^\d+$/.test(x)) return "cijeli broj, 0 = bez ograničenja";
+      if (k === "winstore_sql_minuta" && !/^[1-9]\d*$/.test(x)) return "cijeli broj minuta, najmanje 1";
       if (k === "tvrtka_oib" && x && !/^\d{11}$/.test(x)) return "OIB ima 11 znamenki";
       return "";
     }
@@ -746,12 +799,14 @@
       osvjezi();
     };
     q("#btnSpremi").onclick = async function () {
-      var b = { o: {}, t: {} }, btn = this;
+      var b = { o: {}, t: {}, w: {} }, btn = this;
       qa("[data-k]").forEach(function (el) { var x = vrijednost(el); if (x !== pocetno[el.dataset.k]) b[el.dataset.g][el.dataset.k] = el.type === "checkbox" ? x : x.trim(); });
       btn.disabled = true; btn.textContent = "Spremam…";
       try {
         var novo = Object.keys(b.o).length ? await api("/api/postavke/optimizacija", { body: Object.assign({ tko: S.korisnik }, b.o) }) : null;
         var novoT = Object.keys(b.t).length ? await api("/api/postavke/tvrtka", { body: Object.assign({ tko: S.korisnik }, b.t) }) : null;
+        if (b.w.winstore_sql_lozinka === "") delete b.w.winstore_sql_lozinka;          // prazno = lozinka se ne mijenja
+        if (Object.keys(b.w).length) await api("/api/postavke/winstore", { body: Object.assign({ tko: S.korisnik }, b.w) });
         (novo || []).forEach(function (x) { var el = q('[data-k="' + x.kljuc + '"]'); if (el && el.type !== "checkbox") el.value = x.vrijednost == null ? "" : x.vrijednost; });
         if (novoT) Object.keys(novoT).forEach(function (k) { var el = q('[data-k="' + k + '"]'); if (el) el.value = novoT[k]; });
         qa("[data-k]").forEach(function (el) { pocetno[el.dataset.k] = vrijednost(el); });
@@ -759,6 +814,25 @@
       } catch (e) { btn.textContent = "Spremi postavke"; osvjezi(); q("#spStanje").innerHTML = '<span class="stat crit sm"><i>!</i> ' + esc(e.message || "spremanje nije uspjelo") + '</span>'; }
     };
     osvjezi();
+
+    if (q("#btnWsProvjeri")) q("#btnWsProvjeri").onclick = async function () {
+      var b = this; b.disabled = true; b.textContent = "Provjeravam…";
+      try {
+        var r = await api("/api/winstore/provjeri", { body: {} });
+        q("#wsInfo").innerHTML = r.ok ? '<b>Veza radi</b> — ' + r.stavki + ' stavki (' + r.ploca + ' ploča, ' + r.restlova + ' restlova). Hub iz Winstorea samo čita.'
+          : '<b class="crit-t">Veza ne radi</b> — ' + esc(r.poruka);
+        toast(r.ok ? "Veza radi" : r.poruka, !r.ok);
+      } catch (e) { toast(e.message || "provjera nije uspjela", true); }
+      b.disabled = false; b.textContent = "Provjeri vezu";
+    };
+    if (q("#btnWsOsvjezi")) q("#btnWsOsvjezi").onclick = async function () {
+      var b = this; b.disabled = true; b.textContent = "Preuzimam…";
+      try {
+        var r = await api("/api/winstore/osvjezi", { body: { tko: S.korisnik } });
+        toast(r.stavke + " stavki preuzeto");
+        render();
+      } catch (e) { toast(e.message || "preuzimanje nije uspjelo", true); b.disabled = false; b.textContent = "Osvježi sada"; }
+    };
 
     if (q("#btnKor")) q("#btnKor").onclick = function () { q("#korisnik").click(); };
     if (q("#btnOdjava")) q("#btnOdjava").onclick = function () { q("#korisnik").click(); };
