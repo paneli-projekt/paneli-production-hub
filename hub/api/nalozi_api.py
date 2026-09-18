@@ -34,6 +34,7 @@
     POST /api/nalog/{id}/materijal/{nm}/optimizacija {nacin, dubina, tko}  novi prijedlog;  POST /api/optimizacija/{oid}/potvrdi {tko}
     POST /api/nalog/{id}/optimizacija/pripremi {nm, tko}   zadani prijedlog (realno za pilu) + Hub rezerva kad štedi m² (D-91)
     GET  /api/optimizacija/{oid}/sheme.png?h=&list=   sličica slaganja (sve ploče / jedna) za ekran;  GET …/pregled  listovi + elementi (JSON)
+    GET  /api/postavke/tvrtka                  podaci tvrtke na dokumentima (naziv, adresa, OIB, IBAN, telefon, e-mail, web);  POST {kljuc: vrijednost}
     GET  /api/postavke/optimizacija            skrivene postavke (kerf, kerf_pile, nadmjera_trake, obracun_rezanja…, D-77); POST {kljuc: vrijednost}
     GET  /api/nalog/{id}/ispis/krojni.pdf      krojni nacrt PDF iz potvrđenog slaganja (D-76); ?materijal=nm (jedan) ?oid= (prijedlog) ?mapa= ; POST … {materijal, mapa, tko} napravi i zabilježi
     GET  /api/ponuda/{vid}                     verzija sa stavkama;  POST /api/ponuda/{vid}/eslog {mapa, broj}  POST /api/ponuda/{vid}/poslana {na, mail_tekst}
@@ -824,6 +825,39 @@ def postavke_optimizacija_upisi(p: dict):
             db.dnevnik(c, tko, "postavke", k, "promjena", str(v))
         c.commit()
         return _postavke_opt(c)
+
+
+# podaci tvrtke na dokumentima (ponuda PDF, narudžbenica, potpis u mailu) — ekran Postavke (Igor, 17. 9.)
+POSTAVKE_TVRTKA = ("tvrtka_naziv", "tvrtka_adresa", "tvrtka_oib", "tvrtka_iban", "tvrtka_tel", "tvrtka_mail", "tvrtka_web")
+
+
+@router.get("/api/postavke/tvrtka")
+def postavke_tvrtka():
+    from ..nalozi import ponuda_pdf as PP
+    zad = dict(tvrtka_naziv=PP.TVRTKA["naziv"], tvrtka_adresa=PP.TVRTKA["adresa"], tvrtka_mail=PP.TVRTKA["mail"], tvrtka_web=PP.TVRTKA["web"])
+    with _ctx["brava"]:
+        c = _c()
+        return {k: db.postavka(c, k, zad.get(k, "")) or "" for k in POSTAVKE_TVRTKA}
+
+
+@router.post("/api/postavke/tvrtka")
+def postavke_tvrtka_upisi(p: dict):
+    """{tvrtka_…: vrijednost} — samo ključevi iz POSTAVKE_TVRTKA; OIB 11 znamenki kad je upisan."""
+    with _brava():
+        c = _c()
+        tko = p.pop("tko", "web")
+        for k, v in p.items():
+            if k not in POSTAVKE_TVRTKA:
+                raise HTTPException(400, "nepoznata postavka %s" % k)
+            v = ("" if v is None else str(v)).strip()
+            if k == "tvrtka_oib" and v and not re.fullmatch(r"\d{11}", v):
+                raise HTTPException(400, "OIB mora imati 11 znamenki")
+            if k == "tvrtka_iban":
+                v = re.sub(r"\s+", "", v).upper()
+            db.postavi(c, k, v, "podaci tvrtke na dokumentima")
+            db.dnevnik(c, tko, "postavke", k, "promjena", v)
+        c.commit()
+    return postavke_tvrtka()
 
 
 @router.get("/api/ponuda/{vid}")
